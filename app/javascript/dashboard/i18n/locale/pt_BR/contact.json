@@ -79,7 +79,7 @@
     "BUTTON_LABEL": "Exportar",
     "TITLE": "Exportar contatos",
     "DESC": "Exportar contatos para arquivo CSV.",
-    "SUCCESS_MESSAGE": "Export is in progress, You will be notified via email when export file is ready to dowanlod.",
+    "SUCCESS_MESSAGE": "A exportação está em andamento. Você será notificado por e-mail quando o arquivo de exportação estiver pronto para download.",
     "ERROR_MESSAGE": "Ocorreu um erro, por favor tente novamente",
     "CONFIRM": {
       "TITLE": "Exportar contatos",
