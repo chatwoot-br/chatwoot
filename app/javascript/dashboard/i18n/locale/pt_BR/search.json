@@ -10,7 +10,7 @@
     "SECTION": {
       "CONTACTS": "Contatos",
       "CONVERSATIONS": "Conversas",
-      "MESSAGES": "Messagem",
+      "MESSAGES": "Mensagens",
       "ARTICLES": "Artigos"
     },
     "VIEW_MORE": "Ver mais",
@@ -22,7 +22,7 @@
     "PLACEHOLDER_KEYBINDING": "/ para focar",
     "INPUT_PLACEHOLDER": "Digite 3 ou mais caracteres para pesquisar",
     "EMPTY_STATE_DEFAULT": "Procurar por ID de conversa, e-mail, número de telefone, mensagens para melhores resultados de busca.",
-    "BOT_LABEL": "Robôs",
+    "BOT_LABEL": "Bot",
     "READ_MORE": "Saiba mais",
     "WROTE": "escreveu:",
     "FROM": "de",
