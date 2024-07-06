@@ -16,12 +16,16 @@
           <option value="twilio">
             {{ $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO') }}
           </option>
+          <option value="evolution">
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION') }}
+          </option>
         </select>
       </label>
     </div>
 
     <twilio v-if="provider === 'twilio'" type="whatsapp" />
     <three-sixty-dialog-whatsapp v-else-if="provider === '360dialog'" />
+    <evolution v-else-if="provider === 'evolution'" />
     <cloud-whatsapp v-else />
   </div>
 </template>
@@ -31,6 +35,7 @@ import PageHeader from '../../SettingsSubPageHeader.vue';
 import Twilio from './Twilio.vue';
 import ThreeSixtyDialogWhatsapp from './360DialogWhatsapp.vue';
 import CloudWhatsapp from './CloudWhatsapp.vue';
+import Evolution from './Evolution.vue';
 
 export default {
   components: {
@@ -38,6 +43,7 @@ export default {
     Twilio,
     ThreeSixtyDialogWhatsapp,
     CloudWhatsapp,
+    Evolution,
   },
   data() {
     return {
