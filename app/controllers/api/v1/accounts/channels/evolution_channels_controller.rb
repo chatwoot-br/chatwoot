@@ -1,5 +1,7 @@
 class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accounts::BaseController
   include Api::V1::InboxesHelper
+  before_action :authorize_request
+  before_action :set_user
 
   def create
     ActiveRecord::Base.transaction do
@@ -12,22 +14,38 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
           permitted_params.except(:channel)
         )
       )
+
+      params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type)
+      Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], params[:webhook_url],
+                                           params[:api_key], @user.access_token.token)
       @inbox.save!
     end
+
+    render json: @inbox, status: :created
+  rescue StandardError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   private
 
+  def authorize_request
+    authorize ::Inbox
+  end
+
+  def set_user
+    @user = current_user
+  end
+
   def create_channel
     return unless %w[api whatsapp].include?(permitted_params[:channel][:type])
 
-    account_channels_method.create!(permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type))
+    params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type, :api_key)
+    params[:webhook_url] = "#{params[:webhook_url]}/chatwoot/webhook/#{permitted_params[:name]}"
+    account_channels_method.create!(params)
   end
 
   def inbox_attributes
-    [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
-     :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
-     :lock_to_single_conversation, :portal_id, :sender_name_type, :business_name]
+    [:name]
   end
 
   def permitted_params(channel_attributes = [])
@@ -36,7 +54,7 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
 
     params.permit(
       *inbox_attributes,
-      channel: [:type, *channel_attributes]
+      channel: [:type, :api_key, *channel_attributes]
     )
   end
 
