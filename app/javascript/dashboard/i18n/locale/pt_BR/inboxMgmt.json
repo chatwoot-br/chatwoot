@@ -214,7 +214,8 @@
           "LABEL": "Provedor de API",
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "Cloud do WhatsApp",
-          "360_DIALOG": "360Dialog"
+          "360_DIALOG": "360Dialog",
+          "EVOLUTION": "Evolution API"
         },
         "INBOX_NAME": {
           "LABEL": "Nome da Caixa de Entrada",
@@ -272,6 +273,23 @@
           "PLACEHOLDER": "URL do Webhook"
         },
         "SUBMIT_BUTTON": "Criar canal de API",
+        "API": {
+          "ERROR_MESSAGE": "Não foi possível salvar o canal de API"
+        }
+      },
+      "EVOLUTION": {
+        "WEBHOOK_URL": {
+          "LABEL": "URL do Webhook",
+          "SUBTITLE": "Configure a URL onde você deseja receber retornos de chamada em eventos.",
+          "PLACEHOLDER": "URL do Webhook",
+          "ERROR": "Por favor, insira um valor válido."
+        },
+        "API_KEY": {
+          "LABEL": "Chave da API",
+          "SUBTITLE": "Configure a chave API da Evolution.",
+          "PLACEHOLDER": "Chave da API",
+          "ERROR": "Por favor, insira um valor válido."
+        },
         "API": {
           "ERROR_MESSAGE": "Não foi possível salvar o canal de API"
         }

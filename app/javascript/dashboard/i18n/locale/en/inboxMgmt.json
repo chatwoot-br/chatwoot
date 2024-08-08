@@ -224,7 +224,8 @@
           "LABEL": "API Provider",
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
-          "360_DIALOG": "360Dialog"
+          "360_DIALOG": "360Dialog",
+          "EVOLUTION": "Evolution API"
         },
         "INBOX_NAME": {
           "LABEL": "Inbox Name",
@@ -282,6 +283,23 @@
           "PLACEHOLDER": "Webhook URL"
         },
         "SUBMIT_BUTTON": "Create API Channel",
+        "API": {
+          "ERROR_MESSAGE": "We were not able to save the api channel"
+        }
+      },
+      "EVOLUTION": {
+        "WEBHOOK_URL": {
+          "LABEL": "Evolution API URL",
+          "SUBTITLE": "Configure the URL where you want to receive callbacks on events.",
+          "PLACEHOLDER": "https://evolution.startup.chatwoot.app.br",
+          "ERROR": "Please enter a valid value."
+        },
+        "API_KEY": {
+          "LABEL": "API key",
+          "SUBTITLE": "Configure the Evolution API key.",
+          "PLACEHOLDER": "API key",
+          "ERROR": "Please enter a valid value."
+        },
         "API": {
           "ERROR_MESSAGE": "We were not able to save the api channel"
         }
