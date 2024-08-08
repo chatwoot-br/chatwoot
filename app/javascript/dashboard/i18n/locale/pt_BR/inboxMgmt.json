@@ -221,10 +221,15 @@
         "TITLE": "Canal do WhatsApp",
         "DESC": "Comece a oferecer suporte a seus clientes pelo WhatsApp.",
         "PROVIDERS": {
-          "LABEL": "Provedor de API",
+          "LABEL": "API Provider",
+          "WHATSAPP_EMBEDDED": "WhatsApp Business",
           "TWILIO": "Twilio",
-          "WHATSAPP_CLOUD": "Cloud do WhatsApp",
-          "360_DIALOG": "360Dialog"
+          "WHATSAPP_CLOUD": "WhatsApp Cloud",
+          "WHATSAPP_CLOUD_DESC": "Quick setup through Meta",
+          "TWILIO_DESC": "Connect via Twilio credentials",
+          "360_DIALOG": "360Dialog",
+          "EVOLUTION": "Evolution API",
+          "EVOLUTION_DESC": "Connect via Evolution API"
         },
         "INBOX_NAME": {
           "LABEL": "Nome da Caixa de Entrada",
@@ -322,6 +327,23 @@
           "PLACEHOLDER": "URL do Webhook"
         },
         "SUBMIT_BUTTON": "Criar canal de API",
+        "API": {
+          "ERROR_MESSAGE": "Não foi possível salvar o canal de API"
+        }
+      },
+      "EVOLUTION": {
+        "WEBHOOK_URL": {
+          "LABEL": "URL do Webhook",
+          "SUBTITLE": "Configure a URL onde você deseja receber retornos de chamada em eventos.",
+          "PLACEHOLDER": "URL do Webhook",
+          "ERROR": "Por favor, insira um valor válido."
+        },
+        "API_KEY": {
+          "LABEL": "Chave da API",
+          "SUBTITLE": "Configure a chave API da Evolution.",
+          "PLACEHOLDER": "Chave da API",
+          "ERROR": "Por favor, insira um valor válido."
+        },
         "API": {
           "ERROR_MESSAGE": "Não foi possível salvar o canal de API"
         }
