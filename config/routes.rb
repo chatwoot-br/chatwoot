@@ -101,6 +101,7 @@ Rails.application.routes.draw do
           resources :dashboard_apps, only: [:index, :show, :create, :update, :destroy]
           namespace :channels do
             resource :twilio_channel, only: [:create]
+            resource :evolution_channel, only: [:create]
           end
           resources :conversations, only: [:index, :create, :show, :update, :destroy] do
             collection do
