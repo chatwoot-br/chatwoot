@@ -19,6 +19,8 @@
       />
     </div>
     <div class="flex flex-col items-center justify-end pb-6">
+      <webphone-minimized />
+
       <primary-nav-item
         v-if="!isACustomBrandedInstance"
         icon="book-open-globe"
@@ -47,6 +49,7 @@ import NotificationBell from './NotificationBell.vue';
 import wootConstants from 'dashboard/constants/globals';
 import { frontendURL } from 'dashboard/helper/URLHelper';
 import { ACCOUNT_EVENTS } from '../../../helper/AnalyticsHelper/events';
+import WebphoneMinimized from './WebphoneMinimized.vue';
 
 export default {
   components: {
@@ -55,6 +58,7 @@ export default {
     OptionsMenu,
     AgentDetails,
     NotificationBell,
+    WebphoneMinimized,
   },
   props: {
     isACustomBrandedInstance: {

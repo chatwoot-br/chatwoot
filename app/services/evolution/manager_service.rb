@@ -35,7 +35,8 @@ class Evolution::ManagerService
       Rails.logger.info("HTTP Request Successful: #{response}")
     else
       Rails.logger.error response.body
-      nil
     end
+
+    response
   end
 end

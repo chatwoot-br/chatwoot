@@ -6,6 +6,7 @@
     :class="{ 'app-rtl--wrapper': isRTLView }"
     :dir="isRTLView ? 'rtl' : 'ltr'"
   >
+    <webphone />
     <update-banner :latest-chatwoot-version="latestChatwootVersion" />
     <template v-if="currentAccountId">
       <pending-email-verification-banner v-if="hideOnOnboardingView" />
@@ -45,6 +46,7 @@ import {
   verifyServiceWorkerExistence,
 } from './helper/pushHelper';
 import ReconnectService from 'dashboard/helper/ReconnectService';
+import Webphone from './components/layout/webphoneComponents/Webphone.vue';
 
 export default {
   name: 'App',
@@ -58,6 +60,7 @@ export default {
     WootSnackbarBox,
     UpgradeBanner,
     PendingEmailVerificationBanner,
+    Webphone,
   },
 
   mixins: [rtlMixin],

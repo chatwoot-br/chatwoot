@@ -16,8 +16,10 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
       )
 
       params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type)
-      Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], params[:webhook_url],
-                                           params[:api_key], @user.access_token.token)
+      response = Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], params[:webhook_url],
+                                                      params[:api_key], @user.access_token.token)
+
+      @inbox.external_token = response['instance']['instanceId']
       @inbox.save!
     end
 
