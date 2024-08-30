@@ -4,26 +4,29 @@ class Evolution::ManagerService
   end
 
   def create(account_id, name, webhook_url, api_key, access_token)
+    frontend_url = ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
+    internal_api_url = ENV.fetch('INTERNAL_API_URL', nil) || frontend_url
     response = HTTParty.post(
       "#{webhook_url}/instance/create",
       headers: api_headers(api_key),
       body: {
         instanceName: name,
-        token: SecureRandom.uuid,
         qrcode: true,
-        # number: phone_number,
-        auto_create: false,
-        chatwoot_name_inbox: name,
-        chatwoot_account_id: account_id,
-        chatwoot_token: access_token,
-        chatwoot_url: ENV.fetch('FRONTEND_URL', 'http://localhost:3000'),
-        chatwoot_sign_msg: true,
-        chatwoot_reopen_conversation: true,
-        chatwoot_conversation_pending: false,
-        chatwoot_import_messages: false,
-        chatwoot_import_contacts: false,
-        chatwoot_merge_brazil_contacts: true,
-        chatwoot_days_limit_import_messages: 0
+        integration: 'WHATSAPP-BAILEYS',
+        groupsIgnore: true,
+        chatwootAccountId: account_id.to_s,
+        chatwootToken: access_token,
+        chatwootUrl: internal_api_url,
+        chatwootSignMsg: true,
+        chatwootReopenConversation: true,
+        chatwootConversationPending: false,
+        chatwootImportContacts: false,
+        chatwootNameInbox: name,
+        chatwootMergeBrazilContacts: true,
+        chatwootImportMessages: false,
+        chatwootDaysLimitImportMessages: 0,
+        chatwootOrganization: 'WhatsApp Bot',
+        chatwootLogo: "#{frontend_url}/assets/images/dashboard/channels/whatsapp.png"
       }.to_json
     )
 
