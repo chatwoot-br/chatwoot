@@ -4,8 +4,14 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
   before_action :set_user
 
   def create
+    params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type)
+    evolution_api_url = ENV.fetch('EVOLUTION_API_URL', params[:webhook_url])
+    evolution_api_key = ENV.fetch('EVOLUTION_API_KEY', params[:api_key])
+
+    return render json: { error: 'Evolution API URL is missing' }, status: :unprocessable_entity if evolution_api_url.nil?
+
     ActiveRecord::Base.transaction do
-      channel = create_channel
+      channel = create_channel(evolution_api_url)
       @inbox = Current.account.inboxes.build(
         {
           name: inbox_name(channel),
@@ -15,9 +21,8 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
         )
       )
 
-      params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type)
-      Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], params[:webhook_url],
-                                           params[:api_key], @user.access_token.token)
+      Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], evolution_api_url,
+                                           evolution_api_key, @user.access_token.token)
       @inbox.save!
     end
 
@@ -36,11 +41,11 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
     @user = current_user
   end
 
-  def create_channel
+  def create_channel(webhook_url)
     return unless %w[api whatsapp].include?(permitted_params[:channel][:type])
 
     params = permitted_params(channel_type_from_params::EDITABLE_ATTRS)[:channel].except(:type, :api_key)
-    params[:webhook_url] = "#{params[:webhook_url]}/chatwoot/webhook/#{permitted_params[:name]}"
+    params[:webhook_url] = "#{webhook_url}/chatwoot/webhook/#{permitted_params[:name]}"
     account_channels_method.create!(params)
   end
 
