@@ -9,7 +9,7 @@ services:
     volumes:
       - postgres:/data/postgres
     environment:
-      - POSTGRES_DB=chatwoot
+      - POSTGRES_DB=chatwoot_dev
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=P@ssw0rd
 
