@@ -176,6 +176,9 @@ importers:
       vue-dompurify-html:
         specifier: ^5.1.0
         version: 5.1.0(vue@3.5.8(typescript@5.6.2))
+      vue-dragscroll:
+        specifier: ^4.0.6
+        version: 4.0.6(typescript@5.6.2)
       vue-i18n:
         specifier: 9.14.0
         version: 9.14.0(vue@3.5.8(typescript@5.6.2))
@@ -4722,6 +4725,9 @@ packages:
     resolution: {integrity: sha512-616o2/PBdOLM2bwlRWLdzeEC9NerLkwiudqNgaIJ5vBQWXec+u7Kuzh+45DtQQrids67s4pHnTnJZLVfyPMxbA==}
     peerDependencies:
       vue: ^3.0.0
+
+  vue-dragscroll@4.0.6:
+    resolution: {integrity: sha512-zW1k58p41yhmFhmg/JxfesUM4Srl0JfXg7xSINqffVGpHJKvnEHMK4QgF6mUVkPMTgibn976fhPYkomcXPvvFA==}
 
   vue-eslint-parser@9.4.3:
     resolution: {integrity: sha512-2rYRLWlIpaiN8xbPiDyXZXRgLGOtWxERV7ND5fFAv5qo1D2N9Fu9MNajBNc6o13lZ+24DAWCkQCvj4klgmcITg==}
@@ -9971,6 +9977,12 @@ snapshots:
     dependencies:
       dompurify: 3.1.6
       vue: 3.5.8(typescript@5.6.2)
+
+  vue-dragscroll@4.0.6(typescript@5.6.2):
+    dependencies:
+      vue: 3.5.8(typescript@5.6.2)
+    transitivePeerDependencies:
+      - typescript
 
   vue-eslint-parser@9.4.3(eslint@8.57.0):
     dependencies:

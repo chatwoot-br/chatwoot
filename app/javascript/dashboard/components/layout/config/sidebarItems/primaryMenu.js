@@ -18,6 +18,14 @@ const primaryMenuItems = accountId => [
     toStateName: 'home',
   },
   {
+    icon: 'kanban',
+    key: 'kanban',
+    label: 'KANBAN',
+    featureFlag: FEATURE_FLAGS.KANBAN,
+    toState: frontendURL(`accounts/${accountId}/kanban`),
+    toStateName: 'kanban_dashboard',
+  },
+  {
     icon: 'captain',
     key: 'captain',
     label: 'CAPTAIN',

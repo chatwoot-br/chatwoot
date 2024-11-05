@@ -92,3 +92,6 @@
 - name: custom_roles
   enabled: false
   premium: true
+- name: kanban
+  enabled: true
+  premium: false
