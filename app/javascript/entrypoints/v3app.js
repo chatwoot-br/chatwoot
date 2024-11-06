@@ -1,5 +1,6 @@
 import { createApp } from 'vue';
 import { createI18n } from 'vue-i18n';
+import VueDragscroll from "vue-dragscroll";
 
 import i18nMessages from 'dashboard/i18n';
 import * as Sentry from '@sentry/vue';
@@ -25,6 +26,7 @@ const i18n = createI18n({
 
 const app = createApp(App);
 app.use(i18n);
+app.use(VueDragscroll);
 app.use(store);
 app.use(router);
 

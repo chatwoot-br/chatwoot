@@ -1,27 +1,36 @@
 <template>
   <article
-    class="group flex flex-col bg-white dark:bg-dark-grey p-4 rounded-lg cursor-pointer shadow-task max-w-[280px]">
-    <h3 class="text-black dark:text-white font-bold select-none pointer-events-none"
-      :class="managerStore.dragging ? '' : 'group-hover:text-main-purple'">
-      {{ task.title }}
+    class="group flex flex-col bg-white dark:bg-dark-grey p-4 rounded-lg cursor-pointer max-w-[280px]"
+  >
+    <h3
+      class="font-bold select-none pointer-events-none"
+      :class="managerStore.dragging ? '' : 'group-hover:text-main-purple'"
+    >
+      {{ contact.name }}
     </h3>
-    <p class="text-xs text-medium-grey font-bold select-none pointer-events-none">{{ subtasksCompleted }} substasks</p>
+    <p
+      class="text-xs text-medium-grey font-bold select-none pointer-events-none"
+    >
+      {{ contact.email }}
+    </p>
   </article>
 </template>
 
 <script setup>
 import { computed } from 'vue';
-const managerStore = {}
+const managerStore = {};
 const props = defineProps({
-  task: {
+  contact: {
     type: Object,
-    required: true
-  }
-})
+    required: true,
+  },
+});
 
-const subtasksCompleted = computed(() => {
-  const completed = props.task.subtasks.filter((sub) => sub.isCompleted).length;
-  const total = props.task.subtasks.length;
-  return `${completed} of ${total}`
-})
+const subcontactsCompleted = computed(() => {
+  const completed = props.contact.subcontacts?.filter(
+    sub => sub.isCompleted
+  )?.length;
+  const total = props.contact.subcontacts?.length;
+  return `${completed} of ${total}`;
+});
 </script>
