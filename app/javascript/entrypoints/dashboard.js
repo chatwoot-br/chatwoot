@@ -1,6 +1,7 @@
 import { createApp } from 'vue';
 import { createI18n } from 'vue-i18n';
-import VueDragscroll from "vue-dragscroll";
+import VueDragscroll from 'vue-dragscroll';
+import { createPinia } from 'pinia';
 
 import axios from 'axios';
 // Global Components
@@ -47,7 +48,10 @@ sync(store, router);
 
 const app = createApp(App);
 app.use(i18n);
+
 app.use(VueDragscroll);
+app.use(createPinia());
+
 app.use(store);
 app.use(router);
 

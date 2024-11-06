@@ -23,6 +23,8 @@ import ruby from 'vite-plugin-ruby';
 import path from 'path';
 import vue from '@vitejs/plugin-vue';
 
+import { fileURLToPath, URL } from 'node:url'
+
 const isLibraryMode = process.env.BUILD_MODE === 'library';
 const isTestMode = process.env.TEST === 'true';
 
@@ -82,6 +84,7 @@ export default defineConfig({
       survey: path.resolve('./app/javascript/survey'),
       widget: path.resolve('./app/javascript/widget'),
       assets: path.resolve('./app/javascript/dashboard/assets'),
+      '@': fileURLToPath(new URL('./app/javascript/dashboard/routes/dashboard/kanban', import.meta.url)),
     },
   },
   test: {

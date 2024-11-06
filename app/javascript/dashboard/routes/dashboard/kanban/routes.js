@@ -1,6 +1,6 @@
 /* eslint arrow-body-style: 0 */
 import { frontendURL } from '../../../helper/URLHelper';
-const KanbanView = () => import('./components/KanbanView.vue');
+const KanbanView = () => import('./KanbanView.vue');
 
 export const routes = [
   {
