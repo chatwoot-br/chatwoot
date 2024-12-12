@@ -1,0 +1,76 @@
+# Notes
+
+## Getting started
+
+```bash
+cp .env.dev .env
+make setup
+docker compose -f docker-compose.dev.yaml up
+make db
+
+make run
+# npx vite dev
+
+# chuting down
+docker compose -f docker-compose.dev.yaml down --volumes
+```
+
+Go to http://localhost:3000
+
+```
+john@acme.inc
+P@ssw0rd
+```
+
+### Installing PNPM
+
+```bash
+corepack enable
+corepack prepare pnpm@latest --activate
+```
+
+## Rebase with upstream
+
+```bash
+git fetch --all --prune
+git checkout next
+
+git checkout -B release/v3.14.1
+git push --set-upstream origin release/v3.14.1
+
+git checkout next
+git rebase upstream/master --autostash
+```
+
+## Build
+
+```sh
+git clean -fdx
+git reset --hard
+
+rm -rf enterprise
+rm -rf spec/enterprise
+echo -en '\nENV CW_EDITION="ce"' >> docker/Dockerfile
+
+# docker buildx use crossplatform-builder
+# v3.11.0-4 commits ahead
+docker buildx build --load --platform linux/arm64 -f docker/Dockerfile .
+docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
+
+# git rev-list --count upstream..HEAD
+docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -t ghcr.io/chatwoot-br/chatwoot:v3.13.0 -f docker/Dockerfile --push .
+
+docker buildx imagetools create --tag ghcr.io/chatwoot-br/chatwoot:latest --tag ghcr.io/chatwoot-br/chatwoot:v3.15.0 ghcr.io/chatwoot-br/chatwoot:next
+docker push ghcr.io/chatwoot-br/chatwoot:latest
+docker push ghcr.io/chatwoot-br/chatwoot:v3.15.0
+
+# docker buildx build --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:latest -f docker/Dockerfile --push .
+# docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:wavoip -f docker/Dockerfile --push .
+```
+
+## Keep tracking
+
+Comparing changes between 3.x and master branches:
+
+     https://github.com/chatwoot/chatwoot/compare/master...3.x
