@@ -6,6 +6,7 @@ class CustomMarkdownRenderer < CommonMarker::HtmlRenderer
   VIMEO_REGEX = %r{https?://(?:www\.)?vimeo\.com/(\d+)}
   MP4_REGEX = %r{https?://(?:www\.)?.+\.(mp4)}
   ARCADE_REGEX = %r{https?://(?:www\.)?app\.arcade\.software/share/([^&/]+)}
+  CLOUDFLARE_REGEX = %r{https?://.*?\.cloudflarestream\.com/.*}
 
   def text(node)
     content = node.string_content
@@ -50,7 +51,8 @@ class CustomMarkdownRenderer < CommonMarker::HtmlRenderer
       VIMEO_REGEX => :make_vimeo_embed,
       MP4_REGEX => :make_video_embed,
       LOOM_REGEX => :make_loom_embed,
-      ARCADE_REGEX => :make_arcade_embed
+      ARCADE_REGEX => :make_arcade_embed,
+      CLOUDFLARE_REGEX => :make_cloudflare_embed
     }
 
     embedding_methods.each do |regex, method|
@@ -111,6 +113,19 @@ class CustomMarkdownRenderer < CommonMarker::HtmlRenderer
         allowfullscreen
         style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
        </div>
+    )
+  end
+
+  def make_cloudflare_embed(link_url)
+    %(
+      <div style="position: relative; padding-top: 56.25%;">
+       <iframe
+        src="#{link_url}"
+        loading="lazy"
+        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+        allowfullscreen
+        style="border: none; position: absolute; top: 0; left: 0; height: 100%; width: 100%;"></iframe>
+      </div>
     )
   end
 
