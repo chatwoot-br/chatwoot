@@ -34,9 +34,10 @@ corepack prepare pnpm@latest --activate
 ```bash
 git fetch --all --prune
 git checkout next
+git rebase upstream/master --autostash
 
-git checkout -B release/v3.14.1
-git push --set-upstream origin release/v3.14.1
+git checkout -B release/v3.16.0
+git push --no-verify --set-upstream origin release/v3.16.0
 
 git checkout next
 git rebase upstream/master --autostash
@@ -61,9 +62,9 @@ docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -t ghcr.io/chatwoot-br/chatwoot:v3.13.0 -f docker/Dockerfile --push .
 
-docker buildx imagetools create --tag ghcr.io/chatwoot-br/chatwoot:latest --tag ghcr.io/chatwoot-br/chatwoot:v3.15.0 ghcr.io/chatwoot-br/chatwoot:next
+docker buildx imagetools create --tag ghcr.io/chatwoot-br/chatwoot:latest --tag ghcr.io/chatwoot-br/chatwoot:v3.16.0 ghcr.io/chatwoot-br/chatwoot:next
 docker push ghcr.io/chatwoot-br/chatwoot:latest
-docker push ghcr.io/chatwoot-br/chatwoot:v3.15.0
+docker push ghcr.io/chatwoot-br/chatwoot:v3.16.0
 
 # docker buildx build --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:latest -f docker/Dockerfile --push .
 # docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:wavoip -f docker/Dockerfile --push .
