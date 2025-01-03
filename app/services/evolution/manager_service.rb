@@ -18,7 +18,7 @@ class Evolution::ManagerService
         chatwootToken: access_token,
         chatwootUrl: internal_api_url,
         chatwootSignMsg: true,
-        chatwootReopenConversation: true,
+        chatwootReopenConversation: false,
         chatwootConversationPending: false,
         chatwootImportContacts: false,
         chatwootNameInbox: name,
