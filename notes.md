@@ -10,6 +10,7 @@ make db
 
 make run
 # npx vite dev
+# pnpm run start:dev
 
 # chuting down
 docker compose -f docker-compose.dev.yaml down --volumes
