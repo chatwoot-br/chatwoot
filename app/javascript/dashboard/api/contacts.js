@@ -1,3 +1,4 @@
+import store from 'dashboard/store';
 /* global axios */
 import ApiClient from './ApiClient';
 
@@ -35,8 +36,24 @@ class ContactAPI extends ApiClient {
     return axios.patch(`${this.url}/${id}?include_contact_inboxes=false`, data);
   }
 
-  getConversations(contactId) {
-    return axios.get(`${this.url}/${contactId}/conversations`);
+  async getConversations(contactId) {
+    const { getCurrentPermissions, getCurrentUserID } = store.getters;
+    const response = await axios.get(`${this.url}/${contactId}/conversations`);
+
+    if (!getCurrentPermissions.includes('conversation_unassigned_manage')) {
+      return response;
+    }
+
+    const filteredPayload = response.data.payload.filter(
+      conversation => conversation.meta?.assignee?.id === getCurrentUserID
+    );
+
+    return {
+      data: {
+        ...response.data,
+        payload: filteredPayload
+      }
+    };
   }
 
   getContactableInboxes(contactId) {
