@@ -5,8 +5,20 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
 
   def create
     user = Current.user || @resource
-    mb = Messages::MessageBuilder.new(user, @conversation, params)
-    @message = mb.perform
+    Rails.logger.debug 'Processing message creation with potential audio attachments'
+
+    # Process the transcript before constructing the message
+    transcription = process_audio_transcription if audio_attachment?
+
+    # Creates the parameters correctly
+    merged_params = params.dup
+    if transcription.present?
+      Rails.logger.debug 'Adding transcription to message content'
+      original_content = params[:content].presence
+      merged_params[:content] = [original_content, transcription].compact.join("\n\n")
+    end
+
+    @message = Messages::MessageBuilder.new(user, @conversation, merged_params).perform
   rescue StandardError => e
     render_could_not_create_error(e.message)
   end
@@ -46,6 +58,50 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   private
+
+  def audio_attachment?
+    return false if params[:attachments].blank?
+
+    params[:attachments].any? do |attachment|
+      content_type = attachment.try(:content_type)
+      content_type&.start_with?('audio/')
+    end
+  end
+
+  def process_audio_transcription
+    Rails.logger.debug 'Processing audio attachments for transcription'
+    transcriptions = []
+
+    params[:attachments].each do |attachment|
+      next unless attachment.content_type&.start_with?('audio/')
+
+      Rails.logger.debug { "Attempting to transcribe audio file: #{attachment.original_filename}" }
+
+      begin
+        # Temporarily upload to ActiveStorage
+        blob = ActiveStorage::Blob.create_and_upload!(
+          io: attachment.tempfile,
+          filename: attachment.original_filename,
+          content_type: attachment.content_type
+        )
+
+        temp_url = Rails.application.routes.url_helpers.rails_blob_url(blob, only_path: false)
+
+        Rails.logger.debug { "Generated temporary URL for audio file: #{temp_url}" }
+        transcription_service = Openai::AudioTranscriptionService.new(temp_url)
+        transcription = transcription_service.process
+
+        if transcription.present?
+          Rails.logger.debug 'Transcription successful'
+          transcriptions << transcription.to_s
+        end
+      rescue StandardError => e
+        Rails.logger.error "Error transcribing audio file: #{e.message}\n#{e.backtrace.join("\n")}"
+      end
+    end
+
+    transcriptions.any? ? transcriptions.join("\n\n") : nil
+  end
 
   def message
     @message ||= @conversation.messages.find(permitted_params[:id])
