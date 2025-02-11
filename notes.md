@@ -61,11 +61,13 @@ docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
 
 # git rev-list --count upstream..HEAD
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
-docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -t ghcr.io/chatwoot-br/chatwoot:v3.13.0 -f docker/Dockerfile --push .
 
-docker buildx imagetools create --tag ghcr.io/chatwoot-br/chatwoot:latest --tag ghcr.io/chatwoot-br/chatwoot:v3.16.0 ghcr.io/chatwoot-br/chatwoot:next
-docker push ghcr.io/chatwoot-br/chatwoot:latest
-docker push ghcr.io/chatwoot-br/chatwoot:v3.16.0
+docker buildx imagetools create \
+  --tag ghcr.io/chatwoot-br/chatwoot:v3.18.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v3.18 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v3 \
+  --tag ghcr.io/chatwoot-br/chatwoot:latest \
+  ghcr.io/chatwoot-br/chatwoot:next
 
 # docker buildx build --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:latest -f docker/Dockerfile --push .
 # docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:wavoip -f docker/Dockerfile --push .
