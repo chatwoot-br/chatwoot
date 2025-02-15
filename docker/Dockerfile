@@ -1,42 +1,47 @@
 # pre-build stage
-FROM ruby:3.3.3-alpine3.19 AS pre-builder
+FROM ruby:3.3.7-slim-bullseye AS pre-builder
 
 # ARG default to production settings
 # For development docker-compose file overrides ARGS
 ARG BUNDLE_WITHOUT="development:test"
-ENV BUNDLE_WITHOUT ${BUNDLE_WITHOUT}
+ENV BUNDLE_WITHOUT=${BUNDLE_WITHOUT}
 ENV BUNDLER_VERSION=2.5.11
 
 ARG RAILS_SERVE_STATIC_FILES=true
-ENV RAILS_SERVE_STATIC_FILES ${RAILS_SERVE_STATIC_FILES}
+ENV RAILS_SERVE_STATIC_FILES=${RAILS_SERVE_STATIC_FILES}
 
 ARG RAILS_ENV=production
-ENV RAILS_ENV ${RAILS_ENV}
+ENV RAILS_ENV=${RAILS_ENV}
 
 ARG NODE_OPTIONS="--max-old-space-size=4096 --openssl-legacy-provider"
-ENV NODE_OPTIONS ${NODE_OPTIONS}
+ENV NODE_OPTIONS=${NODE_OPTIONS}
 
 ENV BUNDLE_PATH="/gems"
 
-RUN apk update && apk add --no-cache \
+RUN apt-get update && apt-get install -y \
   openssl \
   tar \
-  build-base \
+  build-essential \
   tzdata \
-  postgresql-dev \
+  libpq-dev \
   postgresql-client \
-  nodejs=20.15.1-r0 \
   git \
-  && mkdir -p /var/app \
-  && gem install bundler
+  curl \
+  wget \
+  && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /var/app \
+  && gem install bundler -v ${BUNDLER_VERSION}
 
 # Install pnpm and configure environment
 RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh - \
-    && echo 'export PNPM_HOME="/root/.local/share/pnpm"' >> /root/.shrc \
-    && echo 'export PATH="$PNPM_HOME:$PATH"' >> /root/.shrc \
-    && export PNPM_HOME="/root/.local/share/pnpm" \
-    && export PATH="$PNPM_HOME:$PATH" \
-    && pnpm --version
+  && echo 'export PNPM_HOME="/root/.local/share/pnpm"' >> /root/.shrc \
+  && echo 'export PATH="$PNPM_HOME:$PATH"' >> /root/.shrc \
+  && export PNPM_HOME="/root/.local/share/pnpm" \
+  && export PATH="$PNPM_HOME:$PATH" \
+  && pnpm --version
 
 # Persist the environment variables in Docker
 ENV PNPM_HOME="/root/.local/share/pnpm"
@@ -46,15 +51,19 @@ WORKDIR /app
 
 COPY Gemfile Gemfile.lock ./
 
-# natively compile grpc and protobuf to support alpine musl (dialogflow-docker workflow)
-# https://github.com/googleapis/google-cloud-ruby/issues/13306
-# adding xz as nokogiri was failing to build libxml
-# https://github.com/chatwoot/chatwoot/issues/4045
-RUN apk update && apk add --no-cache build-base musl ruby-full ruby-dev gcc make musl-dev openssl openssl-dev g++ linux-headers xz vips
+# Install dependencies for native compilation
+RUN apt-get update && apt-get install -y \
+  build-essential \
+  ruby-dev \
+  libssl-dev \
+  xz-utils \
+  libvips-dev \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN bundle config set --local force_ruby_platform true
 
 # https://github.com/grpc/grpc/issues/29489#issuecomment-1108496534
-RUN gem install grpc:1.62.0
+RUN gem install grpc -v 1.62.0
 
 # Do not install development or test gems in production
 RUN if [ "$RAILS_ENV" = "production" ]; then \
@@ -63,7 +72,8 @@ RUN if [ "$RAILS_ENV" = "production" ]; then \
   fi
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm i
+# Forces the installation of pnpm version 9.x, as expected by the project
+RUN pnpm i -g pnpm@9 && pnpm install
 
 COPY . /app
 
@@ -87,42 +97,47 @@ RUN rm -rf /gems/ruby/3.3.0/cache/*.gem \
   && rm .gitignore
 
 # final build stage
-FROM ruby:3.3.3-alpine3.19
-
+FROM ruby:3.3.7-slim-bullseye
 
 ARG BUNDLE_WITHOUT="development:test"
-ENV BUNDLE_WITHOUT ${BUNDLE_WITHOUT}
+ENV BUNDLE_WITHOUT=${BUNDLE_WITHOUT}
 ENV BUNDLER_VERSION=2.5.11
 
 ARG EXECJS_RUNTIME="Disabled"
-ENV EXECJS_RUNTIME ${EXECJS_RUNTIME}
+ENV EXECJS_RUNTIME=${EXECJS_RUNTIME}
 
 ARG RAILS_SERVE_STATIC_FILES=true
-ENV RAILS_SERVE_STATIC_FILES ${RAILS_SERVE_STATIC_FILES}
+ENV RAILS_SERVE_STATIC_FILES=${RAILS_SERVE_STATIC_FILES}
 
 ARG BUNDLE_FORCE_RUBY_PLATFORM=1
-ENV BUNDLE_FORCE_RUBY_PLATFORM ${BUNDLE_FORCE_RUBY_PLATFORM}
+ENV BUNDLE_FORCE_RUBY_PLATFORM=${BUNDLE_FORCE_RUBY_PLATFORM}
 
 ARG RAILS_ENV=production
-ENV RAILS_ENV ${RAILS_ENV}
+ENV RAILS_ENV=${RAILS_ENV}
 ENV BUNDLE_PATH="/gems"
 
-RUN apk update && apk add --no-cache \
-  build-base \
+# Persists pnpm variables
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN apt-get update && apt-get install -y \
+  build-essential \
   openssl \
   tzdata \
   postgresql-client \
   imagemagick \
   git \
-  vips \
-  && gem install bundler
+  libvips-dev \
+  && rm -rf /var/lib/apt/lists/* \
+  && gem install bundler -v ${BUNDLER_VERSION}
 
 RUN if [ "$RAILS_ENV" != "production" ]; then \
-  apk add --no-cache nodejs=20.15.1-r0; \
-  # Install pnpm and configure environment
+  apt-get update && apt-get install -y curl wget && \
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+  apt-get install -y nodejs && \
   wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" sh - \
-  && source /root/.shrc \
-  && pnpm --version; \
+  && . /root/.shrc && pnpm --version && \
+  rm -rf /var/lib/apt/lists/*; \
   fi
 
 COPY --from=pre-builder /gems/ /gems/
