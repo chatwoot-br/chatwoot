@@ -83,6 +83,13 @@ class WebhookListener < BaseListener
     deliver_account_webhooks(payload, account)
   end
 
+  def inbox_deleted(event)
+    inbox, account = extract_inbox_and_account(event)
+    inbox_webhook_data = Inbox::EventDataPresenter.new(inbox).push_data
+    payload = inbox_webhook_data.merge(event: __method__.to_s)
+    deliver_account_webhooks(payload, account)
+  end
+
   def conversation_typing_on(event)
     handle_typing_status(__method__.to_s, event)
   end
