@@ -75,6 +75,7 @@ class Inbox < ApplicationRecord
 
   enum sender_name_type: { friendly: 0, professional: 1 }
 
+  before_destroy :dispatch_destroy_event
   after_destroy :delete_round_robin_agents
 
   after_create_commit :dispatch_create_event
@@ -187,6 +188,12 @@ class Inbox < ApplicationRecord
     return if ENV['ENABLE_INBOX_EVENTS'].blank?
 
     Rails.configuration.dispatcher.dispatch(INBOX_UPDATED, Time.zone.now, inbox: self, changed_attributes: previous_changes)
+  end
+
+  def dispatch_destroy_event
+    return if ENV['ENABLE_INBOX_EVENTS'].blank?
+
+    Rails.configuration.dispatcher.dispatch(INBOX_DELETED, Time.zone.now, inbox: self)
   end
 
   def ensure_valid_max_assignment_limit
