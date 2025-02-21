@@ -30,6 +30,13 @@ corepack enable
 corepack prepare pnpm@latest --activate
 ```
 
+### Installing Ruby
+
+```bash
+rvm install ruby-3.3.7 --with-openssl-dir=$(brew --prefix openssl)
+rvm use 3.3.7 --default
+```
+
 ## Rebase with upstream
 
 ```bash
