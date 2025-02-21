@@ -25,8 +25,13 @@ class BaseListener
   end
 
   def extract_inbox_and_account(event)
-    inbox = event.data[:inbox]
-    [inbox, inbox.account]
+    inbox_data = event.data[:inbox]
+    if inbox_data.is_a?(Inbox)
+      [inbox_data, inbox_data.account]
+    else
+      inbox = Inbox.find_by(id: inbox_data['id'])
+      [inbox, inbox&.account]
+    end
   end
 
   def extract_changed_attributes(event)
