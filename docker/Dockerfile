@@ -1,5 +1,5 @@
 # pre-build stage
-FROM node:23-slim-bullseye as node
+FROM node:23-bullseye-slim AS node
 FROM ruby:3.3.7-slim-bullseye AS pre-builder
 
 ARG NODE_VERSION="23.7.0"
@@ -33,7 +33,6 @@ RUN apt-get update && apt-get install -y \
   postgresql-client \
   git \
   curl \
-  xz \
   wget
 
 RUN mkdir -p /var/app \
