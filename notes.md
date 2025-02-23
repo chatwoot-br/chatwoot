@@ -16,11 +16,15 @@ make run
 docker compose -f docker-compose.dev.yaml down --volumes
 ```
 
-Go to http://localhost:3000
+### Getting started with Docker
 
-```
-john@acme.inc
-P@ssw0rd
+```bash
+cp .enc.example .env
+docker compose build base
+docker compose run --rm rails bundle exec rails db:chatwoot_prepare
+
+docker compose up --build
+docker compose down --volumes
 ```
 
 ### Installing PNPM
@@ -35,6 +39,15 @@ corepack prepare pnpm@latest --activate
 ```bash
 rvm install ruby-3.3.7 --with-openssl-dir=$(brew --prefix openssl)
 rvm use 3.3.7 --default
+```
+
+## Development Environment
+
+Go to http://localhost:3000
+
+```
+john@acme.inc
+P@ssw0rd
 ```
 
 ## Rebase with upstream
@@ -63,7 +76,7 @@ echo -en '\nENV CW_EDITION="ce"' >> docker/Dockerfile
 
 # docker buildx use crossplatform-builder
 # v3.11.0-4 commits ahead
-docker buildx build --load --platform linux/arm64 -f docker/Dockerfile .
+docker buildx build --load --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile .
 docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
 
 # git rev-list --count upstream..HEAD
@@ -85,3 +98,5 @@ docker buildx imagetools create \
 Comparing changes between 3.x and master branches:
 
      https://github.com/chatwoot/chatwoot/compare/master...3.x
+
+RAILS_ENV=development bundle exec rails db:chatwoot_prepare
