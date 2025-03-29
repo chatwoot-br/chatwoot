@@ -57,8 +57,8 @@ git fetch --all --prune
 git checkout next
 git rebase upstream/master --autostash
 
-git checkout -B release/v3.16.0
-git push --no-verify --set-upstream origin release/v3.16.0
+git checkout -B release/v4
+git push --no-verify --set-upstream origin release/v4
 
 git checkout next
 git rebase upstream/master --autostash
@@ -75,12 +75,17 @@ rm -rf spec/enterprise
 echo -en '\nENV CW_EDITION="ce"' >> docker/Dockerfile
 
 # docker buildx use crossplatform-builder
-# v3.11.0-4 commits ahead
 docker buildx build --load --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile .
 docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
 
 # git rev-list --count upstream..HEAD
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
+
+docker buildx imagetools create \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.0.3 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4 \
+  ghcr.io/chatwoot-br/chatwoot:next
 
 docker buildx imagetools create \
   --tag ghcr.io/chatwoot-br/chatwoot:v3.18.0 \
