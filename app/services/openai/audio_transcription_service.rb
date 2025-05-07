@@ -13,7 +13,7 @@ class Openai::AudioTranscriptionService
 
   def process
     if @api_key.blank?
-      Rails.logger.error 'OpenAI API key is not configured'
+      Rails.logger.info 'OpenAI API key is not configured'
       return nil
     end
 
