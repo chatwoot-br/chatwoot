@@ -76,14 +76,15 @@ echo -en '\nENV CW_EDITION="ce"' >> docker/Dockerfile
 
 # docker buildx use crossplatform-builder
 docker buildx build --load --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile .
-docker buildx build --load --platform linux/amd64 -f docker/Dockerfile .
+docker buildx build --load --platform linux/arm64 -f docker/Dockerfile . --no-cache
+docker buildx build --load --platform linux/amd64 -f docker/Dockerfile . --no-cache
 
 # git rev-list --count upstream..HEAD
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
 
 docker buildx imagetools create \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.0.3 \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.2.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.2 \
   --tag ghcr.io/chatwoot-br/chatwoot:v4 \
   ghcr.io/chatwoot-br/chatwoot:next
 
