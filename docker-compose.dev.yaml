@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:alpine
+    image: pgvector/pgvector:pg16
     restart: always
     ports:
       - '5432:5432'
