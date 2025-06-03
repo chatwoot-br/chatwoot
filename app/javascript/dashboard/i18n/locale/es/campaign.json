@@ -137,6 +137,64 @@
         }
       }
     },
+    "API": {
+      "HEADER_TITLE": "Campañas de API",
+      "NEW_CAMPAIGN": "Crear campaña",
+      "EMPTY_STATE": {
+        "TITLE": "No hay campañas de API disponibles",
+        "SUBTITLE": "Inicie una campaña API para llegar directamente a sus clientes. Envíe mensajes personalizados a través de su integración API. Haga clic en \"Crear campaña\" para empezar."
+      },
+      "CARD": {
+        "STATUS": {
+          "COMPLETED": "Completado",
+          "SCHEDULED": "Programado"
+        },
+        "CAMPAIGN_DETAILS": {
+          "SENT_FROM": "Enviado desde",
+          "ON": "en"
+        }
+      },
+      "CREATE": {
+        "TITLE": "Crear campaña de API",
+        "CANCEL_BUTTON_TEXT": "Cancelar",
+        "CREATE_BUTTON_TEXT": "Crear",
+        "FORM": {
+          "TITLE": {
+            "LABEL": "Título",
+            "PLACEHOLDER": "Por favor escriba un título para la campaña",
+            "ERROR": "El título es obligatorio"
+          },
+          "MESSAGE": {
+            "LABEL": "Mensaje",
+            "PLACEHOLDER": "Por favor escriba el mensaje para la campaña",
+            "ERROR": "El mensaje es obligatorio"
+          },
+          "INBOX": {
+            "LABEL": "Seleccione una bandeja de entrada",
+            "PLACEHOLDER": "Seleccione una bandeja de entrada",
+            "ERROR": "Se requiere buzón de entrada"
+          },
+          "AUDIENCE": {
+            "LABEL": "Audiencia",
+            "PLACEHOLDER": "Seleccione las etiquetas personalizadas",
+            "ERROR": "El público es requerido"
+          },
+          "SCHEDULED_AT": {
+            "LABEL": "Programar tiempo",
+            "PLACEHOLDER": "Por favor, seleccione la hora",
+            "ERROR": "El tiempo programado es requerido"
+          },
+          "BUTTONS": {
+            "CREATE": "Crear",
+            "CANCEL": "Cancelar"
+          },
+          "API": {
+            "SUCCESS_MESSAGE": "Campaña de API creada con éxito",
+            "ERROR_MESSAGE": "Se presentó un error. Por favor intente nuevamente."
+          }
+        }
+      }
+    },
     "CONFIRM_DELETE": {
       "TITLE": "¿Está seguro de eliminar?",
       "DESCRIPTION": "La acción de eliminación es permanente y no puede ser revertida.",

@@ -137,6 +137,64 @@
         }
       }
     },
+    "API": {
+      "HEADER_TITLE": "API-Kampagnen",
+      "NEW_CAMPAIGN": "Kampagne erstellen",
+      "EMPTY_STATE": {
+        "TITLE": "Keine API-Kampagnen verfügbar",
+        "SUBTITLE": "Starten Sie eine API-Kampagne, um Ihre Kunden direkt zu erreichen. Senden Sie benutzerdefinierte Nachrichten über Ihre API-Integration. Klicken Sie auf 'Kampagne erstellen', um zu beginnen."
+      },
+      "CARD": {
+        "STATUS": {
+          "COMPLETED": "Abgeschlossen",
+          "SCHEDULED": "Geplant"
+        },
+        "CAMPAIGN_DETAILS": {
+          "SENT_FROM": "Gesendet von",
+          "ON": "am"
+        }
+      },
+      "CREATE": {
+        "TITLE": "API-Kampagne erstellen",
+        "CANCEL_BUTTON_TEXT": "Stornieren",
+        "CREATE_BUTTON_TEXT": "Erstellen",
+        "FORM": {
+          "TITLE": {
+            "LABEL": "Titel",
+            "PLACEHOLDER": "Bitte geben Sie den Titel der Kampagne ein",
+            "ERROR": "Titel ist erforderlich"
+          },
+          "MESSAGE": {
+            "LABEL": "Nachricht",
+            "PLACEHOLDER": "Bitte geben Sie die Nachricht der Kampagne ein",
+            "ERROR": "Nachricht ist erforderlich"
+          },
+          "INBOX": {
+            "LABEL": "Postfach auswählen",
+            "PLACEHOLDER": "Postfach auswählen",
+            "ERROR": "Postfach ist erforderlich"
+          },
+          "AUDIENCE": {
+            "LABEL": "Zielgruppe",
+            "PLACEHOLDER": "Kunden-Labels auswählen",
+            "ERROR": "Zielgruppe ist erforderlich"
+          },
+          "SCHEDULED_AT": {
+            "LABEL": "Geplanter Zeitpunkt",
+            "PLACEHOLDER": "Bitte wählen Sie die Zeit",
+            "ERROR": "Geplante Zeit ist erforderlich"
+          },
+          "BUTTONS": {
+            "CREATE": "Erstellen",
+            "CANCEL": "Stornieren"
+          },
+          "API": {
+            "SUCCESS_MESSAGE": "API-Kampagne erfolgreich erstellt",
+            "ERROR_MESSAGE": "Es ist ein Fehler aufgetreten, bitte versuchen Sie es erneut."
+          }
+        }
+      }
+    },
     "CONFIRM_DELETE": {
       "TITLE": "Sind Sie sicher, dass Sie das löschen möchten?",
       "DESCRIPTION": "The delete action is permanent and cannot be reversed.",

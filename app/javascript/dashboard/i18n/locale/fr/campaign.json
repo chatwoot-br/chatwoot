@@ -137,6 +137,64 @@
         }
       }
     },
+    "API": {
+      "HEADER_TITLE": "Campagnes API",
+      "NEW_CAMPAIGN": "Créer une campagne",
+      "EMPTY_STATE": {
+        "TITLE": "Aucune campagne API n'est disponible",
+        "SUBTITLE": "Lancez une campagne API pour atteindre directement vos clients. Envoyez des messages personnalisés via votre intégration API. Cliquez sur 'Créer une campagne' pour commencer."
+      },
+      "CARD": {
+        "STATUS": {
+          "COMPLETED": "Terminé",
+          "SCHEDULED": "Programmé"
+        },
+        "CAMPAIGN_DETAILS": {
+          "SENT_FROM": "Envoyé depuis",
+          "ON": "le"
+        }
+      },
+      "CREATE": {
+        "TITLE": "Créer une campagne API",
+        "CANCEL_BUTTON_TEXT": "Annuler",
+        "CREATE_BUTTON_TEXT": "Créer",
+        "FORM": {
+          "TITLE": {
+            "LABEL": "Titre",
+            "PLACEHOLDER": "Veuillez saisir le titre de la campagne",
+            "ERROR": "Le titre est requis"
+          },
+          "MESSAGE": {
+            "LABEL": "Message",
+            "PLACEHOLDER": "Veuillez saisir le message de la campagne",
+            "ERROR": "Le message est requis"
+          },
+          "INBOX": {
+            "LABEL": "Sélectionner la boîte de réception",
+            "PLACEHOLDER": "Sélectionner la boîte de réception",
+            "ERROR": "La boîte de réception est requise"
+          },
+          "AUDIENCE": {
+            "LABEL": "Audience",
+            "PLACEHOLDER": "Sélectionnez les étiquettes des clients",
+            "ERROR": "L'audience est requise"
+          },
+          "SCHEDULED_AT": {
+            "LABEL": "Heure prévue",
+            "PLACEHOLDER": "Veuillez sélectionner l'heure",
+            "ERROR": "L'heure programmée est requise"
+          },
+          "BUTTONS": {
+            "CREATE": "Créer",
+            "CANCEL": "Annuler"
+          },
+          "API": {
+            "SUCCESS_MESSAGE": "Campagne API créée avec succès",
+            "ERROR_MESSAGE": "Une erreur est survenue, veuillez réessayer."
+          }
+        }
+      }
+    },
     "CONFIRM_DELETE": {
       "TITLE": "Êtes-vous sûr de vouloir supprimer?",
       "DESCRIPTION": "The delete action is permanent and cannot be reversed.",
