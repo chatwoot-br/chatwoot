@@ -83,7 +83,7 @@
   enabled: true
 - name: campaigns
   display_name: Campaigns
-  enabled: true
+  enabled: false
   help_url: https://chwt.app/hc/campaigns
 - name: reports
   display_name: Reports
