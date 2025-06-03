@@ -19,7 +19,8 @@ class Whatsapp::OneoffWhatsappCampaignService
   delegate :channel, to: :inbox
 
   def process_audience(audience_labels)
-    campaign.account.contacts.tagged_with(audience_labels, any: true).each do |contact|
+    contacts = campaign.account.contacts.tagged_with(audience_labels, any: true)
+    contacts.each do |contact|
       next if contact.phone_number.blank?
 
       send_message(to: contact.phone_number, content: campaign.message)
