@@ -71,6 +71,7 @@ class Campaign < ApplicationRecord
       Sms::OneoffSmsCampaignService.new(campaign: self).perform
     when 'Whatsapp'
       Whatsapp::OneoffCampaignService.new(campaign: self).perform if account.feature_enabled?(:whatsapp_campaign)
+      # Whatsapp::OneoffWhatsappCampaignService.new(campaign: self).perform if inbox.inbox_type == 'Whatsapp'
     end
   end
 
