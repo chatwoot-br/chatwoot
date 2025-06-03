@@ -19,7 +19,8 @@ class Api::OneoffApiCampaignService
   delegate :channel, to: :inbox
 
   def process_audience(audience_labels)
-    campaign.account.contacts.tagged_with(audience_labels, any: true).each do |contact|
+    contacts = campaign.account.contacts.tagged_with(audience_labels, any: true)
+    contacts.each do |contact|
       create_conversation_and_message(contact)
     end
   end
