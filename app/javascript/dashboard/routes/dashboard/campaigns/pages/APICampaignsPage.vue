@@ -19,21 +19,31 @@ const selectedCampaign = ref(null);
 const [showAPICampaignDialog, toggleAPICampaignDialog] = useToggle();
 
 const uiFlags = useMapGetter('campaigns/getUIFlags');
-const isFetchingCampaigns = computed(() => uiFlags.value.isFetching);
+const isFetchingCampaigns = computed(() => uiFlags.value?.isFetching ?? false);
 
 const confirmDeleteCampaignDialogRef = ref(null);
 
-const APICampaigns = computed(() =>
-  getters['campaigns/getCampaigns'].value(CAMPAIGN_TYPES.ONE_OFF)
-);
+const APICampaigns = computed(() => {
+  const campaigns = getters['campaigns/getCampaigns']?.value?.(
+    CAMPAIGN_TYPES.ONE_OFF
+  );
+  return (
+    campaigns?.filter(campaign => {
+      const channelType = campaign?.inbox?.channel_type;
+      return channelType && channelType.includes('Api');
+    }) ?? []
+  );
+});
 
 const hasNoAPICampaigns = computed(
   () => APICampaigns.value?.length === 0 && !isFetchingCampaigns.value
 );
 
 const handleDelete = campaign => {
+  if (!campaign) return;
+
   selectedCampaign.value = campaign;
-  confirmDeleteCampaignDialogRef.value.dialogRef.open();
+  confirmDeleteCampaignDialogRef.value?.dialogRef?.open?.();
 };
 </script>
 
