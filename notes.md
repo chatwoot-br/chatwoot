@@ -8,9 +8,9 @@ make setup
 docker compose -f docker-compose.dev.yaml up
 make db
 
-make run
-# npx vite dev
-# pnpm run start:dev
+# make run
+pnpm rails s -p 3000
+pnpm dotenv bundle exec sidekiq -C config/sidekiq.yml
 
 # chuting down
 docker compose -f docker-compose.dev.yaml down --volumes
