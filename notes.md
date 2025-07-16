@@ -83,8 +83,8 @@ docker buildx build --load --platform linux/amd64 -f docker/Dockerfile . --no-ca
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
 
 docker buildx imagetools create \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.2.0 \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.2 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.3.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.3 \
   --tag ghcr.io/chatwoot-br/chatwoot:v4 \
   ghcr.io/chatwoot-br/chatwoot:next
 
