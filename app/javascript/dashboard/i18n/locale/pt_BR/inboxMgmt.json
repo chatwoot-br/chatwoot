@@ -221,15 +221,15 @@
         "TITLE": "Canal do WhatsApp",
         "DESC": "Comece a oferecer suporte a seus clientes pelo WhatsApp.",
         "PROVIDERS": {
-          "LABEL": "API Provider",
+          "LABEL": "Provedor de API",
           "WHATSAPP_EMBEDDED": "WhatsApp Business",
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
-          "WHATSAPP_CLOUD_DESC": "Quick setup through Meta",
-          "TWILIO_DESC": "Connect via Twilio credentials",
+          "WHATSAPP_CLOUD_DESC": "Configuração rápida através do Meta",
+          "TWILIO_DESC": "Conectar via credenciais do Twilio",
           "360_DIALOG": "360Dialog",
           "EVOLUTION": "Evolution API",
-          "EVOLUTION_DESC": "Connect via Evolution API"
+          "EVOLUTION_DESC": "Conectar via Evolution API"
         },
         "INBOX_NAME": {
           "LABEL": "Nome da Caixa de Entrada",
