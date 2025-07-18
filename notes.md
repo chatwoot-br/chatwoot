@@ -37,8 +37,8 @@ corepack prepare pnpm@latest --activate
 ### Installing Ruby
 
 ```bash
-rvm install ruby-3.3.7 --with-openssl-dir=$(brew --prefix openssl)
-rvm use 3.3.7 --default
+rvm install ruby-3.4.4 --with-openssl-dir=$(brew --prefix openssl)
+rvm use 3.4.4 --default
 ```
 
 ## Development Environment
@@ -83,8 +83,8 @@ docker buildx build --load --platform linux/amd64 -f docker/Dockerfile . --no-ca
 docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
 
 docker buildx imagetools create \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.3.0 \
-  --tag ghcr.io/chatwoot-br/chatwoot:v4.3 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.4.0 \
+  --tag ghcr.io/chatwoot-br/chatwoot:v4.4 \
   --tag ghcr.io/chatwoot-br/chatwoot:v4 \
   ghcr.io/chatwoot-br/chatwoot:next
 
