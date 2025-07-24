@@ -1,4 +1,6 @@
 <script>
+import { mapGetters } from 'vuex';
+import { useAccount } from 'dashboard/composables/useAccount';
 import EmptyState from '../../../../components/widgets/EmptyState.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import DuplicateInboxBanner from './channels/instagram/DuplicateInboxBanner.vue';
@@ -9,7 +11,22 @@ export default {
     NextButton,
     DuplicateInboxBanner,
   },
+  setup() {
+    const { accountId } = useAccount();
+    return { accountId };
+  },
+  data() {
+    return {
+      features: {},
+    };
+  },
   computed: {
+    ...mapGetters({
+      getAccount: 'accounts/getAccount',
+    }),
+    featureInboundEmailEnabled() {
+      return !!this.features?.inbound_emails;
+    },
     currentInbox() {
       return this.$store.getters['inboxes/getInbox'](
         this.$route.params.inbox_id
@@ -79,7 +96,11 @@ export default {
         )}`;
       }
 
-      if (this.isAEmailInbox && !this.currentInbox.provider) {
+      if (
+        this.isAEmailInbox &&
+        this.featureInboundEmailEnabled &&
+        !this.currentInbox.provider
+      ) {
         return this.$t('INBOX_MGMT.ADD.EMAIL_CHANNEL.FINISH_MESSAGE');
       }
 
@@ -88,6 +109,22 @@ export default {
       }
 
       return this.$t('INBOX_MGMT.FINISH.MESSAGE');
+    },
+  },
+  mounted() {
+    this.loadAccountFeatures();
+  },
+  methods: {
+    loadAccountFeatures() {
+      try {
+        const { features } = this.getAccount(this.accountId);
+        this.features = features;
+      } catch (error) {
+        // Log error for debugging purposes
+        // Optionally handle specific error types here
+        // eslint-disable-next-line no-console
+        console.error('Error loading account features:', error);
+      }
     },
   },
 };
@@ -155,7 +192,11 @@ export default {
           />
         </div>
         <div
-          v-if="isAEmailInbox && !currentInbox.provider"
+          v-if="
+            isAEmailInbox &&
+            featureInboundEmailEnabled &&
+            !currentInbox.provider
+          "
           class="w-[50%] max-w-[50%] ml-[25%]"
         >
           <woot-code lang="html" :script="currentInbox.forward_to_email" />
