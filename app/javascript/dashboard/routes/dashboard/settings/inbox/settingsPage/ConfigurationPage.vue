@@ -1,4 +1,6 @@
 <script>
+import { mapGetters } from 'vuex';
+import { useAccount } from 'dashboard/composables/useAccount';
 import { useAlert } from 'dashboard/composables';
 import inboxMixin from 'shared/mixins/inboxMixin';
 import SettingsSection from '../../../../../components/SettingsSection.vue';
@@ -23,16 +25,26 @@ export default {
     },
   },
   setup() {
-    return { v$: useVuelidate() };
+    const { accountId } = useAccount();
+    return { v$: useVuelidate(), accountId };
   },
   data() {
     return {
       hmacMandatory: false,
       whatsAppInboxAPIKey: '',
+      features: {},
     };
   },
   validations: {
     whatsAppInboxAPIKey: { required },
+  },
+  computed: {
+    ...mapGetters({
+      getAccount: 'accounts/getAccount',
+    }),
+    featureInboundEmailEnabled() {
+      return !!this.features?.inbound_emails;
+    },
   },
   watch: {
     inbox() {
@@ -45,6 +57,15 @@ export default {
   methods: {
     setDefaults() {
       this.hmacMandatory = this.inbox.hmac_mandatory || false;
+
+      try {
+        const { features } = this.getAccount(this.accountId);
+        this.features = features;
+      } catch (error) {
+        // Log error for debugging purposes
+        // eslint-disable-next-line no-console
+        console.error('Error fetching account features:', error);
+      }
     },
     handleHmacFlag() {
       this.updateInbox();
@@ -183,7 +204,7 @@ export default {
     </SettingsSection>
   </div>
   <div v-else-if="isAnEmailChannel">
-    <div class="mx-8">
+    <div v-if="featureInboundEmailEnabled" class="mx-8">
       <SettingsSection
         :title="$t('INBOX_MGMT.SETTINGS_POPUP.FORWARD_EMAIL_TITLE')"
         :sub-title="$t('INBOX_MGMT.SETTINGS_POPUP.FORWARD_EMAIL_SUB_TEXT')"
