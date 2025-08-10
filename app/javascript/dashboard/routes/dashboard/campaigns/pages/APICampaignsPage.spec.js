@@ -9,23 +9,24 @@ const mockCampaigns = [
     title: 'Test API Campaign 1',
     status: 'completed',
     scheduled_at: '2025-06-01T10:00:00Z',
-    inbox: { name: 'API Inbox 1' },
+    inbox: { name: 'API Inbox 1', channel_type: 'Api::Base' },
   },
   {
     id: 2,
     title: 'Test API Campaign 2',
     status: 'scheduled',
     scheduled_at: '2025-06-05T15:00:00Z',
-    inbox: { name: 'API Inbox 2' },
+    inbox: { name: 'API Inbox 2', channel_type: 'Api::Base' },
   },
 ];
 
-// Mock the composables
+// Mock the composables with a dynamic campaigns result we can tweak per test
+let campaignsReturnValue = mockCampaigns;
 vi.mock('dashboard/composables/store', () => ({
   useStoreGetters: () => ({
     'campaigns/getCampaigns': {
       value: vi.fn(type =>
-        type === CAMPAIGN_TYPES.ONE_OFF ? mockCampaigns : []
+        type === CAMPAIGN_TYPES.ONE_OFF ? campaignsReturnValue : []
       ),
     },
   }),
@@ -92,28 +93,19 @@ describe('APICampaignsPage', () => {
   });
 
   it('displays campaigns when available', () => {
+    campaignsReturnValue = mockCampaigns;
     const wrapper = createWrapper();
 
     // Should have campaigns available
-    expect(wrapper.vm.APICampaigns).toHaveLength(2);
+    expect(wrapper.vm.APICampaigns?.length).toBe(2);
     expect(wrapper.vm.hasNoAPICampaigns).toBe(false);
   });
 
   it('shows empty state when no campaigns', () => {
-    // Mock empty campaigns
-    const useStoreGetters = vi.fn(() => ({
-      'campaigns/getCampaigns': {
-        value: vi.fn(() => []),
-      },
-    }));
-
-    vi.doMock('dashboard/composables/store', () => ({
-      useStoreGetters,
-      useMapGetter: vi.fn(() => ({ value: { isFetching: false } })),
-    }));
-
+    // Use empty campaigns
+    campaignsReturnValue = [];
     const wrapper = createWrapper();
-    expect(wrapper.vm.hasNoAPICampaigns.value).toBe(true);
+    expect(wrapper.vm.hasNoAPICampaigns).toBe(true);
   });
 
   it('handles campaign deletion', () => {
@@ -131,7 +123,7 @@ describe('APICampaignsPage', () => {
 
     wrapper.vm.handleDelete(testCampaign);
 
-    expect(wrapper.vm.selectedCampaign.value).toEqual(testCampaign);
+    expect(wrapper.vm.selectedCampaign).toEqual(testCampaign);
     expect(
       wrapper.vm.confirmDeleteCampaignDialogRef.dialogRef.open
     ).toHaveBeenCalled();
