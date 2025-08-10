@@ -4,7 +4,8 @@
 name: Deploy Check
 
 on:
-  pull_request:
+  workflow_dispatch:
+  # pull_request:
 
 # If two pushes happen within a short time in the same PR, cancel the run of the oldest push
 concurrency:
