@@ -28,7 +28,8 @@ describe WebhookListener do
     context 'when webhook is configured and event is subscribed' do
       it 'triggers the webhook event' do
         webhook = create(:webhook, inbox: inbox, account: account)
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, message.webhook_data.merge(event: 'message_created')).once
+        expected_payload = message.webhook_data.merge(event: 'message_created').as_json
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, expected_payload).once
         listener.message_created(message_created_event)
       end
     end
@@ -90,7 +91,8 @@ describe WebhookListener do
     context 'when webhook is configured' do
       it 'triggers webhook' do
         webhook = create(:webhook, inbox: inbox, account: account)
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, conversation.webhook_data.merge(event: 'conversation_created')).once
+        expected_payload = conversation.webhook_data.merge(event: 'conversation_created').as_json
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, expected_payload).once
         listener.conversation_created(conversation_created_event)
       end
     end
@@ -144,19 +146,21 @@ describe WebhookListener do
 
         conversation.update(custom_attributes: { test: 'testing custom attri webhook' })
 
+        expected_payload = conversation.webhook_data.merge(
+          event: 'conversation_updated',
+          changed_attributes: [
+            {
+              custom_attributes: {
+                previous_value: { test: nil },
+                current_value: { test: 'testing custom attri webhook' }
+              }
+            }
+          ]
+        ).as_json
+
         expect(WebhookJob).to receive(:perform_later).with(
           webhook.url,
-          conversation.webhook_data.merge(
-            event: 'conversation_updated',
-            changed_attributes: [
-              {
-                custom_attributes: {
-                  previous_value: { test: nil },
-                  current_value: { test: 'testing custom attri webhook' }
-                }
-              }
-            ]
-          )
+          expected_payload
         ).once
 
         listener.conversation_updated(conversation_updated_event)
@@ -177,7 +181,8 @@ describe WebhookListener do
     context 'when webhook is configured' do
       it 'triggers webhook' do
         webhook = create(:webhook, account: account)
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, contact.webhook_data.merge(event: 'contact_created')).once
+        expected_payload = contact.webhook_data.merge(event: 'contact_created').as_json
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, expected_payload).once
         listener.contact_created(contact_event)
       end
     end
@@ -208,12 +213,13 @@ describe WebhookListener do
     context 'when webhook is configured and there are changed attributes' do
       it 'triggers webhook' do
         webhook = create(:webhook, account: account)
+        expected_payload = contact.webhook_data.merge(
+          event: 'contact_updated',
+          changed_attributes: [{ 'name' => { :current_value => 'Jane Doe', :previous_value => 'Jane' } }]
+        ).as_json
         expect(WebhookJob).to receive(:perform_later).with(
           webhook.url,
-          contact.webhook_data.merge(
-            event: 'contact_updated',
-            changed_attributes: [{ 'name' => { :current_value => 'Jane Doe', :previous_value => 'Jane' } }]
-          )
+          expected_payload
         ).once
         listener.contact_updated(contact_updated_event)
       end
@@ -235,7 +241,8 @@ describe WebhookListener do
       it 'triggers webhook' do
         inbox_data = Inbox::EventDataPresenter.new(inbox).push_data
         webhook = create(:webhook, account: account, subscriptions: ['inbox_created'])
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, inbox_data.merge(event: 'inbox_created')).once
+        expected_payload = inbox_data.merge(event: 'inbox_created').as_json
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, expected_payload).once
         listener.inbox_created(inbox_created_event)
       end
     end
@@ -272,7 +279,7 @@ describe WebhookListener do
 
         expect(WebhookJob).to receive(:perform_later).with(
           webhook.url,
-          inbox_data.merge(event: 'inbox_updated', changed_attributes: changed_attributes_data)
+          inbox_data.merge(event: 'inbox_updated', changed_attributes: changed_attributes_data).as_json
         ).once
 
         listener.inbox_updated(inbox_updated_event)
@@ -302,7 +309,7 @@ describe WebhookListener do
           is_private: false
         }
 
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, payload).once
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, payload.as_json).once
         listener.conversation_typing_on(typing_event)
       end
     end
@@ -349,7 +356,7 @@ describe WebhookListener do
           is_private: false
         }
 
-        expect(WebhookJob).to receive(:perform_later).with(webhook.url, payload).once
+        expect(WebhookJob).to receive(:perform_later).with(webhook.url, payload.as_json).once
         listener.conversation_typing_off(typing_event)
       end
     end
