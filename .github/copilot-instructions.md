@@ -42,7 +42,7 @@ These instructions guide GitHub Copilot (Chat and Code Review) when used in this
 - Validate external input (backend and frontend). Apply sanitization and rate limiting where appropriate.
 
 ## Language & communication
-- Comments, commit messages, and PRs preferably in **Brazilian Portuguese**.
+- Comments, commit messages, and PRs always in **English**.
 - Explain assumptions and trade-offs when generating code that impacts performance/security.
 
 ## What to **avoid**

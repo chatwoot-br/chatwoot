@@ -251,6 +251,19 @@ Rails.application.routes.draw do
             resource :authorization, only: [:create]
           end
 
+          namespace :whatsapp_web do
+            resources :gateway, only: [], param: :id, controller: 'gateway' do
+              member do
+                get :login
+                get :login_with_code
+                get :devices
+                get :logout
+                get :reconnect
+                post :sync_history
+              end
+            end
+          end
+
           resources :webhooks, only: [:index, :create, :update, :destroy]
           namespace :integrations do
             resources :apps, only: [:index, :show]
@@ -500,6 +513,8 @@ Rails.application.routes.draw do
   post 'webhooks/sms/:phone_number', to: 'webhooks/sms#process_payload'
   get 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#verify'
   post 'webhooks/whatsapp/:phone_number', to: 'webhooks/whatsapp#process_payload'
+  # WhatsApp Web (Go gateway) webhooks
+  post 'webhooks/whatsapp_web/:phone_number', to: 'webhooks/whatsapp_web#process_payload'
   get 'webhooks/instagram', to: 'webhooks/instagram#verify'
   post 'webhooks/instagram', to: 'webhooks/instagram#events'
 
