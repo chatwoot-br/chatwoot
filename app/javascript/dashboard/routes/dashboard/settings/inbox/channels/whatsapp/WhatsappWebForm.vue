@@ -1,27 +1,11 @@
 <script>
 import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
-import { required, url, helpers } from '@vuelidate/validators';
+import { required } from '@vuelidate/validators';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import QRCodeModal from 'dashboard/components/QRCodeModal.vue';
-
-// Custom URL validator that accepts localhost
-const urlOrLocalhost = helpers.withMessage(
-  'Please provide a valid URL',
-  value => {
-    if (!value) return true; // Allow empty values (let required handle it)
-
-    // Allow localhost URLs
-    if (value.includes('localhost:')) {
-      return true;
-    }
-
-    // Use standard URL validation for other URLs
-    return url(value);
-  }
-);
 
 export default {
   name: 'WhatsappWebForm',
@@ -83,7 +67,7 @@ export default {
   validations() {
     const baseValidations = {
       phoneNumber: { required, isPhoneE164OrEmpty },
-      gatewayBaseUrl: { required, urlOrLocalhost },
+      gatewayBaseUrl: { required },
       basicAuthUser: {},
       basicAuthPassword: {},
       webhookSecret: { required },
