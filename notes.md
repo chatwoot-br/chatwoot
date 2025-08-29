@@ -106,3 +106,26 @@ Comparing changes between 3.x and master branches:
      https://github.com/chatwoot/chatwoot/compare/master...3.x
 
 RAILS_ENV=development bundle exec rails db:chatwoot_prepare
+
+```bash
+curl -X GET "http://host.docker.internal:3001/app/status" -u "admin:password123"
+curl -X GET "http://host.docker.internal:3001/5521987654321/app/status" -u "admin:password123"
+
+curl -X GET "http://host.docker.internal:8088/admin/instances" \
+ -H "Authorization: Bearer dev-token-123"
+
+curl -X DELETE "http://host.docker.internal:8088/admin/instances/3001" \
+  -H "Authorization: Bearer dev-token-123"
+
+curl -X POST "http://host.docker.internal:8088/admin/instances" \
+  -H "Authorization: Bearer dev-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "port": 3001,
+    "basic_auth": "admin:password123",
+    "debug": true,
+    "base_path": "/5521987654321",
+    "webhook": "http://host.docker.internal:56102/webhooks/whatsapp_web/5521987654321",
+    "webhook_secret": "my-webhook-secret"
+  }'
+```
