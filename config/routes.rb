@@ -253,12 +253,18 @@ Rails.application.routes.draw do
 
           namespace :whatsapp_web do
             resources :gateway, only: [], param: :id, controller: 'gateway' do
+              collection do
+                post :test_connection
+                post :test_devices
+              end
               member do
                 get :login
                 get :login_with_code
                 get :devices
+                get :status
                 get :logout
                 get :reconnect
+                get :qr_code
                 post :sync_history
               end
             end

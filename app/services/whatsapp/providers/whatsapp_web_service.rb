@@ -35,7 +35,7 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def validate_provider_config?
-    response = HTTParty.get("#{api_path}/app/devices")
+    response = HTTParty.get("#{api_path}/app/status", headers: api_headers)
     Rails.logger.debug { "[WHATSAPP] Webhook setup response: #{response.inspect}" }
     response.success?
   rescue StandardError => e
@@ -76,7 +76,7 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def api_path
-    "#{api_base_path}/#{sanitize_number(whatsapp_channel['phone_number'])}"
+    "#{api_base_path}/#{clean_phone_number(whatsapp_channel['phone_number'])}"
   end
 
   def api_base_path
@@ -137,58 +137,93 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_image_message(phone_number, attachment, message)
-    # Use image_url instead of binary upload to avoid ActiveStorage access issues
-    image_url = attachment.download_url
+    # Validate image type before sending
+    unless valid_image_type?(attachment)
+      Rails.logger.warn "[WHATSAPP WEB] Unsupported image type: #{attachment.file.content_type}, sending as document"
+      return send_file_message(phone_number, attachment, message)
+    end
+
+    # Build the request body according to API spec
+    body_params = {
+      phone: phone_number,
+      caption: message.outgoing_content.presence || '',
+      view_once: false,
+      compress: false,
+      image_url: attachment.download_url
+    }
+
+    # Add reply context if this is a reply
+    reply_id = extract_reply_message_id(message)
+    body_params[:reply_message_id] = reply_id if reply_id.present?
 
     response = HTTParty.post(
       "#{api_path}/send/image",
-      headers: multipart_headers,
-      body: {
-        phone: phone_number,
-        caption: message.outgoing_content,
-        image_url: image_url
-      }
+      headers: api_headers,
+      body: body_params.to_json
     )
 
     process_response(response, message)
   end
 
   def send_audio_message(phone_number, attachment, message)
+    # Build the request body according to API spec
+    body_params = {
+      phone: phone_number,
+      audio_url: attachment.download_url
+    }
+
+    # Add reply context if this is a reply
+    reply_id = extract_reply_message_id(message)
+    body_params[:reply_message_id] = reply_id if reply_id.present?
+
     response = HTTParty.post(
       "#{api_path}/send/audio",
-      headers: multipart_headers,
-      body: {
-        phone: phone_number,
-        audio: attachment.file
-      }
+      headers: api_headers,
+      body: body_params.to_json
     )
 
     process_response(response, message)
   end
 
   def send_video_message(phone_number, attachment, message)
+    # Build the request body according to API spec
+    body_params = {
+      phone: phone_number,
+      caption: message.outgoing_content.presence || '',
+      view_once: false,
+      compress: false,
+      video_url: attachment.download_url
+    }
+
+    # Add reply context if this is a reply
+    reply_id = extract_reply_message_id(message)
+    body_params[:reply_message_id] = reply_id if reply_id.present?
+
     response = HTTParty.post(
       "#{api_path}/send/video",
-      headers: multipart_headers,
-      body: {
-        phone: phone_number,
-        caption: message.outgoing_content,
-        video: attachment.file
-      }
+      headers: api_headers,
+      body: body_params.to_json
     )
 
     process_response(response, message)
   end
 
   def send_file_message(phone_number, attachment, message)
+    # Build the request body according to API spec
+    body_params = {
+      phone: phone_number,
+      caption: message.outgoing_content.presence || '',
+      file_url: attachment.download_url
+    }
+
+    # Add reply context if this is a reply
+    reply_id = extract_reply_message_id(message)
+    body_params[:reply_message_id] = reply_id if reply_id.present?
+
     response = HTTParty.post(
       "#{api_path}/send/file",
-      headers: multipart_headers,
-      body: {
-        phone: phone_number,
-        caption: message.outgoing_content,
-        file: attachment.file
-      }
+      headers: api_headers,
+      body: body_params.to_json
     )
 
     process_response(response, message)
@@ -308,6 +343,55 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.parsed_response
   end
 
+  def connection_status
+    response = HTTParty.get(
+      "#{api_path}/app/status",
+      headers: api_headers
+    )
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Gateway connection status response: #{response.inspect}" }
+
+    raise StandardError, "Gateway connection status failed: #{response.message}" unless response.success?
+
+    response.parsed_response
+  end
+
+  def connect_with_qr_conversion
+    result = connect
+    convert_qr_to_base64(result)
+    result
+  end
+
+  def test_connection_with_qr_conversion
+    result = connect
+    convert_qr_to_base64(result)
+    result
+  end
+
+  private
+
+  def convert_qr_to_base64(result)
+    return unless result.dig('results', 'qr_link').present?
+
+    original_qr_link = result['results']['qr_link']
+    Rails.logger.debug { "[WHATSAPP_WEB] Converting QR link: #{original_qr_link}" }
+
+    begin
+      qr_result = fetch_qr_code_image(original_qr_link)
+
+      if qr_result[:success]
+        base64_data = Base64.strict_encode64(qr_result[:data])
+        data_url = "data:#{qr_result[:content_type]};base64,#{base64_data}"
+        result['results']['qr_link'] = data_url
+        Rails.logger.info '[WHATSAPP_WEB] Converted QR code to base64 data URL'
+      else
+        Rails.logger.warn "[WHATSAPP_WEB] Failed to fetch QR code: #{qr_result[:error]}"
+      end
+    rescue StandardError => e
+      Rails.logger.error "[WHATSAPP_WEB] QR code conversion error: #{e.message}"
+    end
+  end
+
   def send_interactive_text_message(phone_number, message)
     # Para mensagens interativas, usamos o endpoint de mensagem padrão
     # pois a API WhatsApp Web Gateway pode não suportar mensagens interativas complexas
@@ -323,9 +407,67 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     process_response(response, message)
   end
 
-  private
+  def proxy_qr_code(qr_path)
+    # Build full URL to the QR code image
+    qr_url = "#{gateway_base_url}/#{sanitize_number(whatsapp_channel.phone_number)}/#{qr_path}"
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Proxying QR code from: #{qr_url}" }
+
+    # Fetch the QR code image from the gateway
+    response = HTTParty.get(qr_url, headers: api_headers)
+
+    if response.success?
+      {
+        success: true,
+        data: response.body,
+        content_type: response.headers['content-type'] || 'image/png'
+      }
+    else
+      Rails.logger.error "[WHATSAPP_WEB] QR code proxy failed: #{response.code} - #{response.message}"
+      {
+        success: false,
+        error: "Failed to fetch QR code: #{response.message}"
+      }
+    end
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP_WEB] QR code proxy exception: #{e.message}"
+    {
+      success: false,
+      error: "QR code proxy error: #{e.message}"
+    }
+  end
+
+  def fetch_qr_code_image(qr_url)
+    Rails.logger.debug { "[WHATSAPP_WEB] Fetching QR code image from: #{qr_url}" }
+
+    # Fetch the QR code image from the gateway
+    response = HTTParty.get(qr_url, headers: api_headers)
+
+    if response.success?
+      {
+        success: true,
+        data: response.body,
+        content_type: response.headers['content-type'] || 'image/png'
+      }
+    else
+      Rails.logger.error "[WHATSAPP_WEB] QR code fetch failed: #{response.code} - #{response.message}"
+      {
+        success: false,
+        error: "Failed to fetch QR code: #{response.message}"
+      }
+    end
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP_WEB] QR code fetch exception: #{e.message}"
+    {
+      success: false,
+      error: "QR code fetch error: #{e.message}"
+    }
+  end
 
   def process_response(response, message)
+    # Log HTTP response status for debugging
+    Rails.logger.debug { "[WHATSAPP WEB] HTTP Status: #{response.code}, Body: #{response.body}" }
+
     parsed_response = JSON.parse(response.body) if response.body.present?
     return nil unless parsed_response
 
@@ -348,17 +490,46 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
       end
     end
 
-    Rails.logger.error "[WHATSAPP WEB] Message send failed: #{parsed_response}"
+    # Log detailed error information
+    error_code = parsed_response['code']
+    error_message = parsed_response['message']
+    Rails.logger.error "[WHATSAPP WEB] Message send failed - Code: #{error_code}, Message: #{error_message}, Full response: #{parsed_response}"
+
+    # Raise specific error for better upstream handling
+    if error_code == 'INTERNAL_SERVER_ERROR' && error_message&.include?('unsupported file type')
+      raise StandardError, "Unsupported file type for WhatsApp Web Gateway: #{error_message}"
+    end
+
     nil
   end
 
   def sanitize_number(number)
-    number.to_s.strip.delete_prefix('+')
+    # Remove any formatting and prefixes
+    clean_number = number.to_s.strip.delete_prefix('+')
+
+    # The API expects the format: number@s.whatsapp.net
+    # Check if it already has the suffix
+    return clean_number if clean_number.include?('@s.whatsapp.net')
+
+    "#{clean_number}@s.whatsapp.net"
+  end
+
+  def clean_phone_number(number)
+    # For API path construction - return only digits
+    number.to_s.strip.delete_prefix('+').split('@').first
   end
 
   def extract_reply_message_id(message)
     # Extract reply message ID from content attributes
     # This corresponds to in_reply_to_external_id from the frontend
     message.content_attributes&.dig('in_reply_to_external_id')
+  end
+
+  def valid_image_type?(attachment)
+    # WhatsApp supports: JPEG, PNG, WEBP
+    supported_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    content_type = attachment.file.content_type&.downcase
+
+    supported_types.include?(content_type)
   end
 end

@@ -71,8 +71,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       end
     end
 
-    # Skip if avatar already exists
-    if @contact.avatar.attached?
+    # Skip if avatar was recently updated (within last 24 hours)
+    if @contact.avatar.attached? && @contact.updated_at > 24.hours.ago
       Rails.logger.debug { 'WhatsApp Web: Contact has recent avatar, skipping update' }
       return
     end
@@ -228,7 +228,13 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def extract_phone_number(phone_identifier)
     # Remove WhatsApp suffixes if present (@s.whatsapp.net, @g.us)
-    phone_identifier.to_s.split('@').first
+    clean_number = phone_identifier.to_s.split('@').first
+
+    # Remove device-specific parts (e.g., ":35" from "557999777712:35")
+    clean_number = clean_number.split(':').first
+
+    # Extract only numeric characters to ensure valid source_id
+    clean_number.gsub(/\D/, '')
   end
 
   def from_identifier(identifier)

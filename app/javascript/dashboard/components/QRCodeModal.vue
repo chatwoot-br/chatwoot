@@ -22,6 +22,7 @@ export default {
   data() {
     return {
       qrCodeUrl: null,
+      qrCodeBlobUrl: null,
       isLoading: false,
       timeRemaining: 0,
       qrDuration: 60,
@@ -53,6 +54,9 @@ export default {
           if (response.data && response.data.data.results) {
             this.qrCodeUrl = response.data.data.results.qr_link;
             this.qrDuration = response.data.data.results.qr_duration || 60;
+
+            // The QR code URL is now a base64 data URL, so we can use it directly
+            this.qrCodeBlobUrl = this.qrCodeUrl;
           } else {
             throw new Error('Invalid response format from gateway');
           }
@@ -62,6 +66,10 @@ export default {
           const testResponse = await this.testGatewayConnection();
           this.qrCodeUrl = testResponse.qr_link;
           this.qrDuration = testResponse.qr_duration || 60;
+
+          // For test mode, the QR URL might be a direct gateway URL
+          // so we don't need authentication headers
+          this.qrCodeBlobUrl = this.qrCodeUrl;
         }
 
         this.timeRemaining = this.qrDuration;
@@ -73,46 +81,18 @@ export default {
             this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.FETCH_ERROR')
         );
         this.qrCodeUrl = null;
+        this.qrCodeBlobUrl = null;
       } finally {
         this.isLoading = false;
       }
     },
 
     async testGatewayConnection() {
-      // Test connection to gateway with provided config
-      const config = {
-        gateway_base_url: this.gatewayConfig.gatewayBaseUrl,
-      };
-
-      if (
-        this.gatewayConfig.basicAuthUser &&
-        this.gatewayConfig.basicAuthPassword
-      ) {
-        config.basic_auth_user = this.gatewayConfig.basicAuthUser;
-        config.basic_auth_password = this.gatewayConfig.basicAuthPassword;
-      }
-
-      // Make a direct HTTP request to the gateway for testing
-      const axios = (await import('axios')).default;
-      const gatewayUrl = this.gatewayConfig.gatewayBaseUrl.replace(/\/$/, '');
-
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      if (config.basic_auth_user && config.basic_auth_password) {
-        const auth = btoa(
-          `${config.basic_auth_user}:${config.basic_auth_password}`
-        );
-        headers.Authorization = `Basic ${auth}`;
-      }
-
-      // Use GET method as per OpenAPI spec
-      const response = await axios.get(`${gatewayUrl}/app/login`, {
-        headers,
-      });
-
-      return response.data;
+      // Test connection to gateway via backend endpoint
+      const response = await WhatsappWebGatewayApi.testConnection(
+        this.gatewayConfig
+      );
+      return response.data.data;
     },
 
     refreshQRCode() {
@@ -139,20 +119,20 @@ export default {
       this.connectionCheckTimer = setInterval(async () => {
         try {
           if (this.inboxId) {
-            // Check via inbox API
-            const response = await WhatsappWebGatewayApi.getDevices(
+            // Check connection status via status endpoint
+            const response = await WhatsappWebGatewayApi.getStatus(
               this.inboxId
             );
             if (
               response.data &&
               response.data.data &&
-              response.data.data.devices &&
-              response.data.data.devices.length > 0
+              response.data.data.results &&
+              response.data.data.results.is_logged_in
             ) {
               this.handleConnectionSuccess();
             }
           } else {
-            // Check via direct gateway connection
+            // For test mode, check via test devices endpoint
             const devices = await this.checkGatewayDevices();
             if (devices && devices.length > 0) {
               this.handleConnectionSuccess();
@@ -166,29 +146,11 @@ export default {
     },
 
     async checkGatewayDevices() {
-      const axios = (await import('axios')).default;
-      const gatewayUrl = this.gatewayConfig.gatewayBaseUrl.replace(/\/$/, '');
-
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      if (
-        this.gatewayConfig.basicAuthUser &&
-        this.gatewayConfig.basicAuthPassword
-      ) {
-        const auth = btoa(
-          `${this.gatewayConfig.basicAuthUser}:${this.gatewayConfig.basicAuthPassword}`
-        );
-        headers.Authorization = `Basic ${auth}`;
-      }
-
-      // Use correct endpoint as per OpenAPI spec
-      const response = await axios.get(`${gatewayUrl}/app/devices`, {
-        headers,
-      });
-
-      return response.data.devices || [];
+      // Check devices via backend endpoint for test mode
+      const response = await WhatsappWebGatewayApi.testDevices(
+        this.gatewayConfig
+      );
+      return response.data.data.devices || [];
     },
 
     handleConnectionSuccess() {
@@ -268,11 +230,11 @@ export default {
                 />
               </div>
               <div
-                v-else-if="qrCodeUrl"
+                v-else-if="qrCodeBlobUrl"
                 class="border border-n-alpha-20 rounded-lg p-4"
               >
                 <img
-                  :src="qrCodeUrl"
+                  :src="qrCodeBlobUrl"
                   alt="QR Code"
                   class="w-64 h-64 object-contain"
                 />

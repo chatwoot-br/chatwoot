@@ -20,6 +20,10 @@ class WhatsappWebGatewayApi extends ApiClient {
     return axios.get(`${this.url}/${inboxId}/devices`);
   }
 
+  getStatus(inboxId) {
+    return axios.get(`${this.url}/${inboxId}/status`);
+  }
+
   logout(inboxId) {
     return axios.get(`${this.url}/${inboxId}/logout`);
   }
@@ -30,6 +34,25 @@ class WhatsappWebGatewayApi extends ApiClient {
 
   syncHistory(inboxId) {
     return axios.post(`${this.url}/${inboxId}/sync_history`);
+  }
+
+  // Test endpoints for gateway configuration validation
+  testConnection(gatewayConfig) {
+    return axios.post(`${this.url}/test_connection`, {
+      gateway_base_url: gatewayConfig.gatewayBaseUrl,
+      basic_auth_user: gatewayConfig.basicAuthUser,
+      basic_auth_password: gatewayConfig.basicAuthPassword,
+      phone_number: gatewayConfig.phoneNumber,
+    });
+  }
+
+  testDevices(gatewayConfig) {
+    return axios.post(`${this.url}/test_devices`, {
+      gateway_base_url: gatewayConfig.gatewayBaseUrl,
+      basic_auth_user: gatewayConfig.basicAuthUser,
+      basic_auth_password: gatewayConfig.basicAuthPassword,
+      phone_number: gatewayConfig.phoneNumber,
+    });
   }
 }
 
