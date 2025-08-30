@@ -29,7 +29,10 @@
         "octref.vetur",
         "esbenp.prettier-vscode",
         "bradlc.vscode-tailwindcss",
-        "ecmel.vscode-html-css"
+        "ecmel.vscode-html-css",
+        "Vue.volar",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg"
       ]
     }
   },
