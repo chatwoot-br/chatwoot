@@ -143,13 +143,25 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
       return send_file_message(phone_number, attachment, message)
     end
 
+    # Get the appropriate URL for the attachment
+    # In production with S3, prefer file_url (Rails redirect) over download_url (direct S3 URL)
+    # because the gateway might have issues with S3 URLs or their signed parameters
+    image_url = get_accessible_attachment_url(attachment)
+
+    if image_url.blank?
+      Rails.logger.error "[WHATSAPP WEB] No accessible URL available for attachment #{attachment.id}"
+      return send_file_message(phone_number, attachment, message)
+    end
+
+    Rails.logger.debug { "[WHATSAPP WEB] Using image URL: #{image_url}" }
+
     # Build the request body according to API spec
     body_params = {
       phone: phone_number,
       caption: message.outgoing_content.presence || '',
       view_once: false,
       compress: false,
-      image_url: attachment.download_url
+      image_url: image_url
     }
 
     # Add reply context if this is a reply
@@ -166,10 +178,20 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_audio_message(phone_number, attachment, message)
+    # Get the appropriate URL for the attachment
+    audio_url = get_accessible_attachment_url(attachment)
+
+    if audio_url.blank?
+      Rails.logger.error "[WHATSAPP WEB] No accessible URL available for audio attachment #{attachment.id}"
+      return nil
+    end
+
+    Rails.logger.debug { "[WHATSAPP WEB] Using audio URL: #{audio_url}" }
+
     # Build the request body according to API spec
     body_params = {
       phone: phone_number,
-      audio_url: attachment.download_url
+      audio_url: audio_url
     }
 
     # Add reply context if this is a reply
@@ -186,13 +208,23 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_video_message(phone_number, attachment, message)
+    # Get the appropriate URL for the attachment
+    video_url = get_accessible_attachment_url(attachment)
+
+    if video_url.blank?
+      Rails.logger.error "[WHATSAPP WEB] No accessible URL available for video attachment #{attachment.id}"
+      return nil
+    end
+
+    Rails.logger.debug { "[WHATSAPP WEB] Using video URL: #{video_url}" }
+
     # Build the request body according to API spec
     body_params = {
       phone: phone_number,
       caption: message.outgoing_content.presence || '',
       view_once: false,
       compress: false,
-      video_url: attachment.download_url
+      video_url: video_url
     }
 
     # Add reply context if this is a reply
@@ -209,11 +241,21 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_file_message(phone_number, attachment, message)
+    # Get the appropriate URL for the attachment
+    file_url = get_accessible_attachment_url(attachment)
+
+    if file_url.blank?
+      Rails.logger.error "[WHATSAPP WEB] No accessible URL available for file attachment #{attachment.id}"
+      return nil
+    end
+
+    Rails.logger.debug { "[WHATSAPP WEB] Using file URL: #{file_url}" }
+
     # Build the request body according to API spec
     body_params = {
       phone: phone_number,
       caption: message.outgoing_content.presence || '',
-      file_url: attachment.download_url
+      file_url: file_url
     }
 
     # Add reply context if this is a reply
@@ -531,5 +573,29 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     content_type = attachment.file.content_type&.downcase
 
     supported_types.include?(content_type)
+  end
+
+  def get_accessible_attachment_url(attachment)
+    return nil unless attachment.file.attached?
+
+    # In production environments with external storage (S3, etc.),
+    # the direct download URL might not be accessible by external services
+    # due to CORS restrictions or signed URL issues.
+    # Try different URL strategies in order of preference.
+
+    # Strategy 1: Use file_url (Rails redirect) for better compatibility
+    # This uses Rails' own redirect mechanism which handles storage backends better
+    file_url = attachment.file_url
+    return file_url if file_url.present?
+
+    # Strategy 2: Fallback to download_url if file_url is not available
+    download_url = attachment.download_url
+    return download_url if download_url.present?
+
+    # Strategy 3: Use external_url if available (for already external assets)
+    return attachment.external_url if attachment.external_url.present?
+
+    Rails.logger.warn "[WHATSAPP WEB] No accessible URL found for attachment #{attachment.id}"
+    nil
   end
 end

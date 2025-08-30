@@ -129,3 +129,5 @@ curl -X POST "http://host.docker.internal:8088/admin/instances" \
     "webhook_secret": "my-webhook-secret"
   }'
 ```
+
+sudo apt-get update && sudo apt-get install -y libvips42 libvips-dev libvips-tools
