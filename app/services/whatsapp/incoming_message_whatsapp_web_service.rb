@@ -109,8 +109,13 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def event_type_from_payload(payload)
-    identifier = to_identifier(payload[:from])
-    'group.message' if identifier.include?('@g.us')
+    from_field = payload[:from]
+    return 'individual.message' if from_field.nil? || from_field.blank?
+
+    identifier = to_identifier(from_field)
+    return 'individual.message' if identifier.nil? || identifier.blank?
+
+    identifier.include?('@g.us') ? 'group.message' : 'individual.message'
   end
 
   def normalize_message_payload
@@ -248,6 +253,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def extract_phone_number(phone_identifier)
+    return '' if phone_identifier.nil? || phone_identifier.to_s.blank?
+
     # Remove WhatsApp suffixes if present (@s.whatsapp.net, @g.us)
     clean_number = phone_identifier.to_s.split('@').first
 
@@ -274,13 +281,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def to_identifier(identifier)
-    return identifier if identifier.blank?
+    return '' if identifier.blank? || identifier.nil?
 
     # Handle complex identifiers like "552140402221:14@s.whatsapp.net in 552140402221@s.whatsapp.net"
     # Extract the main phone number (last "in" if present, otherwise the first part)
     if identifier.include?(' in ')
       # Get the part after "in" and clean it
-      return identifier.split(' in ').last
+      result = identifier.split(' in ').last
+      return result.presence || identifier.split(' in ').first
     end
 
     cleanup_identifier(identifier)
@@ -289,6 +297,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def cleanup_identifier(identifier)
+    return identifier if identifier.nil? || identifier.blank?
+
     # Handle device-specific identifiers like "552140402221:14@s.whatsapp.net"
     if identifier.include?(':') && identifier.include?('@')
       phone_part = identifier.split(':').first
