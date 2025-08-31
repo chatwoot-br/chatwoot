@@ -32,7 +32,8 @@
         "ecmel.vscode-html-css",
         "Vue.volar",
         "mtxr.sqltools",
-        "mtxr.sqltools-driver-pg"
+        "mtxr.sqltools-driver-pg",
+        "ms-ossdata.vscode-pgsql"
       ]
     }
   },

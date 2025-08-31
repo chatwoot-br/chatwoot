@@ -80,7 +80,7 @@ docker buildx build --load --platform linux/arm64 -f docker/Dockerfile . --no-ca
 docker buildx build --load --platform linux/amd64 -f docker/Dockerfile . --no-cache
 
 # git rev-list --count upstream..HEAD
-docker buildx build --platform linux/amd64,linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
+docker buildx build --platform linux/arm64 -t ghcr.io/chatwoot-br/chatwoot:next -f docker/Dockerfile --push .
 
 docker buildx imagetools create \
   --tag ghcr.io/chatwoot-br/chatwoot:v4.4.0 \
@@ -109,7 +109,7 @@ RAILS_ENV=development bundle exec rails db:chatwoot_prepare
 
 ```bash
 curl -X GET "http://host.docker.internal:3001/app/status" -u "admin:password123"
-curl -X GET "http://host.docker.internal:3001/5521987654321/app/status" -u "admin:password123"
+curl -X GET "http://host.docker.internal:3001/5521995539939/app/status" -u "admin:password123"
 
 curl -X GET "http://host.docker.internal:8088/admin/instances" \
  -H "Authorization: Bearer dev-token-123"
@@ -124,10 +124,17 @@ curl -X POST "http://host.docker.internal:8088/admin/instances" \
     "port": 3001,
     "basic_auth": "admin:password123",
     "debug": true,
-    "base_path": "/5521987654321",
-    "webhook": "http://host.docker.internal:56102/webhooks/whatsapp_web/5521987654321",
+    "base_path": "/5521995539939",
+    "webhook": "http://host.docker.internal:5000/webhooks/whatsapp_web/5521995539939",
     "webhook_secret": "my-webhook-secret"
   }'
 ```
 
 sudo apt-get update && sudo apt-get install -y libvips42 libvips-dev libvips-tools
+
+# Mate todos os processos Rails
+
+pkill -f rails
+pkill -f sidekiq
+
+make db_reset
