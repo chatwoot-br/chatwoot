@@ -14,31 +14,21 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     Rails.logger.info { "WhatsApp Web: Incoming message to contact: #{contact_to.inspect}" }
     return if contact_from.blank?
 
-    contact_inbox_from = ::ContactInboxWithContactBuilder.new(
-      source_id: processed_waid(contact_from[:wa_id]),
-      inbox: inbox,
-      contact_attributes: {
-        identifier: contact_from.dig(:profile, :identifier),
-        name: contact_from.dig(:profile, :name),
-        phone_number: TelephoneNumber.parse(contact_from.dig(:profile, :phone_number)).valid? ? contact_from.dig(:profile, :phone_number) : nil
-      }
-    ).perform
-
-    contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: processed_waid(contact_to[:wa_id]),
-      inbox: inbox,
-      contact_attributes: {
-        identifier: contact_to.dig(:profile, :identifier),
-        name: contact_to.dig(:profile, :name),
-        phone_number: TelephoneNumber.parse(contact_to.dig(:profile, :phone_number)).valid? ? contact_to.dig(:profile, :phone_number) : nil
-      }
-    ).perform
-
-    @contact_inbox = contact_inbox
-    @contact = contact_inbox_from.contact
-
-    # Update existing contact name if ProfileName is available and current name is just phone number
-    update_contact_with_profile_name(contact_from)
+    # Check if this is a message from the company's own WhatsApp (outgoing)
+    if message_from_company?(contact_from, contact_to)
+      Rails.logger.info { 'WhatsApp Web: Outgoing message from company WhatsApp' }
+      # For outgoing messages, we need:
+      # 1. Create contact_inbox for the external contact (recipient)
+      setup_external_contact(contact_to)
+      # 2. Create/find the company contact that will be the sender
+      setup_company_contact(contact_from)
+    else
+      Rails.logger.info { 'WhatsApp Web: Incoming message from external contact' }
+      # For incoming messages, the external contact is contact_from
+      setup_external_contact(contact_from)
+      # Update existing contact name if ProfileName is available and current name is just phone number
+      update_contact_with_profile_name(contact_from)
+    end
 
     update_contact_with_whatsapp_web_specific_data
   end
@@ -48,10 +38,17 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     contact_from = @processed_params[:contacts]&.first
     contact_to = @processed_params[:contacts]&.last
 
-    return unless contact_from.dig(:profile, :identifier) != contact_to.dig(:profile, :identifier)
+    # Check if this is an outgoing message from the company's WhatsApp
+    return unless message_from_company?(contact_from, contact_to)
 
+    Rails.logger.info { 'WhatsApp Web: Setting message as outgoing from company' }
     @message.update_attribute(:message_type, :outgoing)
-    @message.update_attribute(:sender_type, 'User')
+
+    # For outgoing messages, the sender should be the company contact, not external contact
+    return unless @company_contact
+
+    @message.update_attribute(:sender, @company_contact)
+    Rails.logger.info { "WhatsApp Web: Message attributed to company contact: #{@company_contact.name}" }
   end
 
   def update_contact_with_whatsapp_web_specific_data
@@ -77,11 +74,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       return
     end
 
-    Rails.logger.debug 'WhatsApp Web: Updating contact avatar'
+    Rails.logger.debug { "WhatsApp Web: Updating contact avatar for identifier: #{identifier}" }
+
+    # Use the full identifier (not just phone number) for avatar request
     avatar_url = inbox.channel.avatar_url(identifier)
     update_contact_avatar(@contact, avatar_url)
   rescue StandardError => e
     Rails.logger.error "WhatsApp Web: Error updating contact avatar: #{e.message}"
+    Rails.logger.error "WhatsApp Web: Identifier: #{identifier}"
     Rails.logger.error "WhatsApp Web: Backtrace: #{e.backtrace.join("\n")}"
     nil
   end
@@ -165,26 +165,28 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def extract_contact_from(payload)
     identifier = from_identifier(payload[:from])
+    phone_number = "+#{extract_phone_number(identifier)}"
 
     {
       wa_id: extract_phone_number(identifier), # source_id
       profile: {
         identifier: identifier,
-        name: payload[:pushname] || payload[:sender_id],
-        phone_number: "+#{extract_phone_number(identifier)}"
+        name: payload[:pushname] || phone_number,
+        phone_number: phone_number
       }
     }
   end
 
   def extract_contact_to(payload)
     identifier = to_identifier(payload[:from])
+    phone_number = "+#{extract_phone_number(identifier)}"
 
     {
       wa_id: extract_phone_number(identifier), # source_id
       profile: {
         identifier: identifier,
-        name: extract_phone_number(identifier),
-        phone_number: "+#{extract_phone_number(identifier)}"
+        name: phone_number,
+        phone_number: phone_number
       }
     }
   end
@@ -446,5 +448,63 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     return content if message['type'] == 'reaction' && content.present?
 
     content
+  end
+
+  # Check if the message is sent from the company's own WhatsApp number
+  def message_from_company?(contact_from, contact_to)
+    return false if contact_from.blank? || contact_to.blank?
+
+    # Get the company's phone number from the inbox
+    company_phone = extract_phone_number(inbox.channel.phone_number)
+    from_phone = extract_phone_number(contact_from.dig(:profile, :identifier))
+
+    Rails.logger.debug { "WhatsApp Web: Company phone: #{company_phone}, From phone: #{from_phone}" }
+
+    # Message is from company if the sender phone matches the company phone
+    company_phone == from_phone
+  end
+
+  # Setup contact inbox for the external contact (not the company)
+  def setup_external_contact(external_contact_params)
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: processed_waid(external_contact_params[:wa_id]),
+      inbox: inbox,
+      contact_attributes: {
+        identifier: external_contact_params.dig(:profile, :identifier),
+        name: external_contact_params.dig(:profile, :name),
+        phone_number: if TelephoneNumber.parse(external_contact_params.dig(:profile,
+                                                                           :phone_number)).valid?
+                        external_contact_params.dig(:profile,
+                                                    :phone_number)
+                      end
+      }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+
+    # Update existing contact name if ProfileName is available and current name is just phone number
+    update_contact_with_profile_name(external_contact_params)
+  end
+
+  # Setup company contact for outgoing messages
+  def setup_company_contact(company_contact_params)
+    company_phone = extract_phone_number(inbox.channel.phone_number)
+
+    Rails.logger.info { "WhatsApp Web: Setting up company contact with phone: #{company_phone}" }
+
+    # Find or create company contact
+    company_contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: processed_waid(company_contact_params[:wa_id]),
+      inbox: inbox,
+      contact_attributes: {
+        identifier: company_contact_params.dig(:profile, :identifier),
+        name: company_contact_params.dig(:profile, :name),
+        phone_number: inbox.channel.phone_number
+      }
+    ).perform
+
+    @company_contact = company_contact_inbox.contact
+    Rails.logger.info { "WhatsApp Web: Company contact set: #{@company_contact.name} (ID: #{@company_contact.id})" }
   end
 end
