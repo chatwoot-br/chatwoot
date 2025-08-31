@@ -29,7 +29,8 @@ describe Whatsapp::IncomingMessageWhatsappWebService do
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
 
         expect(whatsapp_channel.inbox.conversations.count).not_to eq(0)
-        expect(Contact.all.first.name).to eq('João Silva')
+        created_contact = whatsapp_channel.inbox.contact_inboxes.first.contact
+        expect(created_contact.name).to eq('João Silva')
         expect(whatsapp_channel.inbox.messages.first.content).to eq('Hello, I need help!')
         expect(whatsapp_channel.inbox.contact_inboxes.first.source_id).to eq('5511999887766')
       end

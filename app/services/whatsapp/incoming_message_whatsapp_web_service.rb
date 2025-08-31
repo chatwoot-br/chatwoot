@@ -178,8 +178,27 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def extract_contact_to(payload)
-    identifier = to_identifier(payload[:from])
-    phone_number = "+#{extract_phone_number(identifier)}"
+    # For WhatsApp Web, if payload[:from] contains " in ", extract the part after " in "
+    # Otherwise, if this is incoming to our number (payload doesn't have " in "),
+    # the destination is the current inbox phone number
+    if payload[:from].to_s.include?(' in ')
+      identifier = to_identifier(payload[:from])
+      phone_number = "+#{extract_phone_number(identifier)}"
+    else
+      # For incoming messages without " in " structure, check if sender is different from our inbox
+      sender_phone = extract_phone_number(payload[:from])
+      inbox_phone = extract_phone_number(inbox.channel.phone_number)
+
+      if sender_phone == inbox_phone
+        # Fallback to original logic if sender matches our inbox (edge case)
+        identifier = to_identifier(payload[:from])
+        phone_number = "+#{extract_phone_number(identifier)}"
+      else
+        # This is an incoming message, destination should be our inbox number
+        identifier = "#{inbox_phone}@s.whatsapp.net"
+        phone_number = "+#{inbox_phone}"
+      end
+    end
 
     {
       wa_id: extract_phone_number(identifier), # source_id
