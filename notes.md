@@ -125,7 +125,19 @@ curl -X POST "http://host.docker.internal:8088/admin/instances" \
     "basic_auth": "admin:password123",
     "debug": true,
     "base_path": "/5521995539939",
-    "webhook": "http://host.docker.internal:5000/webhooks/whatsapp_web/5521995539939",
+    "webhook": "http://host.docker.internal:3000/webhooks/whatsapp_web/5521995539939",
+    "webhook_secret": "my-webhook-secret"
+  }'
+
+curl -X POST "http://host.docker.internal:8088/admin/instances" \
+  -H "Authorization: Bearer dev-token-123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "port": 3002,
+    "basic_auth": "admin:password123",
+    "debug": true,
+    "base_path": "/5521998762522",
+    "webhook": "http://host.docker.internal:3000/webhooks/whatsapp_web/5521998762522",
     "webhook_secret": "my-webhook-secret"
   }'
 ```
