@@ -101,21 +101,27 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     case event_type
     when 'message.ack'
       normalize_receipt_payload
+    when 'message'
+      normalize_message_payload
     when 'group.message', 'group.participants'
       normalize_group_payload
     else
-      normalize_message_payload
+      {}.with_indifferent_access
     end
   end
 
   def event_type_from_payload(payload)
     from_field = payload[:from]
-    return 'individual.message' if from_field.nil? || from_field.blank?
+    return 'message' if from_field.nil? || from_field.blank?
 
     identifier = to_identifier(from_field)
-    return 'individual.message' if identifier.nil? || identifier.blank?
+    return 'message' if identifier.nil? || identifier.blank?
 
-    identifier.include?('@g.us') ? 'group.message' : 'individual.message'
+    return 'message' if identifier.include?('@s.whatsapp.net')
+    return 'group.message' if identifier.include?('@g.us')
+    return 'newsletter' if identifier.include?('@newsletter')
+
+    return 'message'
   end
 
   def normalize_message_payload
