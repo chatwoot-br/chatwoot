@@ -36,6 +36,41 @@ describe Whatsapp::IncomingMessageWhatsappWebService do
       end
     end
 
+    context 'when message from device with identifier containing device id' do
+      let(:params) do
+        {
+          event: 'message',
+          payload: {
+            sender_id: '554192928877',
+            chat_id: '554192928877',
+            from: '554192928877:6@s.whatsapp.net in 554192928877@s.whatsapp.net',
+            timestamp: '2025-09-01T22:56:24Z',
+            pushname: '2N Marketing',
+            message: {
+              text: '*Suporte ChatWoot:*\nping',
+              id: '3EB0E8A898020108670F17178A707B8E145C2CD4',
+              replied_id: '',
+              quoted_message: ''
+            },
+            type: 'text'
+          }
+        }.with_indifferent_access
+      end
+
+      it 'creates contact with clean identifier and correct phone number' do
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+
+        expect(whatsapp_channel.inbox.conversations.count).not_to eq(0)
+        created_contact = whatsapp_channel.inbox.contact_inboxes.first.contact
+
+        # Should clean the identifier removing device id (:6)
+        expect(created_contact.identifier).to eq('554192928877@s.whatsapp.net')
+        expect(created_contact.name).to eq('2N Marketing')
+        expect(created_contact.phone_number).to eq('+554192928877')
+        expect(whatsapp_channel.inbox.contact_inboxes.first.source_id).to eq('554192928877')
+      end
+    end
+
     context 'when image message params from go-whatsapp-web-multidevice' do
       let(:params) do
         {

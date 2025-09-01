@@ -277,13 +277,11 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Handle complex identifiers like "552140402221:14@s.whatsapp.net in 552140402221@s.whatsapp.net"
     # Extract the main phone number (first "in" if present, otherwise the first part)
     if identifier.include?(' in ')
-      # Get the part after "in" and clean it
-      return identifier.split(' in ').first
+      # Get the part before "in" and clean it
+      return cleanup_identifier(identifier.split(' in ').first)
     end
 
     cleanup_identifier(identifier)
-
-    identifier
   end
 
   def to_identifier(identifier)
@@ -293,13 +291,11 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Extract the main phone number (last "in" if present, otherwise the first part)
     if identifier.include?(' in ')
       # Get the part after "in" and clean it
-      result = identifier.split(' in ').last
-      return result.presence || identifier.split(' in ').first
+      result = cleanup_identifier(identifier.split(' in ').last)
+      return result.presence || cleanup_identifier(identifier.split(' in ').first)
     end
 
     cleanup_identifier(identifier)
-
-    identifier
   end
 
   def cleanup_identifier(identifier)
@@ -507,11 +503,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       contact_attributes: {
         identifier: external_contact_params.dig(:profile, :identifier),
         name: external_contact_params.dig(:profile, :name),
-        phone_number: if TelephoneNumber.parse(external_contact_params.dig(:profile,
-                                                                           :phone_number)).valid?
-                        external_contact_params.dig(:profile,
-                                                    :phone_number)
-                      end
+        phone_number: external_contact_params.dig(:profile, :phone_number)
       }
     ).perform
 
