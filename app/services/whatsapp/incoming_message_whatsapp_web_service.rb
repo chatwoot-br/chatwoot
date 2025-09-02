@@ -12,7 +12,13 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     Rails.logger.info { "WhatsApp Web: Incoming message from contact: #{contact_from.inspect}" }
     contact_to = @processed_params[:contacts]&.last
     Rails.logger.info { "WhatsApp Web: Incoming message to contact: #{contact_to.inspect}" }
+
+    # Return early if no valid contacts to avoid creating empty conversations
     return if contact_from.blank?
+
+    # Ensure we have valid message data before creating contacts
+    messages = @processed_params[:messages]
+    return if messages.blank? || messages.first.blank?
 
     # Check if this is a message from the company's own WhatsApp (outgoing)
     if message_from_company?(contact_from, contact_to)
@@ -102,10 +108,17 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     when 'message.ack'
       normalize_receipt_payload
     when 'message'
+      # Only process if we have valid message data
+      return {}.with_indifferent_access if payload_data[:message].blank? && payload_data[:text].blank?
+
       normalize_message_payload
     when 'group.message', 'group.participants'
-      normalize_group_payload
+      # Skip group events entirely to avoid empty conversations
+      Rails.logger.debug { 'WhatsApp Web: Skipping group event processing' }
+      return {}.with_indifferent_access
     else
+      # Skip unknown event types to avoid empty conversations
+      Rails.logger.debug { "WhatsApp Web: Skipping unknown event type: #{event_type}" }
       {}.with_indifferent_access
     end
   end
@@ -127,12 +140,31 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def normalize_message_payload
     payload = params[:payload] || params
 
+    # Validate that we have essential message data
+    if payload[:message].blank? && payload[:text].blank? && payload[:content].blank?
+      Rails.logger.debug { 'WhatsApp Web: Skipping payload without message content' }
+      return {}.with_indifferent_access
+    end
+
     # Extract contact information based on payload fields
     contact_from = extract_contact_from(payload)
     contact_to = extract_contact_to(payload)
 
     # Extract message information
     message_info = extract_message_info(payload)
+
+    # Validate message has content before proceeding
+    if message_info['text']&.dig('body').blank? &&
+       message_info['image'].blank? &&
+       message_info['video'].blank? &&
+       message_info['audio'].blank? &&
+       message_info['document'].blank? &&
+       message_info['location'].blank? &&
+       message_info['contacts'].blank? &&
+       message_info['sticker'].blank?
+      Rails.logger.debug { 'WhatsApp Web: Skipping message without valid content' }
+      return {}.with_indifferent_access
+    end
 
     {
       contacts: [contact_from, contact_to],
@@ -171,6 +203,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def normalize_group_payload
     # Group events are not processed as messages at the moment
     # Returns empty structure to avoid processing
+    Rails.logger.debug { 'WhatsApp Web: Skipping group event processing' }
     {}.with_indifferent_access
   end
 
@@ -497,8 +530,22 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Setup contact inbox for the external contact (not the company)
   def setup_external_contact(external_contact_params)
+    # Validate we have essential contact data
+    return unless external_contact_params&.dig(:profile, :identifier).present?
+
+    source_id = processed_waid(external_contact_params[:wa_id])
+
+    # Check if contact_inbox already exists to avoid duplicates
+    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    if existing_contact_inbox
+      @contact_inbox = existing_contact_inbox
+      @contact = existing_contact_inbox.contact
+      Rails.logger.debug { "WhatsApp Web: Using existing contact_inbox for source_id: #{source_id}" }
+      return
+    end
+
     contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: processed_waid(external_contact_params[:wa_id]),
+      source_id: source_id,
       inbox: inbox,
       contact_attributes: {
         identifier: external_contact_params.dig(:profile, :identifier),
@@ -516,13 +563,26 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Setup company contact for outgoing messages
   def setup_company_contact(company_contact_params)
+    # Validate we have essential contact data
+    return unless company_contact_params&.dig(:profile, :identifier).present?
+
     company_phone = extract_phone_number(inbox.channel.phone_number)
 
     Rails.logger.info { "WhatsApp Web: Setting up company contact with phone: #{company_phone}" }
 
+    source_id = processed_waid(company_contact_params[:wa_id])
+
+    # Check if company contact_inbox already exists to avoid duplicates
+    existing_company_contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    if existing_company_contact_inbox
+      @company_contact = existing_company_contact_inbox.contact
+      Rails.logger.debug { "WhatsApp Web: Using existing company contact_inbox for source_id: #{source_id}" }
+      return
+    end
+
     # Find or create company contact
     company_contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: processed_waid(company_contact_params[:wa_id]),
+      source_id: source_id,
       inbox: inbox,
       contact_attributes: {
         identifier: company_contact_params.dig(:profile, :identifier),
