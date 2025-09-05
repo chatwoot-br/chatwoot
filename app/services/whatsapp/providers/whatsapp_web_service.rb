@@ -102,10 +102,10 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_text_message(phone_number, message)
-    # Prepare message content with agent name if sender is present and signature is enabled
+    # Prepare message content with agent display name if sender is present and signature is enabled
     include_signature = whatsapp_channel.provider_config['include_signature']
-    message_content = if include_signature && message.sender&.name.present?
-                        "*#{message.sender.name}:*\n #{message.outgoing_content}"
+    message_content = if include_signature && message.sender&.available_name.present?
+                        "*#{message.sender.available_name}:*\n #{message.outgoing_content}"
                       else
                         message.outgoing_content
                       end

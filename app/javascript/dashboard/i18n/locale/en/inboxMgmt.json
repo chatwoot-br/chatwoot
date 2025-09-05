@@ -341,7 +341,7 @@
         },
         "INCLUDE_SIGNATURE": {
           "LABEL": "Include agent signature in messages",
-          "HELP_TEXT": "Add agent's name to outgoing messages (e.g., *Agent Name:* message content)"
+          "HELP_TEXT": "Add agent's display name to outgoing messages (e.g., *Display Name:* message content)"
         },
         "CONNECTION_STATUS": {
           "LABEL": "Connection Status",
