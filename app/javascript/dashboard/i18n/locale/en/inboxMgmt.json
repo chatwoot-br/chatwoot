@@ -343,6 +343,17 @@
           "LABEL": "Include agent signature in messages",
           "HELP_TEXT": "Add agent's name to outgoing messages (e.g., *Agent Name:* message content)"
         },
+        "CONNECTION_STATUS": {
+          "LABEL": "Connection Status",
+          "REFRESH": "Refresh",
+          "REFRESHING": "Refreshing...",
+          "CONNECTED": "Connected",
+          "DISCONNECTED": "Disconnected",
+          "WAITING_QR": "Waiting for QR scan",
+          "CHECKING": "Checking...",
+          "ERROR": "Connection error",
+          "UNKNOWN": "Unknown status"
+        },
         "TEST_CONNECTION": {
           "BUTTON": "Test Connection",
           "SUCCESS": "Gateway connection established successfully!",

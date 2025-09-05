@@ -343,6 +343,17 @@
           "LABEL": "Incluir assinatura do agente nas mensagens",
           "HELP_TEXT": "Adicionar nome do agente às mensagens enviadas (ex: *Nome do Agente:* conteúdo da mensagem)"
         },
+        "CONNECTION_STATUS": {
+          "LABEL": "Status da Conexão",
+          "REFRESH": "Atualizar",
+          "REFRESHING": "Atualizando...",
+          "CONNECTED": "Conectado",
+          "DISCONNECTED": "Desconectado",
+          "WAITING_QR": "Aguardando leitura do QR",
+          "CHECKING": "Verificando...",
+          "ERROR": "Erro de conexão",
+          "UNKNOWN": "Status desconhecido"
+        },
         "TEST_CONNECTION": {
           "BUTTON": "Testar Conexão",
           "SUCCESS": "Conexão com o gateway estabelecida com sucesso!",

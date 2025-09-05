@@ -6,6 +6,7 @@ import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import QRCodeModal from 'dashboard/components/QRCodeModal.vue';
+import WhatsappWebGatewayApi from 'dashboard/api/whatsappWebGateway';
 
 export default {
   name: 'WhatsappWebForm',
@@ -42,6 +43,8 @@ export default {
       webhookSecret: '',
       includeSignature: true,
       showQRModal: false,
+      connectionStatus: null,
+      isLoadingStatus: false,
     };
   },
   computed: {
@@ -63,6 +66,52 @@ export default {
     },
     showInboxNameField() {
       return this.mode === 'create';
+    },
+    connectionStatusText() {
+      if (this.isLoadingStatus) return 'CHECKING';
+      if (!this.connectionStatus) return 'UNKNOWN';
+
+      // Parse the status response based on QRCodeModal logic
+      if (this.connectionStatus.code === 'SUCCESS') {
+        // Check if logged in (similar to QRCodeModal logic)
+        if (this.connectionStatus.results?.is_logged_in) {
+          return 'CONNECTED';
+        }
+
+        // Check status string for more detailed info
+        const status = this.connectionStatus.results?.status || '';
+        if (status.includes('connected') || status.includes('authenticated')) {
+          return 'CONNECTED';
+        }
+        if (
+          status.includes('disconnected') ||
+          status.includes('not authenticated')
+        ) {
+          return 'DISCONNECTED';
+        }
+        if (status.includes('qr') || status.includes('waiting')) {
+          return 'WAITING_QR';
+        }
+
+        // Default to disconnected if success but no logged in flag
+        return 'DISCONNECTED';
+      }
+      return 'ERROR';
+    },
+    connectionStatusColor() {
+      switch (this.connectionStatusText) {
+        case 'CONNECTED':
+          return 'text-green-600 bg-green-50 border-green-200';
+        case 'DISCONNECTED':
+        case 'ERROR':
+          return 'text-red-600 bg-red-50 border-red-200';
+        case 'WAITING_QR':
+          return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+        case 'CHECKING':
+          return 'text-blue-600 bg-blue-50 border-blue-200';
+        default:
+          return 'text-gray-600 bg-gray-50 border-gray-200';
+      }
     },
   },
   validations() {
@@ -86,6 +135,7 @@ export default {
       handler(newInbox) {
         if (newInbox && this.mode === 'edit') {
           this.setDefaults(newInbox);
+          this.checkConnectionStatus();
         }
       },
     },
@@ -155,6 +205,25 @@ export default {
       };
 
       this.$emit('submit', formData);
+    },
+
+    async checkConnectionStatus() {
+      if (this.mode !== 'edit' || !this.inbox?.id) return;
+
+      this.isLoadingStatus = true;
+      try {
+        const response = await WhatsappWebGatewayApi.getStatus(this.inbox.id);
+        this.connectionStatus = response.data.data;
+      } catch (error) {
+        // Connection status check failed
+        this.connectionStatus = { code: 'ERROR', error: error.message };
+      } finally {
+        this.isLoadingStatus = false;
+      }
+    },
+
+    async refreshConnectionStatus() {
+      await this.checkConnectionStatus();
     },
   },
 };
@@ -286,6 +355,42 @@ export default {
       <p class="text-xs text-slate-11 mt-1">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.INCLUDE_SIGNATURE.HELP_TEXT') }}
       </p>
+    </div>
+
+    <!-- Connection Status (only in edit mode) -->
+    <div v-if="mode === 'edit'" class="flex-shrink-0 flex-grow-0 my-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-slate-12">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.LABEL') }}
+        </span>
+        <button
+          type="button"
+          :disabled="isLoadingStatus"
+          class="text-sm text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+          @click="refreshConnectionStatus"
+        >
+          {{
+            isLoadingStatus
+              ? $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.REFRESHING')
+              : $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.REFRESH')
+          }}
+        </button>
+      </div>
+      <div
+        class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border"
+        :class="connectionStatusColor"
+      >
+        <span
+          v-if="isLoadingStatus"
+          class="inline-block w-3 h-3 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"
+        />
+        <span v-else class="w-2 h-2 mr-2 rounded-full bg-current" />
+        {{
+          $t(
+            `INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.${connectionStatusText}`
+          )
+        }}
+      </div>
     </div>
 
     <div class="flex gap-2 mt-4">
