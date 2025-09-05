@@ -225,8 +225,6 @@
           "WHATSAPP_EMBEDDED": "WhatsApp Business",
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
-          "WHATSAPP_CLOUD_DESC": "Configuração rápida via Meta",
-          "TWILIO_DESC": "Conectar através de credenciais Twilio",
           "WHATSAPP_CLOUD_DESC": "Configuração rápida através do Meta",
           "TWILIO_DESC": "Conectar via credenciais do Twilio",
           "360_DIALOG": "360Dialog",
@@ -340,6 +338,10 @@
           "PLACEHOLDER": "secreto_webhook_123",
           "TOOLTIP": "Usado para validar assinatura HMAC dos webhooks",
           "ERROR": "Este campo é obrigatório"
+        },
+        "INCLUDE_SIGNATURE": {
+          "LABEL": "Incluir assinatura do agente nas mensagens",
+          "HELP_TEXT": "Adicionar nome do agente às mensagens enviadas (ex: *Nome do Agente:* conteúdo da mensagem)"
         },
         "TEST_CONNECTION": {
           "BUTTON": "Testar Conexão",

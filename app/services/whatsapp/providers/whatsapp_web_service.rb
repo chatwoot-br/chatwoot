@@ -102,8 +102,13 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_text_message(phone_number, message)
-    # Prepare message content with agent name if sender is present
-    message_content = message.sender&.name.present? ? "*#{message.sender.name}:*\n #{message.outgoing_content}" : message.outgoing_content
+    # Prepare message content with agent name if sender is present and signature is enabled
+    include_signature = whatsapp_channel.provider_config['include_signature']
+    message_content = if include_signature && message.sender&.name.present?
+                        "*#{message.sender.name}:*\n #{message.outgoing_content}"
+                      else
+                        message.outgoing_content
+                      end
 
     payload = {
       phone: sanitize_number(phone_number),
@@ -416,7 +421,7 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   private
 
   def convert_qr_to_base64(result)
-    return unless result.dig('results', 'qr_link').present?
+    return if result.dig('results', 'qr_link').blank?
 
     original_qr_link = result['results']['qr_link']
     Rails.logger.debug { "[WHATSAPP_WEB] Converting QR link: #{original_qr_link}" }
@@ -530,7 +535,7 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
       if message_id.present?
         Rails.logger.info "[WHATSAPP WEB] Message sent successfully with ID: #{message_id}"
         # Update message with source_id for receipt tracking
-        message.update!(source_id: message_id) if message
+        message&.update!(source_id: message_id)
         return message_id
       end
     end

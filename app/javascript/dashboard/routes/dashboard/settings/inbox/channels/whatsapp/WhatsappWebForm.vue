@@ -40,6 +40,7 @@ export default {
       basicAuthUser: '',
       basicAuthPassword: '',
       webhookSecret: '',
+      includeSignature: true,
       showQRModal: false,
     };
   },
@@ -102,6 +103,8 @@ export default {
         this.basicAuthPassword =
           inbox.provider_config.basic_auth_password || '';
         this.webhookSecret = inbox.provider_config.webhook_secret || '';
+        this.includeSignature =
+          inbox.provider_config.include_signature !== false;
       }
     },
 
@@ -137,6 +140,7 @@ export default {
       const providerConfig = {
         gateway_base_url: this.gatewayBaseUrl,
         webhook_secret: this.webhookSecret,
+        include_signature: this.includeSignature,
       };
 
       if (this.basicAuthUser && this.basicAuthPassword) {
@@ -270,6 +274,18 @@ export default {
           {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.WEBHOOK_SECRET.ERROR') }}
         </span>
       </label>
+    </div>
+
+    <div class="flex-shrink-0 flex-grow-0">
+      <label class="flex items-center">
+        <input v-model="includeSignature" type="checkbox" class="mr-2" />
+        <span>
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.INCLUDE_SIGNATURE.LABEL') }}
+        </span>
+      </label>
+      <p class="text-xs text-slate-11 mt-1">
+        {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.INCLUDE_SIGNATURE.HELP_TEXT') }}
+      </p>
     </div>
 
     <div class="flex gap-2 mt-4">

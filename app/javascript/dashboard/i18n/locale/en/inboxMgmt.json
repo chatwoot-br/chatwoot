@@ -339,6 +339,10 @@
           "TOOLTIP": "Used to validate HMAC signature of webhooks",
           "ERROR": "This field is required"
         },
+        "INCLUDE_SIGNATURE": {
+          "LABEL": "Include agent signature in messages",
+          "HELP_TEXT": "Add agent's name to outgoing messages (e.g., *Agent Name:* message content)"
+        },
         "TEST_CONNECTION": {
           "BUTTON": "Test Connection",
           "SUCCESS": "Gateway connection established successfully!",
