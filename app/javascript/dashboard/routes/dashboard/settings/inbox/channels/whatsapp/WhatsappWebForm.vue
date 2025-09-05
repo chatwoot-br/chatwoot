@@ -290,6 +290,7 @@ export default {
 
     <div class="flex gap-2 mt-4">
       <NextButton
+        v-if="mode === 'edit'"
         type="button"
         color="green"
         variant="outline"
