@@ -354,6 +354,17 @@
           "ERROR": "Connection error",
           "UNKNOWN": "Unknown status"
         },
+        "DISCONNECT": {
+          "TITLE": "Disconnect",
+          "CONFIRMATION": "Are you sure you want to disconnect WhatsApp? You'll need to scan the QR code again to reconnect.",
+          "SUCCESS": "WhatsApp disconnected successfully",
+          "ERROR": "Failed to disconnect WhatsApp"
+        },
+        "RECONNECT": {
+          "TITLE": "Restart Connection",
+          "SUCCESS": "WhatsApp connection restart initiated successfully",
+          "ERROR": "Failed to restart WhatsApp connection"
+        },
         "TEST_CONNECTION": {
           "BUTTON": "Test Connection",
           "SUCCESS": "Gateway connection established successfully!",

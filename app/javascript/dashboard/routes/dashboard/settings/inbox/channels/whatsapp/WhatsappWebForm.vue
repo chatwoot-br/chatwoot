@@ -45,6 +45,8 @@ export default {
       showQRModal: false,
       connectionStatus: null,
       isLoadingStatus: false,
+      isDisconnecting: false,
+      isReconnecting: false,
     };
   },
   computed: {
@@ -112,6 +114,21 @@ export default {
         default:
           return 'text-gray-600 bg-gray-50 border-gray-200';
       }
+    },
+    showConnectButton() {
+      return this.connectionStatusText !== 'CONNECTED';
+    },
+    showDisconnectButton() {
+      return this.connectionStatusText === 'CONNECTED';
+    },
+    showReconnectButton() {
+      // Reconnect should be available when connected (to restart connection)
+      // or when there are connection issues
+      return (
+        this.connectionStatusText === 'CONNECTED' ||
+        this.connectionStatusText === 'DISCONNECTED' ||
+        this.connectionStatusText === 'ERROR'
+      );
     },
   },
   validations() {
@@ -224,6 +241,51 @@ export default {
 
     async refreshConnectionStatus() {
       await this.checkConnectionStatus();
+    },
+
+    async disconnectWhatsApp() {
+      if (!this.inbox?.id) return;
+
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.CONFIRMATION')
+      );
+
+      if (!confirmed) return;
+
+      this.isDisconnecting = true;
+      try {
+        await WhatsappWebGatewayApi.logout(this.inbox.id);
+        useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.SUCCESS'));
+        // Refresh status after successful disconnect
+        await this.checkConnectionStatus();
+      } catch (error) {
+        useAlert(
+          error.message ||
+            this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.ERROR')
+        );
+      } finally {
+        this.isDisconnecting = false;
+      }
+    },
+
+    async reconnectWhatsApp() {
+      if (!this.inbox?.id) return;
+
+      this.isReconnecting = true;
+      try {
+        await WhatsappWebGatewayApi.reconnect(this.inbox.id);
+        useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.SUCCESS'));
+        // Refresh status after successful reconnect
+        await this.checkConnectionStatus();
+      } catch (error) {
+        useAlert(
+          error.message ||
+            this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.ERROR')
+        );
+      } finally {
+        this.isReconnecting = false;
+      }
     },
   },
 };
@@ -394,8 +456,9 @@ export default {
     </div>
 
     <div class="flex gap-2 mt-4">
+      <!-- Connect Button (QR Code) -->
       <NextButton
-        v-if="mode === 'edit'"
+        v-if="mode === 'edit' && showConnectButton"
         type="button"
         color="green"
         variant="outline"
@@ -406,6 +469,33 @@ export default {
         @click="openQRModal"
       />
 
+      <!-- Disconnect Button -->
+      <NextButton
+        v-if="mode === 'edit' && showDisconnectButton"
+        type="button"
+        color="red"
+        variant="outline"
+        size="md"
+        icon="i-lucide-log-out"
+        :label="$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.TITLE')"
+        :is-loading="isDisconnecting"
+        @click="disconnectWhatsApp"
+      />
+
+      <!-- Reconnect Button -->
+      <NextButton
+        v-if="mode === 'edit' && showReconnectButton"
+        type="button"
+        color="orange"
+        variant="outline"
+        size="md"
+        icon="i-lucide-refresh-cw"
+        :label="$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.TITLE')"
+        :is-loading="isReconnecting"
+        @click="reconnectWhatsApp"
+      />
+
+      <!-- Submit Button -->
       <NextButton
         :is-loading="isLoading"
         type="submit"

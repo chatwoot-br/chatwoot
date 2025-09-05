@@ -354,6 +354,17 @@
           "ERROR": "Erro de conexão",
           "UNKNOWN": "Status desconhecido"
         },
+        "DISCONNECT": {
+          "TITLE": "Desconectar",
+          "CONFIRMATION": "Tem certeza que deseja desconectar o WhatsApp? Será necessário escanear o código QR novamente para reconectar.",
+          "SUCCESS": "WhatsApp desconectado com sucesso",
+          "ERROR": "Falha ao desconectar o WhatsApp"
+        },
+        "RECONNECT": {
+          "TITLE": "Reiniciar Conexão",
+          "SUCCESS": "Reinicialização da conexão do WhatsApp iniciada com sucesso",
+          "ERROR": "Falha ao reiniciar a conexão do WhatsApp"
+        },
         "TEST_CONNECTION": {
           "BUTTON": "Testar Conexão",
           "SUCCESS": "Conexão com o gateway estabelecida com sucesso!",
