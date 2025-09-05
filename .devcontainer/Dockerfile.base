@@ -8,7 +8,7 @@ ARG NODE_VERSION
 ARG RUBY_VERSION
 ARG USER_UID
 ARG USER_GID
-ARG PNPM_VERSION="10.2.0"
+ARG PNPM_VERSION="10.15.1"
 ENV PNPM_VERSION ${PNPM_VERSION}
 ENV RUBY_CONFIGURE_OPTS=--disable-install-doc
 
@@ -33,6 +33,9 @@ RUN NODE_MAJOR=$(echo $NODE_VERSION | cut -d. -f1) \
         libpq-dev \
         git \
         imagemagick \
+        libvips42 \
+        libvips-dev \
+        libvips-tools \
         libyaml-dev \
         curl \
         ca-certificates \

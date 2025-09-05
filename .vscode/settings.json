@@ -2,5 +2,17 @@
     "cSpell.words": [
         "chatwoot",
         "dompurify"
+    ],
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "localhost",
+            "username": "postgres",
+            "password": "P@ssw0rd",
+            "database": "chatwoot_dev"
+        }
     ]
 }

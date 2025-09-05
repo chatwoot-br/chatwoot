@@ -2,39 +2,48 @@
   "name": "Chatwoot Development Codespace",
   "service": "app",
   "dockerComposeFile": "docker-compose.yml",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
 
-  "settings": {
-    "terminal.integrated.shell.linux": "/bin/zsh",
-    "extensions.showRecommendationsOnlyOnDemand": true,
-    "editor.formatOnSave": true,
-    "files.trimTrailingWhitespace": true,
-    "files.insertFinalNewline": true,
-    "search.exclude": {
-      "**/node_modules": true,
-      "**/tmp": true,
-      "**/log": true,
-      "**/coverage": true,
-      "**/public/packs": true
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/zsh",
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/tmp": true,
+          "**/log": true,
+          "**/coverage": true,
+          "**/public/packs": true
+        }
+      },
+      "extensions": [
+        "Shopify.ruby-lsp",
+        "misogi.ruby-rubocop",
+        "davidpallinder.rails-test-runner",
+        "github.copilot",
+        "mrmlnc.vscode-duplicate",
+        "octref.vetur",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ecmel.vscode-html-css",
+        "Vue.volar",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "ms-ossdata.vscode-pgsql"
+      ]
     }
   },
-
-
-  // Add the IDs of extensions you want installed when the container is created.
-  "extensions": [
-    "Shopify.ruby-lsp",
-    "misogi.ruby-rubocop",
-    "davidpallinder.rails-test-runner",
-    "github.copilot",
-    "mrmlnc.vscode-duplicate"
-  ],
-
 
   // 5432 postgres
   // 6379 redis
   // 1025,8025 mailhog
   "forwardPorts": [8025, 3000, 3036],
 
-  "postCreateCommand": ".devcontainer/scripts/setup.sh && POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare && pnpm install",
+  "postCreateCommand": "bash -c '.devcontainer/scripts/setup.sh && gem install bundler && bundle install && pnpm install && POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare'",
   "portsAttributes": {
     "3000": {
       "label": "Rails Server"

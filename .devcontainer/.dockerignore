@@ -1,0 +1,24 @@
+# Node modules will be installed in container
+node_modules
+
+# Bundle will be installed in container
+vendor/bundle
+
+# Temporary files
+tmp
+log
+storage
+public/system
+public/packs
+
+# Development files
+.DS_Store
+*.swp
+*~
+
+# Environment files (will be created by setup script)
+.env
+.env.*
+
+# Development configs
+docker-compose.*
