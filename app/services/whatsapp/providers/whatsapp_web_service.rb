@@ -102,9 +102,12 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_text_message(phone_number, message)
+    # Prepare message content with agent name if sender is present
+    message_content = message.sender&.name.present? ? "*#{message.sender.name}:*\n #{message.outgoing_content}" : message.outgoing_content
+
     payload = {
       phone: sanitize_number(phone_number),
-      message: message.outgoing_content
+      message: message_content
     }
 
     # Add reply_message_id if this is a reply to another message
