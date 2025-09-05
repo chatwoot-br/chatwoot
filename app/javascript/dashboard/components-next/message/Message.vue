@@ -204,15 +204,16 @@ const isBotOrAgentMessage = computed(() => {
 });
 
 /**
- * Computes the message orientation based on sender type and message type
+ * Computes the message orientation based on message type
  * @returns {import('vue').ComputedRef<'left'|'right'|'center'>} The computed orientation
  */
 const orientation = computed(() => {
-  if (isBotOrAgentMessage.value) {
+  if (props.messageType === MESSAGE_TYPES.ACTIVITY) return ORIENTATION.CENTER;
+
+  // All outgoing messages should be aligned to the right
+  if (props.messageType === MESSAGE_TYPES.OUTGOING) {
     return ORIENTATION.RIGHT;
   }
-
-  if (props.messageType === MESSAGE_TYPES.ACTIVITY) return ORIENTATION.CENTER;
 
   return ORIENTATION.LEFT;
 });
