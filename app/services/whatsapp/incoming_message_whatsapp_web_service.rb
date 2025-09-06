@@ -34,10 +34,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       setup_external_contact(contact_from)
       # Update existing contact name if ProfileName is available and current name is just phone number
       update_contact_with_profile_name(contact_from)
-      # For group messages, set up the group contact but with null phone_number
-      contact_to_modified = contact_to.dup
-      contact_to_modified[:profile][:phone_number] = nil
-      setup_external_contact(contact_to_modified)
+
+      setup_group_contact(contact_to)
     else
       Rails.logger.info { 'WhatsApp Web: Incoming message from external contact' }
       # For incoming messages, the external contact is contact_from
@@ -254,11 +252,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       end
     end
 
-    # For groups, use the full identifier as wa_id to pass validation
-    wa_id_value = identifier.include?('@g.us') ? identifier : extract_phone_number(identifier)
-
     {
-      wa_id: wa_id_value, # source_id
+      wa_id: extract_phone_number(identifier), # source_id
       profile: {
         identifier: identifier,
         name: phone_number,
@@ -580,6 +575,38 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     # Update existing contact name if ProfileName is available and current name is just phone number
     update_contact_with_profile_name(external_contact_params)
+  end
+
+  # Setup contact inbox for the group
+  def setup_group_contact(group_contact_params)
+    # Validate we have essential contact data
+    return unless group_contact_params&.dig(:profile, :identifier).present?
+
+    source_id = group_contact_params.dig(:profile, :identifier)
+
+    # Check if contact_inbox already exists to avoid duplicates
+    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    if existing_contact_inbox
+      @contact_inbox = existing_contact_inbox
+      @contact = existing_contact_inbox.contact
+      Rails.logger.debug { "WhatsApp Web: Using existing contact_inbox for source_id: #{source_id}" }
+      return
+    end
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: source_id,
+      inbox: inbox,
+      contact_attributes: {
+        identifier: source_id,
+        name: group_contact_params.dig(:profile, :name)
+      }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+
+    # Update existing contact name if ProfileName is available and current name is just phone number
+    update_contact_with_profile_name(group_contact_params)
   end
 
   # Setup company contact for outgoing messages
