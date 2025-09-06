@@ -13,36 +13,78 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     contact_to = @processed_params[:contacts]&.last
     Rails.logger.info { "WhatsApp Web: Incoming message to contact: #{contact_to.inspect}" }
 
-    # Return early if no valid contacts to avoid creating empty conversations
-    return if contact_from.blank?
+    return unless valid_contacts_and_messages?
 
-    # Ensure we have valid message data before creating contacts
-    messages = @processed_params[:messages]
-    return if messages.blank? || messages.first.blank?
-
-    # Check if this is a message from the company's own WhatsApp (outgoing)
     if message_from_company?(contact_from, contact_to)
-      Rails.logger.info { 'WhatsApp Web: Outgoing message from company WhatsApp' }
-      # For outgoing messages, we need:
-      # 1. Create contact_inbox for the external contact (recipient)
-      setup_external_contact(contact_to)
-      # 2. Create/find the company contact that will be the sender
-      setup_company_contact(contact_from)
+      handle_company_message(contact_from, contact_to)
+    elsif message_to_group?(contact_from, contact_to)
+      handle_incoming_group_message(contact_from, contact_to)
     else
-      Rails.logger.info { 'WhatsApp Web: Incoming message from external contact' }
-      # For incoming messages, the external contact is contact_from
-      setup_external_contact(contact_from)
-      # Update existing contact name if ProfileName is available and current name is just phone number
-      update_contact_with_profile_name(contact_from)
+      handle_incoming_individual_message(contact_from)
     end
 
     update_contact_with_whatsapp_web_specific_data
+  end
+
+  def valid_contacts_and_messages?
+    # Return early if no valid contacts to avoid creating empty conversations
+    return false if @processed_params[:contacts]&.first.blank?
+
+    # Ensure we have valid message data before creating contacts
+    messages = @processed_params[:messages]
+    messages.present? && messages.first.present?
+  end
+
+  def handle_company_message(contact_from, contact_to)
+    if message_to_group?(contact_from, contact_to)
+      Rails.logger.info { 'WhatsApp Web: Outgoing message from company WhatsApp to a group' }
+      setup_group_contact(contact_to)
+    else
+      Rails.logger.info { 'WhatsApp Web: Outgoing message from company WhatsApp to individual' }
+      setup_external_contact(contact_to)
+    end
+    setup_company_contact(contact_from)
+  end
+
+  def handle_incoming_group_message(contact_from, contact_to)
+    Rails.logger.info { 'WhatsApp Web: Incoming message to a group' }
+    Rails.logger.info { "WhatsApp Web: Group message - contact_from: #{contact_from.inspect}" }
+    Rails.logger.info { "WhatsApp Web: Group message - contact_to: #{contact_to.inspect}" }
+
+    # Setup the individual sender contact first (this will be the message sender)
+    setup_external_contact(contact_from)
+    update_contact_with_profile_name(contact_from)
+    Rails.logger.info { "WhatsApp Web: After setup_external_contact - @contact: #{@contact&.name} (#{@contact&.id})" }
+
+    # Store the sender contact before setting up group
+    @sender_contact = @contact
+    @sender_contact_inbox = @contact_inbox
+
+    # Setup the group contact (this will be used for the conversation)
+    setup_group_contact(contact_to)
+    Rails.logger.info { "WhatsApp Web: After setup_group_contact - group contact: #{@contact&.name} (#{@contact&.id})" }
+
+    # Restore the sender as the message contact, but keep group as conversation contact
+    # The conversation will be with the group, but messages will be from individual senders
+  end
+
+  def handle_incoming_individual_message(contact_from)
+    Rails.logger.info { 'WhatsApp Web: Incoming message from external contact' }
+    setup_external_contact(contact_from)
+    update_contact_with_profile_name(contact_from)
   end
 
   def create_messages
     super
     contact_from = @processed_params[:contacts]&.first
     contact_to = @processed_params[:contacts]&.last
+
+    # For group messages, ensure the sender is the individual who sent the message, not the group
+    if message_to_group?(contact_from, contact_to) && @sender_contact
+      Rails.logger.info { "WhatsApp Web: Group message - setting sender to individual: #{@sender_contact.name}" }
+      @message.update_attribute(:sender, @sender_contact)
+      return
+    end
 
     # Check if this is an outgoing message from the company's WhatsApp
     return unless message_from_company?(contact_from, contact_to)
@@ -107,12 +149,12 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     case event_type
     when 'message.ack'
       normalize_receipt_payload
-    when 'message'
+    when 'message', 'group.message'
       # Only process if we have valid message data
       return {}.with_indifferent_access if payload_data[:message].blank? && payload_data[:text].blank?
 
       normalize_message_payload
-    when 'group.message', 'group.participants'
+    when 'group.participants'
       # Skip group events entirely to avoid empty conversations
       Rails.logger.debug { 'WhatsApp Web: Skipping group event processing' }
       return {}.with_indifferent_access
@@ -528,6 +570,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     company_phone == from_phone
   end
 
+  # Check if the message is sent from the company's own WhatsApp number
+  def message_to_group?(contact_from, contact_to)
+    return false if contact_from.blank? || contact_to.blank?
+
+    to_phone =  contact_to.dig(:profile, :identifier)
+    to_phone.include?('@g.us')
+  end
+
   # Setup contact inbox for the external contact (not the company)
   def setup_external_contact(external_contact_params)
     # Validate we have essential contact data
@@ -559,6 +609,36 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     # Update existing contact name if ProfileName is available and current name is just phone number
     update_contact_with_profile_name(external_contact_params)
+  end
+
+  # Setup contact inbox for the group
+  def setup_group_contact(group_contact_params)
+    # Validate we have essential contact data
+    return unless group_contact_params&.dig(:profile, :identifier).present?
+
+    source_id = group_contact_params.dig(:profile, :identifier)
+
+    # Check if contact_inbox already exists to avoid duplicates
+    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    if existing_contact_inbox
+      @contact_inbox = existing_contact_inbox
+      @contact = existing_contact_inbox.contact
+      Rails.logger.debug { "WhatsApp Web: Using existing contact_inbox for source_id: #{source_id}" }
+      return
+    end
+
+    group_name = inbox.channel.contact_info(source_id)
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: source_id,
+      inbox: inbox,
+      contact_attributes: {
+        identifier: source_id,
+        name: group_name[:name]
+      }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
   end
 
   # Setup company contact for outgoing messages

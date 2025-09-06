@@ -67,14 +67,17 @@ class ContactInbox < ApplicationRecord
   end
 
   def validate_whatsapp_source_id
-    # For whatsapp_web provider, allow group JIDs like <digits>@g.us in addition to numeric waid
+    # For whatsapp_web provider, allow group JIDs like <digits>@g.us and individual JIDs like <digits>@s.whatsapp.net in addition to numeric waid
     if inbox.channel_type == 'Channel::Whatsapp' && inbox.channel.provider == 'whatsapp_web'
-      return if WHATSAPP_CHANNEL_REGEX.match?(source_id) || WHATSAPP_GROUP_JID_REGEX.match?(source_id)
+      if WHATSAPP_CHANNEL_REGEX.match?(source_id) || WHATSAPP_GROUP_JID_REGEX.match?(source_id) || WHATSAPP_WEB_INDIVIDUAL_JID_REGEX.match?(source_id)
+        return
+      end
     elsif WHATSAPP_CHANNEL_REGEX.match?(source_id)
       return
     end
 
-    errors.add(:source_id, "invalid source id for whatsapp inbox. valid Regex #{WHATSAPP_CHANNEL_REGEX}")
+    errors.add(:source_id,
+               "invalid source id for whatsapp inbox. valid Regex #{WHATSAPP_CHANNEL_REGEX}, group JID #{WHATSAPP_GROUP_JID_REGEX}, or individual JID #{WHATSAPP_WEB_INDIVIDUAL_JID_REGEX}")
   end
 
   def valid_source_id_format?
