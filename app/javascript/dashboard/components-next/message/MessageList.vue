@@ -13,6 +13,7 @@ import { useCamelCase } from 'dashboard/composables/useTransformKeys';
  * @property {Boolean} isAnEmailChannel - Whether this is an email channel
  * @property {Object} inboxSupportsReplyTo - Inbox reply support configuration
  * @property {Array} messages - Array of all messages [These are not in camelcase]
+ * @property {Boolean} isGroupConversation - Whether this is a group conversation
  */
 const props = defineProps({
   currentUserId: {
@@ -34,6 +35,10 @@ const props = defineProps({
   messages: {
     type: Array,
     default: () => [],
+  },
+  isGroupConversation: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -112,6 +117,7 @@ const getInReplyToMessage = parentMessage => {
         :group-with-next="shouldGroupWithNext(index, allMessages)"
         :inbox-supports-reply-to="inboxSupportsReplyTo"
         :current-user-id="currentUserId"
+        :is-group-conversation="isGroupConversation"
         data-clarity-mask="True"
       />
     </template>

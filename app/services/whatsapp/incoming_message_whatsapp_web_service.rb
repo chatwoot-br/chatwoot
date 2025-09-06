@@ -48,9 +48,24 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def handle_incoming_group_message(contact_from, contact_to)
     Rails.logger.info { 'WhatsApp Web: Incoming message to a group' }
+    Rails.logger.info { "WhatsApp Web: Group message - contact_from: #{contact_from.inspect}" }
+    Rails.logger.info { "WhatsApp Web: Group message - contact_to: #{contact_to.inspect}" }
+
+    # Setup the individual sender contact first (this will be the message sender)
     setup_external_contact(contact_from)
     update_contact_with_profile_name(contact_from)
+    Rails.logger.info { "WhatsApp Web: After setup_external_contact - @contact: #{@contact&.name} (#{@contact&.id})" }
+
+    # Store the sender contact before setting up group
+    @sender_contact = @contact
+    @sender_contact_inbox = @contact_inbox
+
+    # Setup the group contact (this will be used for the conversation)
     setup_group_contact(contact_to)
+    Rails.logger.info { "WhatsApp Web: After setup_group_contact - group contact: #{@contact&.name} (#{@contact&.id})" }
+
+    # Restore the sender as the message contact, but keep group as conversation contact
+    # The conversation will be with the group, but messages will be from individual senders
   end
 
   def handle_incoming_individual_message(contact_from)
@@ -63,6 +78,13 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     super
     contact_from = @processed_params[:contacts]&.first
     contact_to = @processed_params[:contacts]&.last
+
+    # For group messages, ensure the sender is the individual who sent the message, not the group
+    if message_to_group?(contact_from, contact_to) && @sender_contact
+      Rails.logger.info { "WhatsApp Web: Group message - setting sender to individual: #{@sender_contact.name}" }
+      @message.update_attribute(:sender, @sender_contact)
+      return
+    end
 
     # Check if this is an outgoing message from the company's WhatsApp
     return unless message_from_company?(contact_from, contact_to)
