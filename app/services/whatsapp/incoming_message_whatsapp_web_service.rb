@@ -593,20 +593,18 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       return
     end
 
+    group_name = inbox.channel.contact_info(source_id)
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: source_id,
       inbox: inbox,
       contact_attributes: {
         identifier: source_id,
-        name: group_contact_params.dig(:profile, :name)
+        name: group_name[:name]
       }
     ).perform
 
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
-
-    # Update existing contact name if ProfileName is available and current name is just phone number
-    update_contact_with_profile_name(group_contact_params)
   end
 
   # Setup company contact for outgoing messages

@@ -101,6 +101,44 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.dig('results', 'url')
   end
 
+  def contact_info(identifier)
+    # Check if this is a group identifier
+    if identifier.include?('@g.us')
+      # Use group info endpoint for groups
+      response = HTTParty.get(
+        "#{api_path}/group/info",
+        headers: api_headers,
+        query: { group_id: identifier }
+      )
+
+      raise StandardError, "Gateway group info failed: #{response.message}" unless response.success?
+
+      # Return group name and info
+      group_data = response.dig('results')
+      group_name = group_data&.dig('name') || group_data&.dig('Name')
+      return { name: group_name, type: 'group' } if group_data.present?
+    else
+      # Use user info endpoint for individual contacts
+      response = HTTParty.get(
+        "#{api_path}/user/info",
+        headers: api_headers,
+        query: { phone: identifier }
+      )
+
+      if response.success? && response.dig('results').present?
+        user_data = response.dig('results')
+        user_name = user_data&.dig('pushname') || user_data&.dig('name') || user_data&.dig('Name')
+        return { name: user_name, type: 'contact' }
+      end
+
+      # Fallback: extract phone number from identifier for display
+      phone = identifier.split('@').first
+      return { name: "+#{phone}", type: 'contact' }
+    end
+
+    nil
+  end
+
   def send_text_message(phone_number, message)
     # Prepare message content with agent display name if sender is present and signature is enabled
     include_signature = whatsapp_channel.provider_config['include_signature']
