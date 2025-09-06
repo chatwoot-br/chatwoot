@@ -74,7 +74,7 @@ class ContactInbox < ApplicationRecord
       return
     end
 
-    errors.add(:source_id, "invalid source id for whatsapp inbox. valid Regex #{WHATSAPP_CHANNEL_REGEX}")
+    errors.add(:source_id, "invalid source id for whatsapp inbox. valid Regex #{WHATSAPP_CHANNEL_REGEX} or group JID #{WHATSAPP_GROUP_JID_REGEX}")
   end
 
   def valid_source_id_format?

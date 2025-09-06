@@ -557,6 +557,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     # Remove any formatting and prefixes
     clean_number = number.to_s.strip.delete_prefix('+')
 
+    # Preserve group JIDs (format: digits@g.us)
+    return clean_number if clean_number.include?('@g.us')
     # The API expects the format: number@s.whatsapp.net
     # Check if it already has the suffix
     return clean_number if clean_number.include?('@s.whatsapp.net')
