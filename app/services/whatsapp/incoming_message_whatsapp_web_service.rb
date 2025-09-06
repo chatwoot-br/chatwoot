@@ -28,6 +28,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       setup_external_contact(contact_to)
       # 2. Create/find the company contact that will be the sender
       setup_company_contact(contact_from)
+    elsif message_to_group?(contact_from, contact_to)
+      Rails.logger.info { 'WhatsApp Web: Incoming message to a group' }
+      # For incoming messages, the external contact is contact_from
+      setup_external_contact(contact_from)
+      # Update existing contact name if ProfileName is available and current name is just phone number
+      update_contact_with_profile_name(contact_from)
+      # For group messages, set up the group contact but with null phone_number
+      contact_to_modified = contact_to.dup
+      contact_to_modified[:profile][:phone_number] = nil
+      setup_external_contact(contact_to_modified)
     else
       Rails.logger.info { 'WhatsApp Web: Incoming message from external contact' }
       # For incoming messages, the external contact is contact_from
@@ -107,12 +117,12 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     case event_type
     when 'message.ack'
       normalize_receipt_payload
-    when 'message'
+    when 'message', 'group.message'
       # Only process if we have valid message data
       return {}.with_indifferent_access if payload_data[:message].blank? && payload_data[:text].blank?
 
       normalize_message_payload
-    when 'group.message', 'group.participants'
+    when 'group.participants'
       # Skip group events entirely to avoid empty conversations
       Rails.logger.debug { 'WhatsApp Web: Skipping group event processing' }
       return {}.with_indifferent_access
@@ -244,8 +254,11 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       end
     end
 
+    # For groups, use the full identifier as wa_id to pass validation
+    wa_id_value = identifier.include?('@g.us') ? identifier : extract_phone_number(identifier)
+
     {
-      wa_id: extract_phone_number(identifier), # source_id
+      wa_id: wa_id_value, # source_id
       profile: {
         identifier: identifier,
         name: phone_number,
@@ -526,6 +539,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     # Message is from company if the sender phone matches the company phone
     company_phone == from_phone
+  end
+
+  # Check if the message is sent from the company's own WhatsApp number
+  def message_to_group?(contact_from, contact_to)
+    return false if contact_from.blank? || contact_to.blank?
+
+    to_phone =  contact_to.dig(:profile, :identifier)
+    to_phone.include?('@g.us')
   end
 
   # Setup contact inbox for the external contact (not the company)
