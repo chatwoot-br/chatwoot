@@ -1,8 +1,8 @@
-class Sms::OneoffSmsCampaignService
+class Whatsapp::OneoffWhatsappCampaignService
   pattr_initialize [:campaign!]
 
   def perform
-    raise "Invalid campaign #{campaign.id}" if campaign.inbox.inbox_type != 'Sms' || !campaign.one_off?
+    raise "Invalid campaign #{campaign.id}" if campaign.inbox.inbox_type != 'Whatsapp' || !campaign.one_off?
     raise 'Completed Campaign' if campaign.completed?
 
     # marks campaign completed so that other jobs won't pick it up
@@ -23,14 +23,24 @@ class Sms::OneoffSmsCampaignService
     contacts.each do |contact|
       next if contact.phone_number.blank?
 
-      content = Liquid::CampaignTemplateService.new(campaign: campaign, contact: contact).call(campaign.message)
-      send_message(to: contact.phone_number, content: content)
+      send_message(to: contact.phone_number, content: campaign.message)
     end
   end
 
   def send_message(to:, content:)
-    channel.send_text_message(to, content)
-  rescue StandardError => e
-    Rails.logger.error("[SMS Campaign #{campaign.id}] Failed to send to #{to}: #{e.message}")
+    # Create a proper message object that the WhatsApp provider expects
+    message_object = OpenStruct.new(
+      content: content,
+      attachments: [],
+      conversation: OpenStruct.new(
+        contact_inbox: OpenStruct.new(source_id: nil),
+        can_reply?: true
+      ),
+      additional_attributes: {},
+      content_type: nil,
+      content_attributes: {}
+    )
+
+    channel.send_message(to, message_object)
   end
 end
