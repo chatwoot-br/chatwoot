@@ -1,70 +1,63 @@
-<script>
-import { mapGetters } from 'vuex';
+<script setup>
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
+import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
 import { required } from '@vuelidate/validators';
-import router from '../../../../index';
 import { isPhoneE164OrEmpty } from 'shared/helpers/Validators';
 
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
-export default {
-  components: {
-    NextButton,
-  },
-  setup() {
-    return { v$: useVuelidate() };
-  },
-  data() {
-    return {
-      phoneNumber: '',
-    };
-  },
-  computed: {
-    ...mapGetters({ uiFlags: 'inboxes/getUIFlags' }),
-  },
-  validations: {
-    phoneNumber: { required, isPhoneE164OrEmpty },
-  },
-  methods: {
-    async createChannel() {
-      this.v$.$touch();
-      if (this.v$.$invalid) {
-        return;
-      }
+const router = useRouter();
+const store = useStore();
+const { t } = useI18n();
 
-      try {
-        const whatsappChannel = await this.$store.dispatch(
-          'inboxes/createEvolutionChannel',
-          {
-            name: this.phoneNumber.replace(/\D/g, ''),
-            channel: {
-              type: 'api',
-            },
-          }
-        );
+const phoneNumber = ref('');
 
-        router.replace({
-          name: 'settings_inboxes_add_agents',
-          params: {
-            page: 'new',
-            inbox_id: whatsappChannel.id,
-          },
-        });
-      } catch (error) {
-        useAlert(
-          error.message || this.$t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE')
-        );
+const uiFlags = computed(() => store.getters['inboxes/getUIFlags']);
+
+const rules = {
+  phoneNumber: { required, isPhoneE164OrEmpty },
+};
+
+const v$ = useVuelidate(rules, { phoneNumber });
+
+const createChannel = async () => {
+  v$.value.$touch();
+  if (v$.value.$invalid) {
+    return;
+  }
+
+  try {
+    const whatsappChannel = await store.dispatch(
+      'inboxes/createEvolutionChannel',
+      {
+        name: phoneNumber.value.replace(/\D/g, ''),
+        channel: {
+          type: 'api',
+        },
       }
-    },
-  },
+    );
+
+    router.replace({
+      name: 'settings_inboxes_add_agents',
+      params: {
+        page: 'new',
+        inbox_id: whatsappChannel.id,
+      },
+    });
+  } catch (error) {
+    useAlert(error.message || t('INBOX_MGMT.ADD.WHATSAPP.API.ERROR_MESSAGE'));
+  }
 };
 </script>
 
 <template>
   <form class="flex flex-wrap mx-0" @submit.prevent="createChannel()">
     <div class="w-[65%] flex-shrink-0 flex-grow-0 max-w-[65%]">
-      <label :class="{ error: v$.phoneNumber.$error }">
+      <label :class="{ error: v$.$error }">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP.PHONE_NUMBER.LABEL') }}
         <input
           v-model.trim="phoneNumber"

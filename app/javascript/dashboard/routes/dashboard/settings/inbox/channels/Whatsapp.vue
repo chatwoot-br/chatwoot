@@ -51,8 +51,8 @@ const availableProviders = computed(() => [
     icon: 'i-woot-twilio',
   },
   {
-    value: PROVIDER_TYPES.EVOLUTION,
-    label: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION'),
+    key: PROVIDER_TYPES.EVOLUTION,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION_DESC'),
     icon: '/assets/images/dashboard/channels/evolution.png',
   },
