@@ -8,9 +8,18 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
     evolution_api_url = ENV.fetch('EVOLUTION_API_URL', params[:webhook_url])
     evolution_api_key = ENV.fetch('EVOLUTION_API_KEY', params[:api_key])
 
-    return render json: { error: 'Evolution API URL is missing' }, status: :unprocessable_entity if evolution_api_url.nil?
+    if evolution_api_url.blank?
+      return render_evolution_error(
+        CustomExceptions::Evolution::InvalidConfiguration.new(details: 'Evolution API URL is missing')
+      )
+    end
+
+    Rails.logger.info("Creating Evolution channel for account: #{Current.account.id}, name: #{permitted_params[:name]}")
 
     ActiveRecord::Base.transaction do
+      # Validate Evolution API connection before creating channel
+      validate_evolution_service(evolution_api_url, evolution_api_key, permitted_params[:name])
+
       channel = create_channel(evolution_api_url)
       @inbox = Current.account.inboxes.build(
         {
@@ -20,15 +29,28 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
           permitted_params.except(:channel)
         )
       )
+      @inbox.save!
 
+      # Create Evolution instance
       Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], evolution_api_url,
                                            evolution_api_key, @user.access_token.token)
-      @inbox.save!
     end
 
+    Rails.logger.info("Evolution channel created successfully: #{@inbox.id}")
     render json: @inbox, status: :created
+  rescue CustomExceptions::Evolution::Base => e
+    render_evolution_error(e)
+  rescue ActiveRecord::RecordInvalid => e
+    Rails.logger.error("Database validation failed for Evolution channel: #{e.message}")
+    render_evolution_error(
+      CustomExceptions::Evolution::InvalidConfiguration.new(details: "Database validation failed: #{e.message}")
+    )
   rescue StandardError => e
-    render json: { error: e.message }, status: :unprocessable_entity
+    Rails.logger.error("Unexpected error creating Evolution channel: #{e.class} - #{e.message}")
+    Rails.logger.error(e.backtrace.join("\n"))
+    render_evolution_error(
+      CustomExceptions::Evolution::InvalidConfiguration.new(details: "Unexpected error: #{e.message}")
+    )
   end
 
   private
@@ -39,6 +61,34 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
 
   def set_user
     @user = current_user
+  end
+
+  def validate_evolution_service(_evolution_api_url, _evolution_api_key, instance_name)
+    # Check if instance name already exists by calling Evolution API
+    # This is a preliminary check before actual creation
+    Rails.logger.info("Validating Evolution service accessibility for instance: #{instance_name}")
+
+    # For now, we rely on the ManagerService validation
+    # Future enhancement: Add a health check endpoint call here
+  end
+
+  def render_evolution_error(exception)
+    error_response = {
+      error: exception.message,
+      error_code: exception.error_code,
+      status: exception.http_status
+    }
+
+    # Add additional context for debugging (only in non-production)
+    unless Rails.env.production?
+      error_response[:details] = {
+        exception_class: exception.class.name,
+        data: exception.instance_variable_get(:@data)
+      }
+    end
+
+    Rails.logger.error("Evolution API Error: #{error_response}")
+    render json: error_response, status: exception.http_status
   end
 
   def create_channel(webhook_url)

@@ -302,7 +302,25 @@
           "MANUAL_LINK_TEXT": "manual setup flow"
         },
         "API": {
-          "ERROR_MESSAGE": "We were not able to save the WhatsApp channel"
+          "ERROR_MESSAGE": "We were not able to save the WhatsApp channel",
+          "EVOLUTION_API_UNAVAILABLE": "Evolution API service is currently unavailable. Please check the service status and try again.",
+          "EVOLUTION_INVALID_CREDENTIALS": "Invalid Evolution API credentials. Please verify your API key and server URL are correct.",
+          "EVOLUTION_CONNECTION_FAILED": "Failed to connect to Evolution API server. Please check the server URL and network connectivity.",
+          "EVOLUTION_PHONE_ALREADY_EXISTS": "This phone number is already registered with another Evolution instance. Please use a different number.",
+          "EVOLUTION_INSTANCE_CREATION_FAILED": "Failed to create Evolution API instance. The service may be experiencing issues.",
+          "EVOLUTION_AUTHENTICATION_FAILED": "Authentication with Evolution API failed. Please verify your credentials and try again.",
+          "EVOLUTION_WEBHOOK_SETUP_FAILED": "WhatsApp channel created but webhook configuration failed. Please configure webhooks manually.",
+          "EVOLUTION_RETRY_MESSAGE": "You can try again in a few moments or contact support if the problem persists.",
+          "EVOLUTION_TROUBLESHOOTING": {
+            "TITLE": "Troubleshooting",
+            "CONTACT_SUPPORT": "Contact support for assistance",
+            "CHECK_API_CREDENTIALS": "Verify your Evolution API credentials are correct",
+            "CHECK_SERVER_URL": "Ensure the Evolution API server URL is accessible",
+            "CHECK_NETWORK": "Check your network connection and firewall settings",
+            "USE_DIFFERENT_PHONE": "Try using a different phone number",
+            "RETRY_LATER": "Wait a few moments and try again",
+            "CHECK_SERVICE_STATUS": "Check Evolution API service status"
+          }
         }
       },
       "VOICE": {
@@ -378,7 +396,22 @@
           "ERROR": "Please enter a valid value."
         },
         "API": {
-          "ERROR_MESSAGE": "We were not able to save the api channel"
+          "ERROR_MESSAGE": "We were not able to save the api channel",
+          "EVOLUTION_API_UNAVAILABLE": "Evolution API service is currently unavailable. Please check the service status and try again.",
+          "EVOLUTION_INVALID_CREDENTIALS": "Invalid Evolution API credentials. Please verify your API key and server URL are correct.",
+          "EVOLUTION_CONNECTION_FAILED": "Failed to connect to Evolution API server. Please check the server URL and network connectivity.",
+          "EVOLUTION_PHONE_ALREADY_EXISTS": "This phone number is already registered with another Evolution instance. Please use a different number.",
+          "EVOLUTION_INSTANCE_CREATION_FAILED": "Failed to create Evolution API instance. The service may be experiencing issues.",
+          "EVOLUTION_AUTHENTICATION_FAILED": "Authentication with Evolution API failed. Please verify your credentials and try again.",
+          "EVOLUTION_WEBHOOK_SETUP_FAILED": "WhatsApp channel created but webhook configuration failed. Please configure webhooks manually.",
+          "EVOLUTION_RETRY_MESSAGE": "You can try again in a few moments or contact support if the problem persists.",
+          "EVOLUTION_TROUBLESHOOTING": {
+            "TITLE": "Troubleshooting Tips",
+            "CHECK_URL": "Verify the Evolution API URL is correct and accessible",
+            "CHECK_CREDENTIALS": "Ensure your API key is valid and has proper permissions",
+            "CHECK_NETWORK": "Check your network connection and firewall settings",
+            "CONTACT_SUPPORT": "Contact your Evolution API administrator if issues continue"
+          }
         }
       },
       "EMAIL_CHANNEL": {

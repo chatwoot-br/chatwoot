@@ -301,7 +301,25 @@
           "SUCCESS_FALLBACK": "A conta do WhatsApp Business foi configurada com sucesso"
         },
         "API": {
-          "ERROR_MESSAGE": "Não foi possível salvar o canal do WhatsApp"
+          "ERROR_MESSAGE": "Não foi possível salvar o canal do WhatsApp",
+          "EVOLUTION_API_UNAVAILABLE": "O serviço Evolution API está indisponível no momento. Verifique o status do serviço e tente novamente.",
+          "EVOLUTION_INVALID_CREDENTIALS": "Credenciais da Evolution API inválidas. Verifique se sua chave API e URL do servidor estão corretas.",
+          "EVOLUTION_CONNECTION_FAILED": "Falha ao conectar com o servidor Evolution API. Verifique a URL do servidor e conectividade de rede.",
+          "EVOLUTION_PHONE_ALREADY_EXISTS": "Este número de telefone já está registrado com outra instância Evolution. Use um número diferente.",
+          "EVOLUTION_INSTANCE_CREATION_FAILED": "Falha ao criar instância Evolution API. O serviço pode estar enfrentando problemas.",
+          "EVOLUTION_AUTHENTICATION_FAILED": "Falha na autenticação com Evolution API. Verifique suas credenciais e tente novamente.",
+          "EVOLUTION_WEBHOOK_SETUP_FAILED": "Canal WhatsApp criado mas configuração do webhook falhou. Configure os webhooks manualmente.",
+          "EVOLUTION_RETRY_MESSAGE": "Você pode tentar novamente em alguns instantes ou entrar em contato com o suporte se o problema persistir.",
+          "EVOLUTION_TROUBLESHOOTING": {
+            "TITLE": "Solução de Problemas",
+            "CONTACT_SUPPORT": "Entre em contato com o suporte para assistência",
+            "CHECK_API_CREDENTIALS": "Verifique se suas credenciais da Evolution API estão corretas",
+            "CHECK_SERVER_URL": "Certifique-se de que a URL do servidor Evolution API está acessível",
+            "CHECK_NETWORK": "Verifique sua conexão de rede e configurações de firewall",
+            "USE_DIFFERENT_PHONE": "Tente usar um número de telefone diferente",
+            "RETRY_LATER": "Aguarde alguns instantes e tente novamente",
+            "CHECK_SERVICE_STATUS": "Verifique o status do serviço Evolution API"
+          }
         }
       },
       "VOICE": {
