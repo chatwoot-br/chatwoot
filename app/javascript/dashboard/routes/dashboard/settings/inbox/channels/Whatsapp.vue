@@ -9,6 +9,7 @@ import Evolution from './Evolution.vue';
 
 import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
+import evolutionIcon from 'dashboard/assets/images/channels/evolution.png';
 
 const route = useRoute();
 const router = useRouter();
@@ -54,7 +55,7 @@ const availableProviders = computed(() => [
     key: PROVIDER_TYPES.EVOLUTION,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION_DESC'),
-    icon: '/assets/images/dashboard/channels/evolution.png',
+    icon: evolutionIcon,
   },
 ]);
 
