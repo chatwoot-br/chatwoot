@@ -1,4 +1,6 @@
 <script>
+import { mapGetters } from 'vuex';
+import { useAccount } from 'dashboard/composables/useAccount';
 import { useAlert } from 'dashboard/composables';
 import inboxMixin from 'shared/mixins/inboxMixin';
 import SettingsSection from '../../../../../components/SettingsSection.vue';
@@ -28,7 +30,8 @@ export default {
     },
   },
   setup() {
-    return { v$: useVuelidate() };
+    const { accountId } = useAccount();
+    return { v$: useVuelidate(), accountId };
   },
   data() {
     return {
@@ -38,17 +41,24 @@ export default {
       isSyncingTemplates: false,
       allowedDomains: '',
       isUpdatingAllowedDomains: false,
+      features: {},
     };
   },
   validations: {
     whatsAppInboxAPIKey: { required },
   },
   computed: {
+    ...mapGetters({
+      getAccount: 'accounts/getAccount',
+    }),
     isEmbeddedSignupWhatsApp() {
       return this.inbox.provider_config?.source === 'embedded_signup';
     },
     whatsappAppId() {
       return window.chatwootConfig?.whatsappAppId;
+    },
+    featureInboundEmailEnabled() {
+      return !!this.features?.inbound_emails;
     },
   },
   watch: {
@@ -63,6 +73,15 @@ export default {
     setDefaults() {
       this.hmacMandatory = this.inbox.hmac_mandatory || false;
       this.allowedDomains = this.inbox.allowed_domains || '';
+
+      try {
+        const { features } = this.getAccount(this.accountId);
+        this.features = features;
+      } catch (error) {
+        // Log error for debugging purposes
+        // eslint-disable-next-line no-console
+        console.error('Error fetching account features:', error);
+      }
     },
     handleHmacFlag() {
       this.updateInbox();
@@ -297,7 +316,7 @@ export default {
     </SettingsSection>
   </div>
   <div v-else-if="isAnEmailChannel">
-    <div class="mx-8">
+    <div v-if="featureInboundEmailEnabled" class="mx-8">
       <SettingsSection
         :title="$t('INBOX_MGMT.SETTINGS_POPUP.FORWARD_EMAIL_TITLE')"
         :sub-title="$t('INBOX_MGMT.SETTINGS_POPUP.FORWARD_EMAIL_SUB_TEXT')"
