@@ -313,6 +313,8 @@
           "EVOLUTION_TROUBLESHOOTING": {
             "TITLE": "Solução de Problemas",
             "CONTACT_SUPPORT": "Entre em contato com o suporte para assistência",
+            "CHECK_CREDENTIALS": "Certifique-se de que sua chave de API é válida e possui as permissões adequadas",
+            "CHECK_URL": "Verifique se a URL da Evolution API está correta e acessível",
             "CHECK_API_CREDENTIALS": "Verifique se suas credenciais da Evolution API estão corretas",
             "CHECK_SERVER_URL": "Certifique-se de que a URL do servidor Evolution API está acessível",
             "CHECK_NETWORK": "Verifique sua conexão de rede e configurações de firewall",
@@ -395,7 +397,22 @@
           "ERROR": "Por favor, insira um valor válido."
         },
         "API": {
-          "ERROR_MESSAGE": "Não foi possível salvar o canal de API"
+          "ERROR_MESSAGE": "Não foi possível salvar o canal de API",
+          "EVOLUTION_API_UNAVAILABLE": "O serviço Evolution API está indisponível no momento. Verifique o status do serviço e tente novamente.",
+          "EVOLUTION_INVALID_CREDENTIALS": "Credenciais Evolution API inválidas. Verifique se sua chave de API e URL do servidor estão corretas.",
+          "EVOLUTION_CONNECTION_FAILED": "Falha ao conectar ao servidor Evolution API. Verifique a URL do servidor e a conectividade de rede.",
+          "EVOLUTION_PHONE_ALREADY_EXISTS": "Este número de telefone já está registrado em outra instância Evolution. Use um número diferente.",
+          "EVOLUTION_INSTANCE_CREATION_FAILED": "Falha ao criar instância Evolution API. O serviço pode estar enfrentando problemas.",
+          "EVOLUTION_AUTHENTICATION_FAILED": "Falha na autenticação com Evolution API. Verifique suas credenciais e tente novamente.",
+          "EVOLUTION_WEBHOOK_SETUP_FAILED": "Canal WhatsApp criado mas configuração do webhook falhou. Configure os webhooks manualmente.",
+          "EVOLUTION_RETRY_MESSAGE": "Você pode tentar novamente em alguns instantes ou entrar em contato com o suporte se o problema persistir.",
+          "EVOLUTION_TROUBLESHOOTING": {
+            "TITLE": "Dicas de Solução de Problemas",
+            "CHECK_URL": "Verifique se a URL da Evolution API está correta e acessível",
+            "CHECK_CREDENTIALS": "Certifique-se de que sua chave de API é válida e possui as permissões adequadas",
+            "CHECK_NETWORK": "Verifique sua conexão de rede e configurações de firewall",
+            "CONTACT_SUPPORT": "Entre em contato com o administrador da Evolution API se os problemas continuarem"
+          }
         }
       },
       "EMAIL_CHANNEL": {

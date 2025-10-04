@@ -314,6 +314,8 @@
           "EVOLUTION_TROUBLESHOOTING": {
             "TITLE": "Troubleshooting",
             "CONTACT_SUPPORT": "Contact support for assistance",
+            "CHECK_CREDENTIALS": "Ensure your API key is valid and has proper permissions",
+            "CHECK_URL": "Verify the Evolution API URL is correct and accessible",
             "CHECK_API_CREDENTIALS": "Verify your Evolution API credentials are correct",
             "CHECK_SERVER_URL": "Ensure the Evolution API server URL is accessible",
             "CHECK_NETWORK": "Check your network connection and firewall settings",
