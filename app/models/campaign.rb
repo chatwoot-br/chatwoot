@@ -34,7 +34,7 @@ class Campaign < ApplicationRecord
   validates :account_id, presence: true
   validates :inbox_id, presence: true
   validates :title, presence: true
-  validates :message, presence: true
+  validates :message, presence: true, length: { maximum: Limits::CAMPAIGN_MESSAGE_MAX_LENGTH }
   validate :validate_campaign_inbox
   validate :validate_url
   validate :prevent_completed_campaign_from_update, on: :update

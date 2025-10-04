@@ -187,13 +187,14 @@ campaigns (
 
 ### Frontend (Vuelidate)
 - title: required, minLength(1)
-- message: required, minLength(1)
+- message: required, minLength(1), maxLength(150000)
 - inboxId: required
 - scheduledAt: required, future date only
 - selectedAudience: required
 
 ### Backend (ActiveRecord)
 - account_id, inbox_id, title, message: presence
+- message: length { maximum: Limits::CAMPAIGN_MESSAGE_MAX_LENGTH } (150,000 chars)
 - inbox: must be API/Whatsapp/SMS/Twilio SMS/Website type
 - inbox: must belong to same account
 - completed campaigns: cannot be updated
@@ -421,6 +422,18 @@ See README.md "Future Enhancements" for roadmap.
 - Email: antonio@milesibastos.com
 - Commit: 923ae29a8
 - Date: September 20, 2025
+
+---
+
+## Recent Updates
+
+**October 4, 2025:**
+- ✅ Message character limit increased from 200 to 150,000 characters
+- ✅ Added `Limits::CAMPAIGN_MESSAGE_MAX_LENGTH` constant
+- ✅ Frontend validation updated with `:max-length="150000"`
+- ✅ Backend validation: `length: { maximum: 150_000 }`
+- ✅ 3 new RSpec tests for message length validation
+- ✅ Matches Message model's content limit
 
 ---
 

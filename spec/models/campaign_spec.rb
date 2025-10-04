@@ -334,5 +334,26 @@ RSpec.describe Campaign do
         end
       end
     end
+
+    describe 'message length validation' do
+      it 'accepts message within the limit' do
+        message = 'a' * 150_000
+        campaign = build(:campaign, inbox: inbox, account: account, message: message)
+        expect(campaign).to be_valid
+      end
+
+      it 'rejects message exceeding the limit' do
+        message = 'a' * 150_001
+        campaign = build(:campaign, inbox: inbox, account: account, message: message)
+        expect(campaign).not_to be_valid
+        expect(campaign.errors[:message]).to include('is too long (maximum is 150000 characters)')
+      end
+
+      it 'accepts empty message (presence validation will catch it)' do
+        campaign = build(:campaign, inbox: inbox, account: account, message: '')
+        expect(campaign).not_to be_valid
+        expect(campaign.errors[:message]).to include("can't be blank")
+      end
+    end
   end
 end

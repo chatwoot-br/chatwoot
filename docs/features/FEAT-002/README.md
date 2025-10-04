@@ -136,7 +136,7 @@ The API Campaign feature enables Chatwoot administrators to create and execute o
 
 **Form Fields:**
 - `title` (String, required, min 1 character)
-- `message` (String, required, min 1 character, character count)
+- `message` (String, required, min 1 character, max 150,000 characters, character count)
 - `inboxId` (Number, required, filtered to API inboxes only)
 - `scheduledAt` (DateTime, required, must be future time)
 - `selectedAudience` (Array of label IDs, required, multi-select)
@@ -145,12 +145,14 @@ The API Campaign feature enables Chatwoot administrators to create and execute o
 ```javascript
 const rules = {
   title: { required, minLength: minLength(1) },
-  message: { required, minLength: minLength(1) },
+  message: { required, minLength: minLength(1), maxLength: maxLength(150000) },
   inboxId: { required },
   scheduledAt: { required },
   selectedAudience: { required },
 };
 ```
+
+**Note:** The 150,000 character limit for campaign messages matches the Message model's content limit, allowing for comprehensive campaign messages while preventing database issues.
 
 #### 3. APICampaignDialog.vue
 **Location:** `app/javascript/dashboard/components-next/Campaigns/Pages/CampaignPage/APICampaign/APICampaignDialog.vue`
@@ -241,7 +243,7 @@ end
 # campaigns table
 - id (bigint, primary key)
 - title (string, required)
-- message (text, required)
+- message (text, required, max 150,000 characters)
 - campaign_type (integer, enum: ongoing=0, one_off=1)
 - campaign_status (integer, enum: active=0, completed=1)
 - audience (jsonb)
@@ -251,6 +253,12 @@ end
 - display_id (integer, auto-generated)
 - sender_id (integer, optional)
 - enabled (boolean, default: true)
+```
+
+**Validation:**
+```ruby
+validates :message, presence: true, length: { maximum: Limits::CAMPAIGN_MESSAGE_MAX_LENGTH }
+# where CAMPAIGN_MESSAGE_MAX_LENGTH = 150,000
 ```
 
 **Campaign Lifecycle:**
@@ -521,7 +529,7 @@ channel.send_message(to: contact.phone_number, message_object)
 | Field | Type | Required | Validation | Placeholder |
 |-------|------|----------|------------|-------------|
 | Title | Text Input | Yes | Min 1 char | "Please enter the title of campaign" |
-| Message | Textarea | Yes | Min 1 char | "Please enter the message of campaign" |
+| Message | Textarea | Yes | Min 1 char, Max 150,000 chars | "Please enter the message of campaign" |
 | Inbox | Dropdown | Yes | Must be API inbox | "Select Inbox" |
 | Audience | Multi-select | Yes | At least 1 label | "Select the customer labels" |
 | Scheduled time | DateTime | Yes | Future time only | "Please select the time" |
@@ -1146,5 +1154,17 @@ The campaign feature has been enhanced with configurable message delays to preve
 - Fully tested with 107 passing tests (80 backend + 27 frontend)
 - Production ready with English and Portuguese translations
 - Delay display in UI deferred to future iteration
+
+**Enhancement: Increased Message Character Limit - October 4, 2025**
+
+The campaign message field limit has been increased from 200 to 150,000 characters:
+- Frontend: Added `:max-length="150000"` to TextArea component
+- Backend: Added `Limits::CAMPAIGN_MESSAGE_MAX_LENGTH` constant (150,000)
+- Backend validation: `validates :message, length: { maximum: Limits::CAMPAIGN_MESSAGE_MAX_LENGTH }`
+- Matches Message model's content limit for consistency
+- No database migration required (TEXT column supports this)
+- Fully backward compatible with existing campaigns
+- 3 new RSpec tests added for message length validation
+- Character counter remains visible to users
 
 The extensible architecture (service-based, channel-agnostic) positions the feature well for future enhancements such as template support, advanced targeting, and additional channel types.

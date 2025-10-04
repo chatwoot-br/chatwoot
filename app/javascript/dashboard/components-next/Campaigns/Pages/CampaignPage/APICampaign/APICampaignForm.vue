@@ -211,6 +211,7 @@ const handleSubmit = async () => {
       v-model="state.message"
       :label="t('CAMPAIGN.API.CREATE.FORM.MESSAGE.LABEL')"
       :placeholder="t('CAMPAIGN.API.CREATE.FORM.MESSAGE.PLACEHOLDER')"
+      :max-length="150000"
       show-character-count
       :message="formErrors.message"
       :message-type="formErrors.message ? 'error' : 'info'"
