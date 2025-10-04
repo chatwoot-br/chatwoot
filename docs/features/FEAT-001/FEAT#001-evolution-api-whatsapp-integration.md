@@ -28,6 +28,53 @@ This version completes the Evolution API integration with full backend functiona
 - **Instance Creation Failed (422)**: Evolution API validation error handling
 - **Connection Refused (503)**: Network connectivity issue detection
 
+```mermaid
+flowchart TD
+    Start([API Request]) --> Validate{Valid<br/>Parameters?}
+
+    Validate -->|No| InvalidConfig[400: Invalid Configuration<br/>Missing URL/Key/Phone]
+    Validate -->|Yes| Connect{Connection<br/>Established?}
+
+    Connect -->|Refused| ConnRefused[503: Connection Refused<br/>Check Evolution API URL]
+    Connect -->|Timeout| NetTimeout[504: Network Timeout<br/>30s timeout exceeded]
+    Connect -->|Yes| Auth{Authenticated?}
+
+    Auth -->|No| AuthError[401: Authentication Error<br/>Invalid API Key]
+    Auth -->|Yes| CreateInstance{Create<br/>Instance?}
+
+    CreateInstance -->|Service Down| ServiceUnavail[503: Service Unavailable<br/>Evolution API is down]
+    CreateInstance -->|Duplicate Name| InstanceConflict[409: Instance Conflict<br/>Instance name exists]
+    CreateInstance -->|Validation Failed| CreationFailed[422: Creation Failed<br/>Evolution API validation error]
+    CreateInstance -->|Success| Success([✓ Instance Created])
+
+    InvalidConfig --> ErrorHandler[Frontend Error Handler]
+    ConnRefused --> ErrorHandler
+    NetTimeout --> ErrorHandler
+    AuthError --> ErrorHandler
+    ServiceUnavail --> ErrorHandler
+    InstanceConflict --> ErrorHandler
+    CreationFailed --> ErrorHandler
+
+    ErrorHandler --> Retry{User<br/>Retries?}
+    Retry -->|Yes| Start
+    Retry -->|No| End([Show Troubleshooting])
+
+    Success --> CreateInbox[Create Inbox & Channel]
+    CreateInbox --> End2([✓ Complete])
+
+    style Start fill:#e1f5ff
+    style Success fill:#e6ffe6
+    style End2 fill:#e6ffe6
+    style ErrorHandler fill:#ffe6e6
+    style InvalidConfig fill:#fff4e6
+    style ConnRefused fill:#fff4e6
+    style NetTimeout fill:#fff4e6
+    style AuthError fill:#fff4e6
+    style ServiceUnavail fill:#fff4e6
+    style InstanceConflict fill:#fff4e6
+    style CreationFailed fill:#fff4e6
+```
+
 #### ✅ Frontend Error Handling Enhancement
 - **Evolution Error Handler**: Specialized error handling utility with user-friendly messages
 - **Enhanced Evolution Component**: Retry logic, troubleshooting tips, and improved error states
@@ -118,6 +165,38 @@ However, there was no native integration between Evolution API and Chatwoot, for
 - Proper conversation threading
 - Contact management (merged Brazilian contacts)
 
+```mermaid
+sequenceDiagram
+    participant Customer
+    participant WA as WhatsApp
+    participant Evolution as Evolution API
+    participant Webhook as Chatwoot Webhook
+    participant Handler as WebhookHandler
+    participant Conv as Conversation
+    participant Agent as Agent Dashboard
+
+    Customer->>WA: Send message
+    WA->>Evolution: Receive message
+    Evolution->>Evolution: Process message
+
+    Evolution->>Webhook: POST /chatwoot/webhook/{instance}
+    Note over Webhook: Webhook payload includes:<br/>- sender info<br/>- message content<br/>- media attachments<br/>- timestamp
+
+    Webhook->>Handler: Validate & parse
+    Handler->>Handler: Find/create contact
+
+    alt Existing Conversation
+        Handler->>Conv: Append message
+    else New Conversation
+        Handler->>Conv: Create conversation
+    end
+
+    Conv->>Agent: Real-time update (WebSocket)
+    Agent->>Agent: Notification & display
+
+    Note over Customer,Agent: Total time: < 5 seconds
+```
+
 ### AC5: Error Handling
 **Given** Invalid Evolution API credentials or network issues
 **When** Channel creation fails
@@ -144,6 +223,47 @@ However, there was no native integration between Evolution API and Chatwoot, for
 - **Database Transactions**: Ensures data consistency during channel creation
 - **Error Handling**: Comprehensive exception handling with user-friendly messages
 - **Authorization**: Pundit policies ensure proper account-level access control
+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        A[Vue 3 Component<br/>Evolution.vue]
+    end
+
+    subgraph "Backend Layer"
+        B[EvolutionChannelsController]
+        C[Evolution::ManagerService]
+        D[Inbox Model]
+        E[Channel Model]
+    end
+
+    subgraph "External Services"
+        F[Evolution API<br/>/instance/create]
+        G[WhatsApp]
+    end
+
+    subgraph "Data Store"
+        H[(PostgreSQL)]
+        I[(Redis)]
+    end
+
+    A -->|POST /api/v1/channels/evolution| B
+    B -->|Authorization Check| B
+    B -->|Create Instance| C
+    C -->|HTTP Request| F
+    F -->|Response| C
+    C -->|Create Inbox| D
+    D -->|Create Channel| E
+    E -->|Persist| H
+    D -->|Cache| I
+    F -.->|Webhook| G
+
+    style A fill:#e1f5ff
+    style B fill:#fff4e6
+    style C fill:#fff4e6
+    style F fill:#ffe6e6
+    style G fill:#e6ffe6
+```
 
 ### Frontend Implementation
 - **Vue 3 Composition API**: Modern reactive patterns with `<script setup>`
@@ -192,6 +312,53 @@ However, there was no native integration between Evolution API and Chatwoot, for
 - **Mobile Responsive**: Full functionality on mobile devices
 - **Accessibility**: WCAG 2.1 AA compliance
 
+### Channel Creation Sequence
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Vue as Evolution.vue
+    participant Store as Vuex Store
+    participant API as Rails API
+    participant Service as ManagerService
+    participant Evolution as Evolution API
+    participant DB as Database
+
+    User->>Vue: Fill form & submit
+    Vue->>Vue: Validate inputs
+    Vue->>Store: dispatch createEvolutionChannel
+    Store->>API: POST /api/v1/channels/evolution
+
+    API->>API: Authorize user
+    API->>Service: create_instance(params)
+
+    Service->>Service: Validate parameters
+    Service->>Evolution: POST /instance/create
+
+    alt Success
+        Evolution-->>Service: Instance created
+        Service->>DB: Create inbox & channel
+        DB-->>Service: Records saved
+        Service-->>API: Success response
+        API-->>Store: Channel data
+        Store-->>Vue: Update state
+        Vue->>User: Redirect to agent assignment
+    else Evolution API Error
+        Evolution-->>Service: Error response
+        Service->>Service: Parse error type
+        Service-->>API: Raise custom exception
+        API-->>Store: Error details
+        Store-->>Vue: Error state
+        Vue->>User: Show error with retry option
+    else Network Error
+        Evolution-->>Service: Timeout/Connection error
+        Service-->>API: Raise NetworkTimeout
+        API-->>Store: Timeout error
+        Store-->>Vue: Timeout state
+        Vue->>User: Show retry with troubleshooting
+    end
+```
+
 ## Edge Cases
 
 ### AC7: Network Failures
@@ -213,6 +380,47 @@ However, there was no native integration between Evolution API and Chatwoot, for
 **Given** A deleted Chatwoot inbox
 **When** The Evolution API instance should be cleaned up
 **Then** The system provides manual cleanup instructions (automated cleanup future enhancement)
+
+```mermaid
+stateDiagram-v2
+    [*] --> Requested: User creates channel
+
+    Requested --> Creating: API call initiated
+    Creating --> Active: Instance created successfully
+    Creating --> Failed: Creation error
+
+    Failed --> Requested: Retry
+    Failed --> [*]: User cancels
+
+    Active --> InUse: Messages flowing
+    InUse --> Active: Continuous operation
+
+    Active --> Deleting: User deletes inbox
+    InUse --> Deleting: User deletes inbox
+
+    Deleting --> CleaningUp: Before_destroy hook
+    CleaningUp --> Deleted: Instance removed from Evolution API
+    CleaningUp --> PartialCleanup: Cleanup fails (logged)
+
+    Deleted --> [*]
+    PartialCleanup --> [*]: Manual intervention required
+
+    note right of Creating
+        HTTP Timeout: 30s
+        Connection: 10s
+        Read: 20s
+    end note
+
+    note right of Active
+        Instance ready for
+        message processing
+    end note
+
+    note right of CleaningUp
+        Automatic cleanup
+        on inbox deletion
+    end note
+```
 
 ## Testing Strategy
 
@@ -284,6 +492,62 @@ describe('evolutionChannel.js', () => {
 - **Input Validation**: Comprehensive validation of all user inputs
 
 ## Integration Patterns
+
+### Component Architecture Overview
+
+```mermaid
+graph LR
+    subgraph "Frontend Components"
+        A[Evolution.vue]
+        B[evolutionErrorHandler.js]
+        C[channelActions.js]
+    end
+
+    subgraph "Rails API Layer"
+        D[EvolutionChannelsController]
+        E[Authorization<br/>Pundit Policy]
+    end
+
+    subgraph "Service Layer"
+        F[Evolution::ManagerService]
+        G[Custom Exceptions]
+        H[HTTP Client<br/>Timeout: 30s]
+    end
+
+    subgraph "Data Models"
+        I[Inbox Model]
+        J[Channel Model]
+        K[Contact Model]
+    end
+
+    subgraph "External APIs"
+        L[Evolution API<br/>Instance Management]
+    end
+
+    A --> B
+    A --> C
+    C --> D
+    D --> E
+    E --> D
+    D --> F
+    F --> G
+    F --> H
+    H --> L
+    F --> I
+    I --> J
+    I --> K
+
+    style A fill:#e1f5ff
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style D fill:#fff4e6
+    style F fill:#fff4e6
+    style G fill:#ffe6e6
+    style L fill:#ffe6e6
+    style I fill:#e6f7ff
+    style J fill:#e6f7ff
+    style K fill:#e6f7ff
+```
 
 ### Service Layer Pattern
 ```ruby
