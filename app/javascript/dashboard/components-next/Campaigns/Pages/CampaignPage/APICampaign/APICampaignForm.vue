@@ -1,8 +1,14 @@
 <script setup>
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
-import { required, minLength } from '@vuelidate/validators';
+import {
+  required,
+  minLength,
+  numeric,
+  minValue,
+  maxValue,
+} from '@vuelidate/validators';
 import { useMapGetter } from 'dashboard/composables/store';
 
 import Input from 'dashboard/components-next/input/Input.vue';
@@ -31,6 +37,12 @@ const initialState = {
 
 const state = reactive({ ...initialState });
 
+// Delay configuration state
+const delayType = ref('none');
+const delaySeconds = ref(0);
+const delayMin = ref(1);
+const delayMax = ref(5);
+
 const rules = {
   title: { required, minLength: minLength(1) },
   message: { required, minLength: minLength(1) },
@@ -39,7 +51,54 @@ const rules = {
   selectedAudience: { required },
 };
 
+// Custom validator for delay min/max range
+const delayRangeValidator = () => {
+  if (delayType.value === 'random') {
+    return delayMin.value <= delayMax.value;
+  }
+  return true;
+};
+
+// Dynamic validation rules for delay fields
+const delayValidationRules = computed(() => {
+  if (delayType.value === 'fixed') {
+    return {
+      delaySeconds: {
+        required,
+        numeric,
+        minValue: minValue(0),
+        maxValue: maxValue(300),
+      },
+    };
+  }
+  if (delayType.value === 'random') {
+    return {
+      delayMin: {
+        required,
+        numeric,
+        minValue: minValue(0),
+        maxValue: maxValue(300),
+      },
+      delayMax: {
+        required,
+        numeric,
+        minValue: minValue(0),
+        maxValue: maxValue(300),
+        delayRangeValidator,
+      },
+    };
+  }
+  return {};
+});
+
+const delayState = computed(() => ({
+  delaySeconds: delaySeconds.value,
+  delayMin: delayMin.value,
+  delayMax: delayMax.value,
+}));
+
 const v$ = useVuelidate(rules, state);
+const v$delay = useVuelidate(delayValidationRules, delayState);
 
 const isCreating = computed(() => formState.uiFlags.value.isCreating);
 
@@ -66,6 +125,7 @@ const inboxOptions = computed(() =>
 
 const getErrorMessage = (field, errorKey) => {
   const baseKey = 'CAMPAIGN.API.CREATE.FORM';
+  // eslint-disable-next-line @intlify/vue-i18n/no-dynamic-keys
   return v$.value[field].$error ? t(`${baseKey}.${errorKey}.ERROR`) : '';
 };
 
@@ -84,9 +144,32 @@ const formatToUTCString = localDateTime =>
 
 const resetState = () => {
   Object.assign(state, initialState);
+  delayType.value = 'none';
+  delaySeconds.value = 0;
+  delayMin.value = 1;
+  delayMax.value = 5;
 };
 
 const handleCancel = () => emit('cancel');
+
+const prepareDelayConfiguration = () => {
+  if (delayType.value === 'fixed') {
+    return {
+      type: 'fixed',
+      seconds: delaySeconds.value,
+    };
+  }
+  if (delayType.value === 'random') {
+    return {
+      type: 'random',
+      min: delayMin.value,
+      max: delayMax.value,
+    };
+  }
+  return {
+    type: 'none',
+  };
+};
 
 const prepareCampaignDetails = () => ({
   title: state.title,
@@ -97,11 +180,16 @@ const prepareCampaignDetails = () => ({
     id,
     type: 'Label',
   })),
+  trigger_rules: {
+    delay: prepareDelayConfiguration(),
+  },
 });
 
 const handleSubmit = async () => {
   const isFormValid = await v$.value.$validate();
-  if (!isFormValid) return;
+  const isDelayValid = await v$delay.value.$validate();
+
+  if (!isFormValid || !isDelayValid) return;
 
   emit('submit', prepareCampaignDetails());
   resetState();
@@ -167,6 +255,113 @@ const handleSubmit = async () => {
       :message="formErrors.scheduledAt"
       :message-type="formErrors.scheduledAt ? 'error' : 'info'"
     />
+
+    <!-- Message Delay Configuration -->
+    <div
+      class="flex flex-col gap-3 p-4 border border-n-slate-6 rounded-lg bg-n-alpha-black2"
+    >
+      <label class="text-sm font-medium text-n-slate-12">
+        {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.LABEL') }}
+      </label>
+
+      <!-- Radio buttons for delay type -->
+      <div class="flex flex-wrap gap-4">
+        <label class="flex items-center cursor-pointer">
+          <input
+            v-model="delayType"
+            type="radio"
+            value="none"
+            class="w-4 h-4 text-n-blue-9 border-n-slate-7 focus:ring-n-blue-9 focus:ring-2"
+          />
+          <span class="ml-2 text-sm text-n-slate-12">
+            {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.NONE') }}
+          </span>
+        </label>
+
+        <label class="flex items-center cursor-pointer">
+          <input
+            v-model="delayType"
+            type="radio"
+            value="fixed"
+            class="w-4 h-4 text-n-blue-9 border-n-slate-7 focus:ring-n-blue-9 focus:ring-2"
+          />
+          <span class="ml-2 text-sm text-n-slate-12">
+            {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.FIXED') }}
+          </span>
+        </label>
+
+        <label class="flex items-center cursor-pointer">
+          <input
+            v-model="delayType"
+            type="radio"
+            value="random"
+            class="w-4 h-4 text-n-blue-9 border-n-slate-7 focus:ring-n-blue-9 focus:ring-2"
+          />
+          <span class="ml-2 text-sm text-n-slate-12">
+            {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.RANDOM') }}
+          </span>
+        </label>
+      </div>
+
+      <!-- Fixed delay input -->
+      <div v-if="delayType === 'fixed'" class="flex flex-col gap-2">
+        <Input
+          v-model.number="delaySeconds"
+          type="number"
+          min="0"
+          max="300"
+          :label="t('CAMPAIGN.API.CREATE.FORM.DELAY.FIXED_SECONDS')"
+          :placeholder="t('CAMPAIGN.API.CREATE.FORM.DELAY.FIXED_PLACEHOLDER')"
+          :message="
+            v$delay.delaySeconds?.$error
+              ? t('CAMPAIGN.API.CREATE.FORM.DELAY.ERROR_RANGE')
+              : t('CAMPAIGN.API.CREATE.FORM.DELAY.HELP_TEXT')
+          "
+          :message-type="v$delay.delaySeconds?.$error ? 'error' : 'info'"
+        />
+      </div>
+
+      <!-- Random delay inputs -->
+      <div v-if="delayType === 'random'" class="flex flex-col gap-3">
+        <div class="grid grid-cols-2 gap-4">
+          <Input
+            v-model.number="delayMin"
+            type="number"
+            min="0"
+            max="300"
+            :label="t('CAMPAIGN.API.CREATE.FORM.DELAY.MIN_SECONDS')"
+            :message="
+              v$delay.delayMin?.$error
+                ? t('CAMPAIGN.API.CREATE.FORM.DELAY.ERROR_RANGE')
+                : ''
+            "
+            :message-type="v$delay.delayMin?.$error ? 'error' : 'info'"
+          />
+
+          <Input
+            v-model.number="delayMax"
+            type="number"
+            min="0"
+            max="300"
+            :label="t('CAMPAIGN.API.CREATE.FORM.DELAY.MAX_SECONDS')"
+            :message="
+              v$delay.delayMax?.$error
+                ? t('CAMPAIGN.API.CREATE.FORM.DELAY.ERROR_RANGE')
+                : ''
+            "
+            :message-type="v$delay.delayMax?.$error ? 'error' : 'info'"
+          />
+        </div>
+
+        <p v-if="delayMin > delayMax" class="text-xs text-n-red-9">
+          {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.ERROR_MIN_MAX') }}
+        </p>
+
+        <p class="text-xs text-n-slate-11">
+          {{ t('CAMPAIGN.API.CREATE.FORM.DELAY.RANDOM_HELP_TEXT') }}
+        </p>
+      </div>
+    </div>
 
     <div class="flex items-center justify-between w-full gap-3">
       <Button

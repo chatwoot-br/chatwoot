@@ -162,7 +162,7 @@ describe('APICampaignForm', () => {
     expect(wrapper.vm.state.message).toBe('');
   });
 
-  it('formats campaign details correctly', () => {
+  it('formats campaign details correctly with no delay', () => {
     const wrapper = createWrapper();
 
     wrapper.vm.state.title = 'Test API Campaign';
@@ -182,6 +182,11 @@ describe('APICampaignForm', () => {
         { id: 1, type: 'Label' },
         { id: 2, type: 'Label' },
       ],
+      trigger_rules: {
+        delay: {
+          type: 'none',
+        },
+      },
     });
   });
 
@@ -191,5 +196,266 @@ describe('APICampaignForm', () => {
     wrapper.vm.handleCancel();
 
     expect(wrapper.emitted().cancel).toBeTruthy();
+  });
+
+  // ============================================
+  // Message Delay Feature Tests
+  // ============================================
+
+  describe('Message Delay Configuration', () => {
+    it('initializes with default delay state (none)', () => {
+      const wrapper = createWrapper();
+
+      expect(wrapper.vm.delayType).toBe('none');
+      expect(wrapper.vm.delaySeconds).toBe(0);
+      expect(wrapper.vm.delayMin).toBe(1);
+      expect(wrapper.vm.delayMax).toBe(5);
+    });
+
+    it('renders radio buttons for delay type selection', () => {
+      const wrapper = createWrapper();
+
+      const radioInputs = wrapper.findAll('input[type="radio"]');
+      expect(radioInputs.length).toBeGreaterThanOrEqual(3);
+
+      const noneRadio = wrapper.find('input[value="none"]');
+      const fixedRadio = wrapper.find('input[value="fixed"]');
+      const randomRadio = wrapper.find('input[value="random"]');
+
+      expect(noneRadio.exists()).toBe(true);
+      expect(fixedRadio.exists()).toBe(true);
+      expect(randomRadio.exists()).toBe(true);
+    });
+
+    it('displays fixed delay input when fixed type is selected', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'fixed';
+      await nextTick();
+
+      // Check that delay configuration section exists
+      const delaySection = wrapper.find('.flex.flex-col.gap-3.p-4');
+      expect(delaySection.exists()).toBe(true);
+    });
+
+    it('displays random delay inputs when random type is selected', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'random';
+      await nextTick();
+
+      // Check that delay configuration section exists
+      const delaySection = wrapper.find('.flex.flex-col.gap-3.p-4');
+      expect(delaySection.exists()).toBe(true);
+    });
+
+    it('prepares delay configuration for fixed delay', () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 10;
+
+      const delayConfig = wrapper.vm.prepareDelayConfiguration();
+
+      expect(delayConfig).toEqual({
+        type: 'fixed',
+        seconds: 10,
+      });
+    });
+
+    it('prepares delay configuration for random delay', () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 3;
+      wrapper.vm.delayMax = 10;
+
+      const delayConfig = wrapper.vm.prepareDelayConfiguration();
+
+      expect(delayConfig).toEqual({
+        type: 'random',
+        min: 3,
+        max: 10,
+      });
+    });
+
+    it('prepares delay configuration for no delay', () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'none';
+
+      const delayConfig = wrapper.vm.prepareDelayConfiguration();
+
+      expect(delayConfig).toEqual({
+        type: 'none',
+      });
+    });
+
+    it('includes delay in campaign details for fixed delay', () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.state.title = 'Test';
+      wrapper.vm.state.message = 'Message';
+      wrapper.vm.state.inboxId = 1;
+      wrapper.vm.state.scheduledAt = '2025-06-01T10:00';
+      wrapper.vm.state.selectedAudience = [1];
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 5;
+
+      const campaignDetails = wrapper.vm.prepareCampaignDetails();
+
+      expect(campaignDetails.trigger_rules).toEqual({
+        delay: {
+          type: 'fixed',
+          seconds: 5,
+        },
+      });
+    });
+
+    it('includes delay in campaign details for random delay', () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.state.title = 'Test';
+      wrapper.vm.state.message = 'Message';
+      wrapper.vm.state.inboxId = 1;
+      wrapper.vm.state.scheduledAt = '2025-06-01T10:00';
+      wrapper.vm.state.selectedAudience = [1];
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 3;
+      wrapper.vm.delayMax = 10;
+
+      const campaignDetails = wrapper.vm.prepareCampaignDetails();
+
+      expect(campaignDetails.trigger_rules).toEqual({
+        delay: {
+          type: 'random',
+          min: 3,
+          max: 10,
+        },
+      });
+    });
+
+    it('validates fixed delay within range (0-300)', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 150;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(false);
+    });
+
+    it('invalidates fixed delay outside range (> 300)', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 350;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(true);
+    });
+
+    it('invalidates fixed delay outside range (< 0)', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = -5;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(true);
+    });
+
+    it('validates random delay when min <= max', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 5;
+      wrapper.vm.delayMax = 10;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(false);
+    });
+
+    it('invalidates random delay when min > max', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 15;
+      wrapper.vm.delayMax = 10;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(true);
+    });
+
+    it('validates random delay with equal min and max values', async () => {
+      const wrapper = createWrapper();
+
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 5;
+      wrapper.vm.delayMax = 5;
+
+      await wrapper.vm.v$delay.$validate();
+      expect(wrapper.vm.v$delay.$invalid).toBe(false);
+    });
+
+    it('resets delay state when resetState is called', () => {
+      const wrapper = createWrapper();
+
+      // Set non-default delay values
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 20;
+      wrapper.vm.delayMin = 10;
+      wrapper.vm.delayMax = 30;
+
+      // Reset
+      wrapper.vm.resetState();
+
+      // Check values are back to defaults
+      expect(wrapper.vm.delayType).toBe('none');
+      expect(wrapper.vm.delaySeconds).toBe(0);
+      expect(wrapper.vm.delayMin).toBe(1);
+      expect(wrapper.vm.delayMax).toBe(5);
+    });
+
+    it('prevents form submission when delay validation fails', async () => {
+      const wrapper = createWrapper();
+
+      // Fill form with valid data
+      wrapper.vm.state.title = 'Test';
+      wrapper.vm.state.message = 'Message';
+      wrapper.vm.state.inboxId = 1;
+      wrapper.vm.state.scheduledAt = '2025-06-01T10:00';
+      wrapper.vm.state.selectedAudience = [1];
+
+      // Set invalid delay (min > max)
+      wrapper.vm.delayType = 'random';
+      wrapper.vm.delayMin = 20;
+      wrapper.vm.delayMax = 10;
+
+      await wrapper.vm.handleSubmit();
+
+      // Submission should not emit because delay validation failed
+      expect(wrapper.emitted().submit).toBeFalsy();
+    });
+
+    it('allows form submission when delay validation passes', async () => {
+      const wrapper = createWrapper();
+
+      // Fill form with valid data
+      wrapper.vm.state.title = 'Test';
+      wrapper.vm.state.message = 'Message';
+      wrapper.vm.state.inboxId = 1;
+      wrapper.vm.state.scheduledAt = '2025-06-01T10:00';
+      wrapper.vm.state.selectedAudience = [1];
+
+      // Set valid delay
+      wrapper.vm.delayType = 'fixed';
+      wrapper.vm.delaySeconds = 5;
+
+      await wrapper.vm.handleSubmit();
+
+      // Submission should emit because all validations passed
+      expect(wrapper.emitted().submit).toBeTruthy();
+    });
   });
 });

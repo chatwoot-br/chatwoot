@@ -248,6 +248,20 @@
             "PLACEHOLDER": "Por favor insira a hora",
             "ERROR": "Horário agendado é necessário"
           },
+          "DELAY": {
+            "LABEL": "Atraso entre Mensagens",
+            "NONE": "Sem atraso (enviar imediatamente)",
+            "FIXED": "Atraso fixo",
+            "RANDOM": "Atraso aleatório",
+            "FIXED_SECONDS": "Atraso (segundos)",
+            "FIXED_PLACEHOLDER": "Digite segundos (0-300)",
+            "MIN_SECONDS": "Mín (segundos)",
+            "MAX_SECONDS": "Máx (segundos)",
+            "HELP_TEXT": "Tempo de espera entre o envio de mensagens. Ajuda a evitar limitação de taxa.",
+            "RANDOM_HELP_TEXT": "As mensagens serão enviadas com um atraso aleatório entre mín e máx segundos.",
+            "ERROR_MIN_MAX": "O atraso mínimo deve ser menor ou igual ao atraso máximo",
+            "ERROR_RANGE": "O valor deve estar entre 0 e 300 segundos"
+          },
           "BUTTONS": {
             "CREATE": "Criar",
             "CANCEL": "Cancelar"

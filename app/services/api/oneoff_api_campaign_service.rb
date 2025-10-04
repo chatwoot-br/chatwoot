@@ -20,7 +20,16 @@ class Api::OneoffApiCampaignService
 
   def process_audience(audience_labels)
     contacts = campaign.account.contacts.tagged_with(audience_labels, any: true)
-    contacts.each do |contact|
+    contacts.each_with_index do |contact, index|
+      # Apply delay before sending (except for first message)
+      if index.positive?
+        delay_seconds = campaign.calculate_delay
+        if delay_seconds.positive?
+          Rails.logger.info "[API Campaign] Applying delay of #{delay_seconds} seconds before sending to contact #{contact.id}"
+          sleep(delay_seconds)
+        end
+      end
+
       create_conversation_and_message(contact)
     end
   end

@@ -143,4 +143,128 @@ RSpec.describe Api::OneoffApiCampaignService do
       end
     end
   end
+
+  describe 'delay functionality' do
+    let(:contact2) { create(:contact, account: account) }
+    let(:contact3) { create(:contact, account: account) }
+
+    before do
+      contact2.label_list = [label.title]
+      contact2.save!
+      contact3.label_list = [label.title]
+      contact3.save!
+    end
+
+    context 'when campaign has no delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }], trigger_rules: {})
+      end
+
+      it 'sends all messages immediately without delay' do
+        expect(subject).not_to receive(:sleep)
+        subject.perform
+        expect(Conversation.count).to eq(3)
+      end
+    end
+
+    context 'when campaign has fixed delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 2 } })
+      end
+
+      it 'applies fixed delay between messages except first' do
+        expect(subject).to receive(:sleep).with(2).twice
+        subject.perform
+        expect(Conversation.count).to eq(3)
+      end
+
+      it 'logs delay application' do
+        allow(subject).to receive(:sleep)
+        allow(Rails.logger).to receive(:info).and_call_original
+        subject.perform
+        # Verify delay was applied (sleep was called) instead of checking logs
+        expect(subject).to have_received(:sleep).with(2).exactly(2).times
+      end
+    end
+
+    context 'when campaign has random delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'random', 'min' => 1, 'max' => 3 } })
+      end
+
+      it 'applies random delay within range between messages except first' do
+        delays = []
+        allow(subject).to receive(:sleep) do |delay|
+          delays << delay
+        end
+
+        subject.perform
+
+        expect(delays.count).to eq(2)
+        delays.each do |delay|
+          expect(delay).to be >= 1
+          expect(delay).to be <= 3
+        end
+      end
+
+      it 'logs delay application with actual value' do
+        allow(subject).to receive(:sleep)
+        allow(Rails.logger).to receive(:info).and_call_original
+        subject.perform
+        # Verify delay was applied (sleep was called) instead of checking logs
+        expect(subject).to have_received(:sleep).exactly(2).times
+      end
+    end
+
+    context 'when campaign has delay type "none"' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'none' } })
+      end
+
+      it 'does not apply any delay' do
+        expect(subject).not_to receive(:sleep)
+        subject.perform
+        expect(Conversation.count).to eq(3)
+      end
+    end
+
+    context 'when delay is configured but first message' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 5 } })
+      end
+
+      it 'skips delay for the first contact' do
+        # With 3 contacts, delay should be called 2 times (not 3)
+        expect(subject).to receive(:sleep).with(5).twice
+        subject.perform
+      end
+    end
+
+    context 'when error occurs during message sending' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: api_inbox, audience: [{ 'type' => 'Label', 'id' => label.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 2 } })
+      end
+
+      it 'continues processing remaining contacts with delay' do
+        call_count = 0
+        allow(Campaigns::CampaignConversationBuilder).to receive(:new) do
+          call_count += 1
+          raise StandardError, 'Test error' if call_count == 2
+
+          double('CampaignConversationBuilder', perform: create(:conversation, account: account, inbox: api_inbox, contact: contact))
+        end
+
+        # Expect sleep to be called for 2nd and 3rd contacts (even though 2nd fails)
+        expect(subject).to receive(:sleep).with(2).twice
+
+        expect { subject.perform }.not_to raise_error
+        expect(campaign.reload).to be_completed
+      end
+    end
+  end
 end

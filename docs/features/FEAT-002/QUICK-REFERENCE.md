@@ -85,6 +85,7 @@ Api::OneoffApiCampaignService
   3. Get labels from audience
   4. Find contacts: tagged_with(labels, any: true)
   5. For each contact:
+     - Apply delay (sleep) if index > 0 and delay configured
      - ContactInboxBuilder (creates with UUID)
      - CampaignConversationBuilder (creates conv + message)
   6. Webhook events triggered
@@ -93,7 +94,9 @@ Api::OneoffApiCampaignService
 
 ---
 
-## API Request Example
+## API Request Examples
+
+### Example 1: Campaign with No Delay (Default)
 
 ```javascript
 POST /api/v1/campaigns
@@ -106,7 +109,56 @@ POST /api/v1/campaigns
   "audience": [
     { "type": "Label", "id": 1 },
     { "type": "Label", "id": 2 }
-  ]
+  ],
+  "trigger_rules": {
+    "delay": { "type": "none" }
+  }
+}
+```
+
+### Example 2: Campaign with Fixed 5-Second Delay
+
+```javascript
+POST /api/v1/campaigns
+
+{
+  "title": "Product Announcement",
+  "message": "New feature available now!",
+  "inbox_id": 1,
+  "scheduled_at": "2025-10-05T14:00:00.000Z",
+  "audience": [
+    { "type": "Label", "id": 1 }
+  ],
+  "trigger_rules": {
+    "delay": {
+      "type": "fixed",
+      "seconds": 5
+    }
+  }
+}
+```
+
+### Example 3: Campaign with Random 3-10 Second Delay
+
+```javascript
+POST /api/v1/campaigns
+
+{
+  "title": "Re-engagement Campaign",
+  "message": "We miss you! Come back for exclusive offers.",
+  "inbox_id": 1,
+  "scheduled_at": "2025-10-05T14:00:00.000Z",
+  "audience": [
+    { "type": "Label", "id": 3 },
+    { "type": "Label", "id": 4 }
+  ],
+  "trigger_rules": {
+    "delay": {
+      "type": "random",
+      "min": 3,
+      "max": 10
+    }
+  }
 }
 ```
 
@@ -355,11 +407,11 @@ See README.md "Future Enhancements" for roadmap.
 
 ## Resources
 
-- **Full Spec:** `docs/features/FEAT-002/README.md` (1,140 lines)
-- **Progress:** `docs/features/FEAT-002/PROGRESS.md` (420 lines)
-- **Architecture:** `docs/features/FEAT-002/ARCHITECTURE.md` (933 lines)
-- **Index:** `docs/features/FEAT-002/INDEX.md` (185 lines)
-- **Extension - Message Delay:** `docs/features/FEAT-002/EXT-001-MESSAGE-DELAY.md` (Planning)
+- **Full Spec:** `docs/features/FEAT-002/README.md` (1,150 lines)
+- **Progress:** `docs/features/FEAT-002/PROGRESS.md` (520 lines)
+- **Index:** `docs/features/FEAT-002/INDEX.md` (210 lines)
+- **Quick Reference:** `docs/features/FEAT-002/QUICK-REFERENCE.md` (This file)
+- **Extension - Message Delay:** `docs/features/FEAT-002/EXT-001-MESSAGE-DELAY.md` (✅ Completed)
 
 ---
 

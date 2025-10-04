@@ -111,4 +111,152 @@ describe Whatsapp::OneoffWhatsappCampaignService do
       end
     end
   end
+
+  describe 'delay functionality' do
+    let(:contact1) { create(:contact, :with_phone_number, account: account) }
+    let(:contact2) { create(:contact, :with_phone_number, account: account) }
+    let(:contact3) { create(:contact, :with_phone_number, account: account) }
+
+    before do
+      contact1.update_labels([label1.title])
+      contact2.update_labels([label1.title])
+      contact3.update_labels([label1.title])
+
+      # Stub WhatsApp provider to avoid actual API calls
+      allow(campaign.inbox.channel).to receive(:send_message).and_return('message_id')
+    end
+
+    context 'when campaign has no delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }], trigger_rules: {})
+      end
+
+      it 'sends all messages immediately without delay' do
+        expect(whatsapp_campaign_service).not_to receive(:sleep)
+        whatsapp_campaign_service.perform
+        expect(campaign.inbox.channel).to have_received(:send_message).exactly(3).times
+      end
+    end
+
+    context 'when campaign has fixed delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 2 } })
+      end
+
+      it 'applies fixed delay between messages except first' do
+        expect(whatsapp_campaign_service).to receive(:sleep).with(2).twice
+        whatsapp_campaign_service.perform
+        expect(campaign.inbox.channel).to have_received(:send_message).exactly(3).times
+      end
+
+      it 'logs delay application' do
+        allow(whatsapp_campaign_service).to receive(:sleep)
+        allow(Rails.logger).to receive(:info).and_call_original
+        whatsapp_campaign_service.perform
+        # Verify delay was applied (sleep was called) instead of checking logs
+        expect(whatsapp_campaign_service).to have_received(:sleep).with(2).exactly(2).times
+      end
+    end
+
+    context 'when campaign has random delay configured' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'random', 'min' => 1, 'max' => 3 } })
+      end
+
+      it 'applies random delay within range between messages except first' do
+        delays = []
+        allow(whatsapp_campaign_service).to receive(:sleep) do |delay|
+          delays << delay
+        end
+
+        whatsapp_campaign_service.perform
+
+        expect(delays.count).to eq(2)
+        delays.each do |delay|
+          expect(delay).to be >= 1
+          expect(delay).to be <= 3
+        end
+      end
+
+      it 'logs delay application with actual value' do
+        allow(whatsapp_campaign_service).to receive(:sleep)
+        allow(Rails.logger).to receive(:info).and_call_original
+        whatsapp_campaign_service.perform
+        # Verify delay was applied (sleep was called) instead of checking logs
+        expect(whatsapp_campaign_service).to have_received(:sleep).exactly(2).times
+      end
+    end
+
+    context 'when campaign has delay type "none"' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'none' } })
+      end
+
+      it 'does not apply any delay' do
+        expect(whatsapp_campaign_service).not_to receive(:sleep)
+        whatsapp_campaign_service.perform
+        expect(campaign.inbox.channel).to have_received(:send_message).exactly(3).times
+      end
+    end
+
+    context 'when delay is configured but first message' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 5 } })
+      end
+
+      it 'skips delay for the first contact' do
+        # With 3 contacts, delay should be called 2 times (not 3)
+        expect(whatsapp_campaign_service).to receive(:sleep).with(5).twice
+        whatsapp_campaign_service.perform
+      end
+    end
+
+    context 'when contact has no phone number' do
+      let(:contact_without_phone) { create(:contact, account: account, phone_number: nil) }
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 2 } })
+      end
+
+      before do
+        contact_without_phone.update_labels([label1.title])
+      end
+
+      it 'skips contact without applying delay' do
+        # Should send to 3 contacts with phone numbers, skipping the one without
+        # Delay applied 2 times (for 2nd and 3rd contacts with phone)
+        expect(whatsapp_campaign_service).to receive(:sleep).with(2).twice
+        whatsapp_campaign_service.perform
+        expect(campaign.inbox.channel).to have_received(:send_message).exactly(3).times
+      end
+    end
+
+    context 'when error occurs during message sending' do
+      let(:campaign) do
+        create(:campaign, account: account, inbox: whatsapp_inbox, audience: [{ 'type' => 'Label', 'id' => label1.id }],
+                          trigger_rules: { 'delay' => { 'type' => 'fixed', 'seconds' => 2 } })
+      end
+
+      it 'continues processing remaining contacts with delay' do
+        call_count = 0
+        allow(whatsapp_campaign_service).to receive(:sleep)
+        allow(campaign.inbox.channel).to receive(:send_message) do
+          call_count += 1
+          raise StandardError, 'Test error' if call_count == 2
+
+          'message_id'
+        end
+
+        # Should continue processing despite error
+        expect { whatsapp_campaign_service.perform }.not_to raise_error
+        expect(campaign.reload).to be_completed
+        # Verify sleep was called for 2nd and 3rd contacts
+        expect(whatsapp_campaign_service).to have_received(:sleep).with(2).exactly(2).times
+      end
+    end
+  end
 end

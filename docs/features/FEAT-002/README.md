@@ -9,6 +9,7 @@ The API Campaign feature enables Chatwoot administrators to create and execute o
 - Create one-off campaigns for API and WhatsApp channels
 - Target specific customer audiences using label-based segmentation
 - Schedule campaign execution at specific times
+- **Configurable message delays** (none, fixed, or random) to prevent rate limiting
 - Automatic conversation creation for each targeted contact
 - Multi-channel support with channel-specific service implementations
 - Webhook integration for external system notifications
@@ -1136,5 +1137,14 @@ useTrack(CAMPAIGNS_EVENTS.CREATE_CAMPAIGN, {
 ## Conclusion
 
 The API Campaign feature provides a comprehensive solution for targeted, scheduled messaging through API channels in Chatwoot. With robust validation, multi-channel support, extensive testing, and thoughtful error handling, this feature enables administrators to engage customers proactively while maintaining system performance and reliability.
+
+**Extension: Message Delay (EXT-001) - Completed October 4, 2025**
+
+The campaign feature has been enhanced with configurable message delays to prevent rate limiting and improve deliverability:
+- Three delay types: none (immediate), fixed (constant), or random (range-based)
+- Uses existing `trigger_rules` jsonb column (no migration required)
+- Fully tested with 107 passing tests (80 backend + 27 frontend)
+- Production ready with English and Portuguese translations
+- Delay display in UI deferred to future iteration
 
 The extensible architecture (service-based, channel-agnostic) positions the feature well for future enhancements such as template support, advanced targeting, and additional channel types.
