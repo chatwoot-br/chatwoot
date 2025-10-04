@@ -43,6 +43,26 @@ Detailed progress tracking:
 
 ---
 
+### 📝 [EXT-001-MESSAGE-DELAY.md](EXT-001-MESSAGE-DELAY.md)
+**Extension: Campaign Message Delay** (Planning)
+
+Feature extension specification:
+- Add configurable delays between campaign messages
+- Support fixed delay (e.g., 5 seconds) or random delay (e.g., 3-10 seconds)
+- Prevent rate limiting and improve deliverability
+- User stories and acceptance criteria
+- Database schema changes
+- Backend service updates
+- Frontend form UI updates
+- Implementation tasks with time estimates
+- Testing strategy and success metrics
+
+**Read this for:** Understanding the message delay feature extension and implementation plan.
+
+**Status:** 📝 Planning phase (not yet implemented)
+
+---
+
 ## Quick Reference
 
 ### Key Statistics

@@ -355,10 +355,11 @@ See README.md "Future Enhancements" for roadmap.
 
 ## Resources
 
-- **Full Spec:** `/docs/features/FEAT-002/README.md` (1,140 lines)
-- **Progress:** `/docs/features/FEAT-002/PROGRESS.md` (420 lines)
-- **Architecture:** `/docs/features/FEAT-002/ARCHITECTURE.md` (933 lines)
-- **Index:** `/docs/features/FEAT-002/INDEX.md` (185 lines)
+- **Full Spec:** `docs/features/FEAT-002/README.md` (1,140 lines)
+- **Progress:** `docs/features/FEAT-002/PROGRESS.md` (420 lines)
+- **Architecture:** `docs/features/FEAT-002/ARCHITECTURE.md` (933 lines)
+- **Index:** `docs/features/FEAT-002/INDEX.md` (185 lines)
+- **Extension - Message Delay:** `docs/features/FEAT-002/EXT-001-MESSAGE-DELAY.md` (Planning)
 
 ---
 
