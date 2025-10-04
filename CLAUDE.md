@@ -34,6 +34,7 @@ make run
 
 # Individual services
 bundle exec rails server -p 3000    # Backend only
+dotenv bundle exec sidekiq -C config/sidekiq.yml # Sidekiq
 bin/vite dev                         # Frontend only
 ```
 
