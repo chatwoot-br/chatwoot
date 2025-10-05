@@ -12,6 +12,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import TextArea from 'next/textarea/TextArea.vue';
 import WhatsappReauthorize from '../channels/whatsapp/Reauthorize.vue';
 import { sanitizeAllowedDomains } from 'dashboard/helper/URLHelper';
+import WhatsappWebForm from '../channels/whatsapp/WhatsappWebForm.vue';
 
 export default {
   components: {
@@ -21,6 +22,7 @@ export default {
     NextButton,
     TextArea,
     WhatsappReauthorize,
+    WhatsappWebForm,
   },
   mixins: [inboxMixin],
   props: {
@@ -158,6 +160,23 @@ export default {
         useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
       } finally {
         this.isSyncingTemplates = false;
+      }
+    },
+    async updateWhatsAppWebInbox(formData) {
+      try {
+        const payload = {
+          id: this.inbox.id,
+          formData: false,
+          channel: {
+            phone_number: formData.phone_number,
+            provider_config: formData.provider_config,
+          },
+        };
+
+        await this.$store.dispatch('inboxes/updateInbox', payload);
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+      } catch (error) {
+        useAlert(this.$t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
       }
     },
   },
@@ -327,7 +346,7 @@ export default {
     <ImapSettings :inbox="inbox" />
     <SmtpSettings v-if="inbox.imap_enabled" :inbox="inbox" />
   </div>
-  <div v-else-if="isAWhatsAppChannel && !isATwilioChannel">
+  <div v-else-if="isAWhatsAppCloudChannel">
     <div v-if="inbox.provider_config" class="mx-8">
       <!-- Embedded Signup Section -->
       <template v-if="isEmbeddedSignupWhatsApp">
@@ -422,6 +441,21 @@ export default {
       :inbox="inbox"
       class="hidden"
     />
+  </div>
+  <div v-else-if="isAWhatsAppWebChannel" class="mx-8">
+    <SettingsSection
+      :title="$t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_WEB_SECTION_TITLE')"
+      :sub-title="
+        $t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_WEB_SECTION_SUBHEADER')
+      "
+    >
+      <WhatsappWebForm
+        mode="edit"
+        :inbox="inbox"
+        :is-loading="false"
+        @submit="updateWhatsAppWebInbox"
+      />
+    </SettingsSection>
   </div>
 </template>
 
