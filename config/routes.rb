@@ -121,6 +121,7 @@ Rails.application.routes.draw do
                 member do
                   post :translate
                   post :retry
+                  post :retry_transcription
                 end
               end
               resources :assignments, only: [:create]

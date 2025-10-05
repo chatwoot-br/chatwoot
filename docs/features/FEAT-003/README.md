@@ -13,10 +13,12 @@ Automatically transcribe audio message attachments to text using OpenAI's Whispe
 - **Multi-language Support**: Whisper-1 automatically detects and transcribes 99+ languages
 
 ### Feature Status
-- **Version**: 2.0 (Enhanced Multi-Channel Support)
+- **Version**: 2.1 (Error Handling & Retry Improvements)
 - **Availability**: Core OSS feature
-- **Release**: Enhanced version in Q1 2025
-- **Previous Version**: 1.0 (API-only, synchronous) - commit `11d2bc818`
+- **Release**: v2.1 - January 2025
+- **Previous Versions**:
+  - v2.0 (Multi-Channel Support) - January 2025
+  - v1.0 (API-only, synchronous) - commit `11d2bc818`
 
 ---
 
@@ -274,17 +276,33 @@ ActionCable.server.broadcast(
 // Existing Chatwoot infrastructure handles the update
 ```
 
-**Metadata Structure**:
+**Metadata Structure** (v2.1):
 ```json
 {
   "message": {
     "id": 12345,
-    "content": "Original text\n\nTranscription text here",
-    "additional_attributes": {
+    "content": "Original message content (transcription NOT appended)",
+    "content_attributes": {
       "transcription": {
+        "text": "Transcribed text from audio",
         "language": "en",
         "duration": 12.5,
-        "transcribed_at": "2025-01-04T10:30:00Z"
+        "transcribed_at": "2025-01-05T10:30:00Z"
+      }
+    }
+  }
+}
+```
+
+**Error State Structure** (v2.1):
+```json
+{
+  "message": {
+    "id": 12345,
+    "content_attributes": {
+      "transcription": {
+        "error": "Invalid file format. Supported formats: ['flac', 'm4a', 'mp3', ...]",
+        "failed_at": "2025-01-05T10:30:00Z"
       }
     }
   }
@@ -294,6 +312,45 @@ ActionCable.server.broadcast(
 ---
 
 ## API Integration
+
+### Chatwoot Retry Transcription API (v2.1)
+
+**Endpoint**: `POST /api/v1/accounts/:account_id/conversations/:conversation_id/messages/:message_id/retry_transcription`
+
+**Purpose**: Manually retry failed audio transcriptions
+
+**Request**:
+```http
+POST /api/v1/accounts/1/conversations/123/messages/456/retry_transcription
+Authorization: Bearer {API_TOKEN}
+```
+
+**Success Response** (200 OK):
+```json
+{
+  "message": "Transcription retry initiated"
+}
+```
+
+**Error Responses**:
+- `404 Not Found`: Message not found
+- `422 Unprocessable Entity`: No audio attachments found
+- `500 Internal Server Error`: Processing error
+
+**Behavior**:
+1. Validates message exists and has audio attachments
+2. Clears existing transcription metadata from content_attributes
+3. Re-enqueues TranscribeAudioMessageJob for each audio attachment
+4. Returns immediately (transcription processes in background)
+5. Frontend receives update via ActionCable when complete
+
+**Usage Examples**:
+- User clicks "Retry" button in audio player error state
+- User clicks "Retry transcription" in message context menu (right-click)
+- Programmatic retry via API call
+- Rake task: `rake audio_transcription:retry_failed`
+
+---
 
 ### OpenAI Whisper API
 
@@ -320,14 +377,22 @@ Content-Type: multipart/form-data
 }
 ```
 
-**Supported Audio Formats**:
-- MP3
-- MP4
-- MPEG
-- MPGA
-- M4A
-- WAV
-- WEBM
+**Supported Audio Formats** (v2.1):
+- MP3 (audio/mpeg, audio/mp3)
+- MP4 (audio/mp4, audio/m4a)
+- MPEG (audio/mpeg)
+- MPGA (audio/mpeg)
+- M4A (audio/m4a)
+- WAV (audio/wav, audio/wave)
+- WEBM (audio/webm)
+- OGG (audio/ogg, audio/ogg; codecs=opus)
+- **OPUS**: Automatically mapped to .ogg (OpenAI doesn't support .opus extension)
+
+**Format Mapping** (v2.1):
+The service automatically handles format conversion:
+- `audio/opus` → `.ogg` file extension
+- `audio/ogg; codecs=opus` → `.ogg` file extension
+- Filenames with mime type parameters (e.g., `file.ogg; codecs=opus`) → sanitized to clean extension
 
 **Limitations**:
 - Maximum file size: 25 MB
@@ -408,6 +473,59 @@ AUDIO_TRANSCRIPTION_ENABLED=true
 - **Required**: No (but recommended for production)
 - **Default**: Falls back to relative URL handling
 - **Example**: `FRONTEND_URL=https://app.chatwoot.com`
+
+### Maintenance Tasks (v2.1)
+
+#### Cleanup Stuck Messages
+
+**Purpose**: Mark messages stuck in "Transcribing audio..." state as failed
+
+**Command**:
+```bash
+rake audio_transcription:cleanup_stuck_messages
+```
+
+**What it does**:
+1. Finds audio messages created >5 minutes ago without transcription metadata
+2. Marks them with error: "Transcription timeout or processing error"
+3. Broadcasts updates to clear "Transcribing..." indicator
+4. Shows count of messages processed
+
+**When to use**:
+- After Sidekiq downtime or crashes
+- After OpenAI API outages
+- Regular maintenance (e.g., daily cron job)
+
+#### Retry Failed Transcriptions
+
+**Purpose**: Retry all messages with failed transcription errors
+
+**Command**:
+```bash
+rake audio_transcription:retry_failed
+```
+
+**What it does**:
+1. Finds all messages with transcription errors in content_attributes
+2. Clears error metadata
+3. Re-enqueues TranscribeAudioMessageJob for each message
+4. Shows count of messages retried
+
+**When to use**:
+- After fixing OpenAI API key issues
+- After temporary API outages
+- After deploying fixes for transcription bugs
+
+**Example Cron Schedule**:
+```bash
+# Cleanup stuck messages every hour
+0 * * * * cd /path/to/chatwoot && rake audio_transcription:cleanup_stuck_messages
+
+# Retry failed transcriptions daily at 2 AM
+0 2 * * * cd /path/to/chatwoot && rake audio_transcription:retry_failed
+```
+
+---
 
 ### Setup Instructions
 
@@ -1439,9 +1557,50 @@ Message:
 
 ## Changelog
 
+### Version 2.1 (Error Handling & Retry Improvements)
+**Date**: 2025-01-05
+**Status**: ✅ Completed
+
+**Features**:
+- **User-facing retry functionality**: Retry button in audio player and context menu
+- **Smart error detection**: Frontend displays error states with actionable retry options
+- **WhatsApp filename sanitization**: Fixes invalid file format errors from mime type parameters
+- **Direct blob access**: Uses ActiveStorage blobs directly, avoiding filename corruption
+- **Opus format support**: Automatic mapping of .opus to .ogg for OpenAI compatibility
+- **Transcription in metadata only**: Stores transcription in content_attributes, not message content
+- **Error state broadcasting**: Real-time error feedback via ActionCable
+- **Maintenance rake tasks**: Cleanup stuck messages and retry failed transcriptions
+
+**Bug Fixes**:
+- Fixed WhatsApp audio messages failing with "Invalid file format" due to `; codecs=opus` in filename
+- Fixed infinite "Transcribing audio..." state on failures
+- Fixed context menu not detecting audio messages (added transcription metadata fallback)
+- Fixed .opus extension rejection by OpenAI API
+
+**Files Modified**:
+- `app/controllers/api/v1/accounts/conversations/messages_controller.rb` (added retry_transcription endpoint)
+- `app/jobs/transcribe_audio_message_job.rb` (error callbacks, content_attributes, error broadcasting)
+- `app/services/openai/audio_transcription_service.rb` (blob access, mime mapping, filename sanitization)
+- `app/services/whatsapp/incoming_message_whatsapp_web_service.rb` (sanitize_media_path)
+- `config/routes.rb` (retry_transcription route)
+- `app/javascript/dashboard/api/inbox/message.js` (retryTranscription method)
+- `app/javascript/dashboard/components-next/message/chips/Audio.vue` (error UI, retry button)
+- `app/javascript/dashboard/modules/conversations/components/MessageContextMenu.vue` (retry menu item)
+- `app/javascript/dashboard/i18n/locale/en/conversation.json` (retry translations)
+
+**Files Added**:
+- `lib/tasks/audio_transcription.rake` (cleanup and retry rake tasks)
+
+**Breaking Changes**: None (backward compatible)
+
+**Migration Notes**:
+- Existing messages with transcriptions in `additional_attributes` will continue to work
+- New transcriptions are stored in `content_attributes` for frontend visibility
+- Run `rake audio_transcription:cleanup_stuck_messages` after deployment to fix stuck messages
+
 ### Version 2.0 (Enhanced Multi-Channel Support)
-**Date**: 2025-01-04 (Q1 2025)
-**Status**: In Development
+**Date**: 2025-01-04
+**Status**: ✅ Completed
 
 **Features**:
 - Multi-channel support via listener pattern (API, Widget, WhatsApp, Email, etc.)

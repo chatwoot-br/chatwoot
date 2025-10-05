@@ -14,6 +14,7 @@ import {
 import MenuItem from '../../../components/widgets/conversation/contextMenu/menuItem.vue';
 import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
+import messageAPI from 'dashboard/api/inbox/message';
 
 export default {
   components: {
@@ -79,6 +80,20 @@ export default {
       return useSnakeCase(
         this.message.content_attributes ?? this.message.contentAttributes
       );
+    },
+    hasAudioAttachment() {
+      // Check if message has attachments array
+      const attachments = this.message.attachments || [];
+      if (attachments.length > 0) {
+        return attachments.some(
+          attachment =>
+            attachment.file_type === 'audio' || attachment.fileType === 'audio'
+        );
+      }
+
+      // Fallback: check if content_attributes has transcription data
+      // This indicates it's an audio message
+      return !!this.contentAttributes?.transcription;
     },
   },
   methods: {
@@ -148,6 +163,19 @@ export default {
     },
     closeDeleteModal() {
       this.showDeleteModal = false;
+    },
+    async handleRetryTranscription() {
+      try {
+        await messageAPI.retryTranscription(
+          this.conversationId,
+          this.messageId
+        );
+        useAlert(this.$t('CONVERSATION.TRANSCRIPTION_RETRY_INITIATED'));
+        this.handleClose();
+      } catch (error) {
+        useAlert(this.$t('CONVERSATION.TRANSCRIPTION_RETRY_FAILED'));
+        this.handleClose();
+      }
     },
   },
 };
@@ -220,6 +248,15 @@ export default {
           }"
           variant="icon"
           @click.stop="handleTranslate"
+        />
+        <MenuItem
+          v-if="hasAudioAttachment"
+          :option="{
+            icon: 'arrow-clockwise',
+            label: $t('CONVERSATION.CONTEXT_MENU.RETRY_TRANSCRIPTION'),
+          }"
+          variant="icon"
+          @click.stop="handleRetryTranscription"
         />
         <hr />
         <MenuItem

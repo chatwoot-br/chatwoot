@@ -423,28 +423,28 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Handle different media payload structures
     if payload[:image].present?
       media_data = payload[:image]
-      media_info[:id] = media_data[:media_path] || media_data[:id]
+      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:video].present?
       media_data = payload[:video]
-      media_info[:id] = media_data[:media_path] || media_data[:id]
+      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:audio].present?
       media_data = payload[:audio]
-      media_info[:id] = media_data[:media_path] || media_data[:id]
+      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:document].present?
       media_data = payload[:document]
-      media_info[:id] = media_data[:media_path] || media_data[:id]
+      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
       media_info[:filename] = media_data[:filename]
     elsif payload[:sticker].present?
       media_data = payload[:sticker]
-      media_info[:id] = media_data[:media_path] || media_data[:id]
+      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
       media_info[:mime_type] = media_data[:mime_type]
     else
       # Legacy format fallback
@@ -460,6 +460,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     end
 
     media_info
+  end
+
+  def sanitize_media_path(media_path)
+    return media_path if media_path.blank?
+
+    # Remove mime type parameters (e.g., "; codecs=opus") from media path
+    # These can be appended to the filename and cause issues with file extension detection
+    media_path.to_s.split(';').first&.strip
   end
 
   def extract_location_info(payload)

@@ -7,20 +7,27 @@ class TranscribeAudioMessageJob < ApplicationJob
   retry_on Openai::RateLimitError, wait: :polynomially_longer, attempts: 3
   retry_on Openai::NetworkError, wait: :polynomially_longer, attempts: 3
 
-  # Discard on permanent failures
-  discard_on Openai::InvalidFileError
-  discard_on Openai::AuthenticationError
+  # Discard on permanent failures with error handling
+  discard_on Openai::InvalidFileError do |job, error|
+    job.handle_transcription_error(error)
+  end
+
+  discard_on Openai::AuthenticationError do |job, error|
+    job.handle_transcription_error(error)
+  end
 
   def perform(message_id, attachment_id)
-    message = Message.find_by(id: message_id)
-    attachment = Attachment.find_by(id: attachment_id)
+    @message_id = message_id
+    @attachment_id = attachment_id
+    @message = Message.find_by(id: message_id)
+    @attachment = Attachment.find_by(id: attachment_id)
 
-    if message.blank?
+    if @message.blank?
       Rails.logger.error "Message not found: #{message_id}"
       return
     end
 
-    if attachment.blank?
+    if @attachment.blank?
       Rails.logger.error "Attachment not found: #{attachment_id}"
       return
     end
@@ -28,41 +35,62 @@ class TranscribeAudioMessageJob < ApplicationJob
     Rails.logger.info "Starting transcription for message #{message_id}, attachment #{attachment_id}"
 
     result = Openai::AudioTranscriptionService.new(
-      attachment.download_url,
-      account: message.account
+      attachment: @attachment,
+      account: @message.account
     ).process
 
     return unless result
 
-    update_message_with_transcription(message, result)
-    store_transcription_metadata(message, result)
-    broadcast_transcription_update(message)
+    store_transcription_metadata(@message, result)
+    broadcast_transcription_update(@message)
 
     Rails.logger.info "Transcription completed for message #{message_id}"
   rescue ActiveRecord::RecordNotFound => e
     Rails.logger.error "Record not found: #{e.message}"
   end
 
-  private
+  def handle_transcription_error(error)
+    Rails.logger.error "Transcription failed for message #{@message_id}: #{error.message}"
 
-  def update_message_with_transcription(message, result)
-    current_content = message.content.presence || ''
-    transcription_text = "\n\n#{result[:text]}"
+    message = Message.find_by(id: @message_id)
+    return unless message
 
-    message.update!(content: current_content + transcription_text)
+    # Store error in metadata
+    metadata = message.content_attributes || {}
+    metadata['transcription'] = {
+      'error' => error.message,
+      'failed_at' => Time.current.iso8601
+    }
+    message.update!(content_attributes: metadata)
+
+    # Broadcast update to clear "Transcribing audio..." status
+    broadcast_transcription_error(message)
   end
 
+  private
+
   def store_transcription_metadata(message, result)
-    metadata = message.additional_attributes || {}
+    metadata = message.content_attributes || {}
     metadata['transcription'] = {
+      'text' => result[:text],
       'language' => result[:language],
       'duration' => result[:duration],
       'transcribed_at' => Time.current.iso8601
     }
-    message.update!(additional_attributes: metadata)
+    message.update!(content_attributes: metadata)
   end
 
   def broadcast_transcription_update(message)
+    ActionCable.server.broadcast(
+      "messages:#{message.conversation_id}",
+      {
+        event: 'message.updated',
+        data: message.push_event_data
+      }
+    )
+  end
+
+  def broadcast_transcription_error(message)
     ActionCable.server.broadcast(
       "messages:#{message.conversation_id}",
       {

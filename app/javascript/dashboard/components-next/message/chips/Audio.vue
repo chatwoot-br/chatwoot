@@ -13,6 +13,8 @@ import { useEmitter } from 'dashboard/composables/emitter';
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
 import { useI18n } from 'vue-i18n';
+import { useAlert } from 'dashboard/composables';
+import messageAPI from 'dashboard/api/inbox/message';
 
 const { attachment } = defineProps({
   attachment: {
@@ -26,7 +28,7 @@ defineOptions({
 });
 
 const { t } = useI18n();
-const { content, contentAttributes } = useMessageContext();
+const { contentAttributes, conversationId, id } = useMessageContext();
 
 const timeStampURL = computed(() => {
   return timeStampAppendedURL(attachment.dataUrl);
@@ -39,6 +41,7 @@ const isMuted = ref(false);
 const currentTime = ref(0);
 const duration = ref(0);
 const playbackSpeed = ref(1);
+const isRetrying = ref(false);
 
 const { uid } = getCurrentInstance();
 
@@ -124,6 +127,18 @@ const downloadAudio = async () => {
   downloadFile({ url: dataUrl, type: fileType, extension });
 };
 
+const retryTranscription = async () => {
+  isRetrying.value = true;
+  try {
+    await messageAPI.retryTranscription(conversationId.value, id.value);
+    useAlert(t('CONVERSATION.TRANSCRIPTION_RETRY_INITIATED'));
+  } catch {
+    useAlert(t('CONVERSATION.TRANSCRIPTION_RETRY_FAILED'));
+  } finally {
+    isRetrying.value = false;
+  }
+};
+
 // Compute transcription state
 const transcriptionData = computed(() => {
   return contentAttributes.value?.transcription;
@@ -133,19 +148,19 @@ const hasTranscription = computed(() => {
   return !!transcriptionData.value?.language;
 });
 
+const hasTranscriptionError = computed(() => {
+  return !!transcriptionData.value?.error;
+});
+
 const isTranscribing = computed(() => {
   // Audio attachment exists but no transcription metadata yet
-  return !hasTranscription.value;
+  // Don't show transcribing if there's an error
+  return !hasTranscription.value && !hasTranscriptionError.value;
 });
 
 const transcriptionText = computed(() => {
-  // Extract transcription from message content
-  // Backend appends transcription after double newline
-  const messageContent = content.value || '';
-  const parts = messageContent.split('\n\n');
-
-  // If there are multiple parts, the transcription is after the first double newline
-  return parts.length > 1 ? parts.slice(1).join('\n\n').trim() : '';
+  // Get transcription text from content attributes
+  return transcriptionData.value?.text || '';
 });
 
 const languageName = computed(() => {
@@ -242,6 +257,30 @@ const languageName = computed(() => {
     >
       <Icon class="size-4 animate-spin" icon="i-lucide-loader-circle" />
       <span>{{ t('CONVERSATION.TRANSCRIBING') }}</span>
+    </div>
+
+    <!-- Transcription Error -->
+    <div
+      v-else-if="hasTranscriptionError"
+      class="flex items-center justify-between gap-2 px-3 py-2 text-sm w-full"
+    >
+      <div class="flex items-center gap-2 text-n-red-11">
+        <Icon class="size-4" icon="i-lucide-alert-circle" />
+        <span>{{ t('CONVERSATION.TRANSCRIPTION_FAILED') }}</span>
+      </div>
+      <button
+        class="flex items-center gap-1 px-2 py-1 text-xs border-0 bg-n-alpha-2 hover:bg-n-alpha-3 rounded text-n-slate-11 hover:text-n-slate-12 disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="isRetrying"
+        @click="retryTranscription"
+      >
+        <Icon
+          v-if="isRetrying"
+          class="size-3 animate-spin"
+          icon="i-lucide-loader-circle"
+        />
+        <Icon v-else class="size-3" icon="i-lucide-refresh-cw" />
+        <span>{{ t('CONVERSATION.RETRY') }}</span>
+      </button>
     </div>
 
     <!-- Transcription Content -->
