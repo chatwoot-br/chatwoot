@@ -379,6 +379,7 @@ const payloadForContextMenu = computed(() => {
     content_attributes: props.contentAttributes,
     content: props.content,
     conversation_id: props.conversationId,
+    attachments: props.attachments,
   };
 });
 
