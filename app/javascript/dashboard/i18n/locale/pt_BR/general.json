@@ -7,6 +7,13 @@
     },
     "CLOSE": "Fechar",
     "BETA": "Beta",
-    "BETA_DESCRIPTION": "This feature is in beta and may change as we improve it."
+    "BETA_DESCRIPTION": "This feature is in beta and may change as we improve it.",
+    "CREATING": "Criando...",
+    "RETRY": "Tentar Novamente",
+    "RETRYING": "Tentando novamente...",
+    "CONNECTING_TO_EVOLUTION_API": "Conectando com Evolution API...",
+    "RETRYING_CONNECTION_TO_EVOLUTION_API": "Tentando nova conexão com Evolution API...",
+    "OF": "de",
+    "BULLET_POINT": "•"
   }
 }
