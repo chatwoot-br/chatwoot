@@ -10,7 +10,8 @@ class AudioTranscriptionListener < BaseListener
 
     message.attachments.where(file_type: :audio).find_each do |attachment|
       Rails.logger.info "Enqueuing transcription job for message #{message.id}, attachment #{attachment.id}"
-      TranscribeAudioMessageJob.perform_later(message.id, attachment.id)
+      # Delay slightly to allow ActiveStorage to write file to disk (avoids race condition)
+      TranscribeAudioMessageJob.set(wait: 2.seconds).perform_later(message.id, attachment.id)
     end
   end
 
@@ -26,7 +27,7 @@ class AudioTranscriptionListener < BaseListener
 
   def api_key_available?(account)
     # Use the enhanced service from Phase 1 to check API key availability
-    service = Openai::AudioTranscriptionService.new('dummy', account: account)
+    service = Openai::AudioTranscriptionService.new(audio_url: 'dummy', account: account)
     service.send(:resolve_api_key).present?
   rescue StandardError => e
     Rails.logger.error "Error checking API key availability: #{e.message}"

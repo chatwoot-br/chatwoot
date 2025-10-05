@@ -1,7 +1,6 @@
 require 'httparty'
 require 'down'
 require 'tempfile'
-require_relative 'exceptions'
 
 class Openai::AudioTranscriptionService
   include HTTParty
@@ -67,9 +66,15 @@ class Openai::AudioTranscriptionService
 
     Rails.logger.debug { "Audio file downloaded to: #{sanitized_file.path}" }
     sanitized_file
+  rescue ActiveStorage::FileNotFoundError => e
+    Rails.logger.error "Audio file not found in storage: #{e.message}"
+    raise Openai::InvalidFileError, "Audio file not found: #{e.message}"
+  rescue Down::Error, Errno::ENOENT, OpenURI::HTTPError => e
+    Rails.logger.error "Network error downloading audio: #{e.message}"
+    raise Openai::NetworkError, "Failed to download audio file: #{e.message}"
   rescue StandardError => e
     Rails.logger.error "Error downloading audio file: #{e.message}\n#{e.backtrace.join("\n")}"
-    nil
+    raise Openai::NetworkError, "Unexpected error downloading audio: #{e.message}"
   end
 
   def request_transcription(audio_file)
@@ -134,9 +139,9 @@ class Openai::AudioTranscriptionService
     end
   end
 
-  def open_blob_file(active_storage_blob)
+  def open_blob_file(attached_file)
     # Get the blob's content type to determine extension
-    content_type = active_storage_blob.content_type
+    content_type = attached_file.content_type
     extension = mime_type_to_extension(content_type)
 
     Rails.logger.info "Opening blob with content type: #{content_type}, extension: #{extension}"
@@ -146,7 +151,7 @@ class Openai::AudioTranscriptionService
     tempfile.binmode
 
     # Download blob content directly to tempfile
-    active_storage_blob.blob.download do |chunk|
+    attached_file.download do |chunk|
       tempfile.write(chunk)
     end
 
