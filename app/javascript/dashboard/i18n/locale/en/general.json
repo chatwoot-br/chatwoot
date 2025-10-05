@@ -5,6 +5,13 @@
       "PLACEHOLDER": "Search",
       "EMPTY_STATE": "No results found"
     },
-    "CLOSE": "Close"
+    "CLOSE": "Close",
+    "RETRY": "Retry",
+    "RETRYING": "Retrying...",
+    "CREATING": "Creating...",
+    "CONNECTING_TO_EVOLUTION_API": "Connecting to Evolution API...",
+    "RETRYING_CONNECTION_TO_EVOLUTION_API": "Retrying connection to Evolution API...",
+    "OF": "of",
+    "BULLET_POINT": "•"
   }
 }

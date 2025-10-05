@@ -5,6 +5,13 @@
       "PLACEHOLDER": "Pesquisar",
       "EMPTY_STATE": "Nenhum resultado encontrado"
     },
-    "CLOSE": "Fechar"
+    "CLOSE": "Fechar",
+    "CREATING": "Criando...",
+    "RETRY": "Tentar Novamente",
+    "RETRYING": "Tentando novamente...",
+    "CONNECTING_TO_EVOLUTION_API": "Conectando com Evolution API...",
+    "RETRYING_CONNECTION_TO_EVOLUTION_API": "Tentando nova conexão com Evolution API...",
+    "OF": "de",
+    "BULLET_POINT": "•"
   }
 }
