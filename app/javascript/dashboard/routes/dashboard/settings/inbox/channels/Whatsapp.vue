@@ -51,10 +51,10 @@ const availableProviders = computed(() => [
     icon: 'i-woot-twilio',
   },
   {
-    value: PROVIDER_TYPES.WHATSAPP_WEB,
-    label: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_WEB'),
+    key: PROVIDER_TYPES.WHATSAPP_WEB,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_WEB'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_WEB_DESC'),
-    icon: '/assets/images/dashboard/channels/whatsapp.png',
+    icon: 'i-lucide-qr-code',
   },
 ]);
 

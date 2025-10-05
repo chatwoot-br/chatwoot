@@ -229,7 +229,7 @@
           "TWILIO_DESC": "Connect via Twilio credentials",
           "360_DIALOG": "360Dialog",
           "WHATSAPP_WEB": "WhatsApp Web (GOWA)",
-          "WHATSAPP_WEB_DESC": "Connect via own gateway (go-whatsapp-web-multidevice)"
+          "WHATSAPP_WEB_DESC": "Connect via own gateway"
         },
         "SELECT_PROVIDER": {
           "TITLE": "Select your API provider",
@@ -319,7 +319,7 @@
         "GATEWAY_BASE_URL": {
           "LABEL": "Gateway Base URL",
           "PLACEHOLDER": "http://localhost:3000",
-          "TOOLTIP": "GOWA microservice URL (go-whatsapp-web-multidevice)",
+          "TOOLTIP": "GOWA microservice URL",
           "ERROR": "Enter a valid URL"
         },
         "BASIC_AUTH_USER": {

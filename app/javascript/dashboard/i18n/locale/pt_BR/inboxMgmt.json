@@ -229,7 +229,7 @@
           "TWILIO_DESC": "Conectar através de credenciais Twilio",
           "360_DIALOG": "360Dialog",
           "WHATSAPP_WEB": "WhatsApp Web (GOWA)",
-          "WHATSAPP_WEB_DESC": "Conectar via gateway próprio (go-whatsapp-web-multidevice)"
+          "WHATSAPP_WEB_DESC": "Conectar via gateway próprio"
         },
         "SELECT_PROVIDER": {
           "TITLE": "Selecione seu provedor de API",
