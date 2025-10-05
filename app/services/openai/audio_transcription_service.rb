@@ -1,14 +1,16 @@
 require 'httparty'
 require 'down'
 require 'tempfile'
+require_relative 'exceptions'
 
 class Openai::AudioTranscriptionService
   include HTTParty
   base_uri 'https://api.openai.com/v1'
 
-  def initialize(audio_url)
+  def initialize(audio_url, account: nil)
     @audio_url = audio_url
-    @api_key = ENV.fetch('OPENAI_API_KEY', nil)
+    @account = account
+    @api_key = resolve_api_key
   end
 
   def process
@@ -66,20 +68,42 @@ class Openai::AudioTranscriptionService
       },
       body: {
         model: 'whisper-1',
-        file: audio_file
+        file: audio_file,
+        response_format: 'verbose_json'
       },
       multipart: true
     )
 
     if response.success?
-      response.parsed_response['text']
+      parsed = response.parsed_response
+      {
+        text: parsed['text'],
+        language: parsed['language'],
+        duration: parsed['duration']
+      }
     else
-      Rails.logger.error "OpenAI API error: #{response.code} - #{response.body}"
-      nil
+      handle_error_response(response)
     end
   rescue StandardError => e
     Rails.logger.error "Error in transcription request: #{e.message}\n#{e.backtrace.join("\n")}"
-    nil
+    raise
+  end
+
+  def handle_error_response(response)
+    error_message = "#{response.code} - #{response.body}"
+
+    case response.code
+    when 429
+      raise Openai::RateLimitError, "Rate limit exceeded: #{error_message}"
+    when 400
+      raise Openai::InvalidFileError, "Invalid file: #{error_message}"
+    when 401, 403
+      raise Openai::AuthenticationError, "Authentication failed: #{error_message}"
+    when 500..599
+      raise Openai::NetworkError, "Server error: #{error_message}"
+    else
+      raise Openai::TranscriptionError, "Unknown error: #{error_message}"
+    end
   end
 
   def cleanup_file(file)
@@ -90,5 +114,20 @@ class Openai::AudioTranscriptionService
     file.unlink
   rescue StandardError => e
     Rails.logger.error "Error cleaning up file: #{e.message}"
+  end
+
+  def resolve_api_key
+    # 1. Try integration hook first
+    if @account
+      integration = @account.hooks.find_by(app_id: 'openai', status: 'enabled')
+      if integration&.settings&.dig('api_key').present?
+        Rails.logger.debug { "Using OpenAI API key from integration for account #{@account.id}" }
+        return integration.settings['api_key']
+      end
+    end
+
+    # 2. Fall back to ENV
+    Rails.logger.debug 'Using OpenAI API key from environment variable'
+    ENV.fetch('OPENAI_API_KEY', nil)
   end
 end

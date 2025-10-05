@@ -13,9 +13,10 @@ Automatically transcribe audio message attachments to text using OpenAI's Whispe
 - **Multi-language Support**: Whisper-1 automatically detects and transcribes 99+ languages
 
 ### Feature Status
-- **Version**: Implemented in commit `11d2bc818`
+- **Version**: 2.0 (Enhanced Multi-Channel Support)
 - **Availability**: Core OSS feature
-- **Release**: Available in next release
+- **Release**: Enhanced version in Q1 2025
+- **Previous Version**: 1.0 (API-only, synchronous) - commit `11d2bc818`
 
 ---
 
@@ -88,94 +89,206 @@ Implement automatic speech-to-text transcription using OpenAI's Whisper-1 model,
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ MessagesController                                          │
+│ Message Creation (Any Channel)                              │
+│  - API, Widget, WhatsApp, Email, Telegram, etc.             │
+└─────────────────┬───────────────────────────────────────────┘
+                  │ MESSAGE_CREATED event
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│ AudioTranscriptionListener                                   │
+│  - Subscribes to message events                             │
 │  - Detects audio attachments                                │
-│  - Calls transcription service before message creation      │
-│  - Appends transcription to message content                 │
+│  - Checks API key availability                              │
+│  - Enqueues background job                                  │
+└─────────────────┬───────────────────────────────────────────┘
+                  │ Async (Sidekiq)
+                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│ TranscribeAudioMessageJob                                    │
+│  - Processes in background (non-blocking)                   │
+│  - Retries on transient failures                            │
+│  - Updates message when complete                            │
+│  - Broadcasts to UI via ActionCable                         │
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ Openai::AudioTranscriptionService                           │
-│  - Downloads audio file from URL                            │
-│  - Uploads to OpenAI Whisper API                            │
-│  - Returns transcribed text                                 │
-│  - Cleans up temporary files                                │
+│  - Resolves API key (Integration → ENV)                     │
+│  - Calls OpenAI Whisper with verbose_json                   │
+│  - Returns text + language + duration                       │
+│  - Handles errors with specific exceptions                  │
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ OpenAI Whisper-1 API                                        │
-│  - Speech-to-text transcription                             │
-│  - Automatic language detection                             │
-│  - Supports 99+ languages                                   │
+│ Real-Time UI Update (ActionCable)                           │
+│  - Message updates automatically                            │
+│  - No page refresh required                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Components
 
-#### 1. Audio Transcription Service
-**File**: `app/services/openai/audio_transcription_service.rb`
+#### 1. Audio Transcription Listener
+**File**: `app/listeners/audio_transcription_listener.rb`
 
 **Responsibilities**:
-- Download audio files from URLs (supports both full URLs and relative paths)
-- Upload audio to OpenAI's `/audio/transcriptions` endpoint
-- Handle API authentication with OpenAI
-- Manage temporary files and cleanup
-- Comprehensive error handling and logging
+- Subscribe to MESSAGE_CREATED events across all channels
+- Detect audio attachments in messages
+- Check transcription enablement (feature flag + API key)
+- Enqueue background jobs for processing
+
+**Multi-Channel Support**:
+- API messages
+- Widget uploads
+- WhatsApp voice messages
+- Email audio attachments
+- Telegram voice notes
+- All other channels with audio support
+
+**Key Features**:
+- Event-driven architecture (Wisper pattern)
+- Non-blocking message creation
+- Automatic API key availability check
+- Comprehensive logging
+
+#### 2. Transcription Background Job
+**File**: `app/jobs/transcribe_audio_message_job.rb`
+
+**Responsibilities**:
+- Asynchronous transcription processing (non-blocking)
+- Retry logic with exponential backoff (2s, 4s, 8s)
+- Message content updates
+- Metadata storage (language, duration)
+- ActionCable broadcast for real-time UI updates
+
+**Retry Strategy**:
+- Transient failures (rate limits, network): Auto-retry with backoff
+- Permanent failures (invalid file, auth): Immediate discard
+- Maximum 3 retry attempts
+
+**Error Handling**:
+- `Openai::RateLimitError` → Retry with backoff
+- `Openai::NetworkError` → Retry with backoff
+- `Openai::InvalidFileError` → Discard (log error)
+- `Openai::AuthenticationError` → Discard (log error)
+
+#### 3. Audio Transcription Service (Enhanced)
+**File**: `app/services/openai/audio_transcription_service.rb`
+
+**New Capabilities** (Version 2.0):
+- Integration-based API key resolution
+- Language detection via `verbose_json` format
+- Structured response (text, language, duration)
+- Custom exception classes for error handling
+- Enhanced logging with API key source tracking
 
 **Key Methods**:
 - `process`: Main entry point, orchestrates transcription workflow
+- `resolve_api_key`: Checks integration first, then ENV variable
 - `download_audio_file`: Downloads audio using Down gem
-- `request_transcription`: Makes multipart POST to OpenAI API
+- `request_transcription`: Makes multipart POST to OpenAI API with verbose_json
 - `cleanup_file`: Ensures temporary files are removed
 
 **Dependencies**:
 - HTTParty for API communication
 - Down gem for file downloading
 - Ruby Tempfile for temporary storage
+- Custom exception classes
 
-#### 2. Enhanced Messages Controller
-**File**: `app/controllers/api/v1/accounts/conversations/messages_controller.rb`
+#### 4. Custom Exceptions
+**File**: `app/services/openai/exceptions.rb`
 
-**Enhanced Flow**:
-1. `create` action receives message with attachments
-2. `audio_attachment?` checks if any attachments are audio MIME types
-3. `process_audio_transcription` processes each audio file:
-   - Creates temporary ActiveStorage blob for URL generation
-   - Calls `AudioTranscriptionService` for each audio file
-   - Collects all transcriptions
-4. Merges transcriptions with original message content
-5. Passes enhanced content to `MessageBuilder`
+**Exception Hierarchy**:
+- `Openai::TranscriptionError` (base)
+  - `Openai::RateLimitError` (429 responses)
+  - `Openai::NetworkError` (timeouts, 5xx)
+  - `Openai::InvalidFileError` (400 bad format)
+  - `Openai::AuthenticationError` (401/403)
 
-**Key Features**:
-- Supports multiple audio attachments per message
-- Preserves original message content (if any)
-- Graceful degradation: continues message creation even if transcription fails
-- Comprehensive logging at each step
+**Usage**:
+- Enables specific error handling in retry logic
+- Better error messages and logging
+- Distinguishes retryable vs permanent failures
 
 ### Data Flow
 
 ```
-1. User uploads audio message
+1. User uploads audio message (any channel)
    ↓
-2. Controller receives attachment with content_type: 'audio/*'
+2. Message created with audio attachment
    ↓
-3. Create temporary ActiveStorage blob
+3. MESSAGE_CREATED event published
    ↓
-4. Generate temporary URL for audio file
+4. AudioTranscriptionListener receives event
    ↓
-5. AudioTranscriptionService downloads file
+5. Listener checks for audio attachments
    ↓
-6. Service uploads to OpenAI Whisper API
+6. Listener verifies API key availability
    ↓
-7. OpenAI returns transcribed text
+7. TranscribeAudioMessageJob enqueued (Sidekiq)
    ↓
-8. Transcription appended to message content
+8. Message visible to user immediately (with audio)
    ↓
-9. Message created with original audio + transcript
+9. Background job processes transcription
    ↓
-10. Temporary files cleaned up
+10. AudioTranscriptionService downloads file
+   ↓
+11. Service uploads to OpenAI Whisper API (verbose_json)
+   ↓
+12. OpenAI returns text + language + duration
+   ↓
+13. Job updates message content with transcription
+   ↓
+14. Job stores metadata (language, duration, timestamp)
+   ↓
+15. ActionCable broadcasts message update
+   ↓
+16. UI automatically shows transcription
+   ↓
+17. Temporary files cleaned up
+```
+
+### Real-Time UI Updates
+
+**User Experience Flow**:
+1. User sends audio message → Message appears immediately with audio player
+2. Backend processes transcription asynchronously (5-30 seconds)
+3. UI shows "Transcribing..." indicator (optional)
+4. Transcription appears automatically when ready (ActionCable broadcast)
+5. No page refresh required
+
+**ActionCable Integration**:
+```javascript
+// Backend broadcasts on transcription completion
+ActionCable.server.broadcast(
+  "messages:#{conversation_id}",
+  {
+    event: 'message.updated',
+    data: { /* message with transcription */ }
+  }
+)
+
+// Frontend automatically updates message
+// Existing Chatwoot infrastructure handles the update
+```
+
+**Metadata Structure**:
+```json
+{
+  "message": {
+    "id": 12345,
+    "content": "Original text\n\nTranscription text here",
+    "additional_attributes": {
+      "transcription": {
+        "language": "en",
+        "duration": 12.5,
+        "transcribed_at": "2025-01-04T10:30:00Z"
+      }
+    }
+  }
+}
 ```
 
 ---
@@ -234,19 +347,61 @@ Content-Type: multipart/form-data
 
 ## Configuration
 
+### Method 1: Integration-Based (Recommended)
+**Per-Account Configuration via UI**
+
+1. Navigate to Settings → Integrations
+2. Select "OpenAI"
+3. Configure:
+   - API Key: `sk-proj-...`
+   - ✓ Enable audio transcription
+   - ✓ Detect and store audio language
+4. Save
+
+**Benefits**:
+- Per-account usage tracking
+- Independent billing per workspace
+- No server restart required
+- Granular control
+
+### Method 2: Environment Variable (Global Fallback)
+**Server-Wide Configuration**
+
+```bash
+# Add to .env or environment
+OPENAI_API_KEY=sk-proj-abc123xyz...
+AUDIO_TRANSCRIPTION_ENABLED=true
+```
+
+**Fallback Behavior**:
+- Used when no integration configured
+- Shared across all accounts
+- Requires server restart to change
+
+### Priority Order
+1. Account integration API key (if configured)
+2. Environment variable `OPENAI_API_KEY` (fallback)
+3. Disabled (if neither available)
+
 ### Environment Variables
 
-#### Required
+#### Required (for fallback method)
 
 **`OPENAI_API_KEY`**
 - **Description**: OpenAI API authentication key
-- **Required**: Yes (feature disabled if not present)
+- **Required**: Yes (unless using integration-based config)
 - **Format**: `sk-...` (starts with 'sk-')
 - **Obtain From**: https://platform.openai.com/api-keys
 - **Security**: Store securely, never commit to version control
 - **Example**: `OPENAI_API_KEY=sk-proj-abc123xyz...`
 
 #### Optional
+
+**`AUDIO_TRANSCRIPTION_ENABLED`**
+- **Description**: Global feature flag to enable/disable transcription
+- **Default**: `true`
+- **Values**: `true` or `false`
+- **Example**: `AUDIO_TRANSCRIPTION_ENABLED=true`
 
 **`FRONTEND_URL`**
 - **Description**: Base URL for constructing full audio file URLs from relative paths
@@ -256,26 +411,41 @@ Content-Type: multipart/form-data
 
 ### Setup Instructions
 
-1. **Obtain OpenAI API Key**:
-   ```bash
-   # Sign up at https://platform.openai.com/signup
-   # Navigate to API Keys section
-   # Create new secret key
-   ```
+#### Integration-Based Setup (Recommended)
 
-2. **Configure Environment**:
+1. **Obtain OpenAI API Key**:
+   - Sign up at https://platform.openai.com/signup
+   - Navigate to API Keys section
+   - Create new secret key
+
+2. **Configure in UI**:
+   - Log in as admin
+   - Go to Settings → Integrations
+   - Click "Configure" on OpenAI integration
+   - Enter API key and enable features
+   - Save configuration
+
+3. **Verify Configuration**:
+   - Send test audio message
+   - Check message for transcription
+   - Review integration logs
+
+#### Environment Variable Setup (Fallback)
+
+1. **Configure Environment**:
    ```bash
    # Add to .env file
    echo "OPENAI_API_KEY=sk-your-key-here" >> .env
+   echo "AUDIO_TRANSCRIPTION_ENABLED=true" >> .env
    ```
 
-3. **Restart Application**:
+2. **Restart Application**:
    ```bash
    # Restart Rails server to load new environment variable
    pnpm dev
    ```
 
-4. **Verify Configuration**:
+3. **Verify Configuration**:
    ```ruby
    # Rails console
    ENV['OPENAI_API_KEY'].present?
@@ -293,10 +463,11 @@ Content-Type: multipart/form-data
   - 10,000 messages/month (avg 1 min): $60.00/month
 
 **Recommendations**:
-- Monitor usage via OpenAI dashboard
+- Monitor usage via OpenAI dashboard (or integration analytics for per-account)
 - Set usage limits in OpenAI account settings
 - Consider implementing message length limits for cost control
 - Track transcription success/failure rates
+- Use integration-based config for accurate per-workspace billing
 
 ---
 
@@ -817,59 +988,33 @@ DEBUG -- : Cleaning up temporary audio file
 
 ## Future Enhancements
 
-### Priority 1: High Value
+### Priority 1: High Value ✅ COMPLETED IN V2.0
 
-#### 1. Background Job Processing
-**Problem**: Transcription blocks message creation (sync processing)
-
-**Solution**:
-- Move transcription to Sidekiq background job
-- Return message immediately to user
-- Update message with transcription when ready
-- Use ActionCable to push transcription to UI when complete
+#### 1. Background Job Processing ✅
+**Status**: Implemented in Version 2.0
 
 **Implementation**:
-```ruby
-# app/jobs/transcribe_audio_message_job.rb
-class TranscribeAudioMessageJob < ApplicationJob
-  queue_as :default
+- `TranscribeAudioMessageJob` processes transcriptions asynchronously
+- Messages appear immediately with audio attachment
+- Transcriptions update via ActionCable when ready
+- Non-blocking user experience
 
-  def perform(message_id, attachment_id)
-    message = Message.find(message_id)
-    attachment = message.attachments.find(attachment_id)
+**Files**:
+- `app/jobs/transcribe_audio_message_job.rb`
+- `app/listeners/audio_transcription_listener.rb`
 
-    transcription = Openai::AudioTranscriptionService.new(attachment.file_url).process
-
-    if transcription.present?
-      message.update(content: "#{message.content}\n\n#{transcription}")
-      # Broadcast update via ActionCable
-    end
-  end
-end
-```
-
-**Benefits**:
-- Faster message creation response
-- Better user experience
-- Handles API slowness gracefully
-
-#### 2. Language Detection and Translation
-**Feature**: Detect audio language and optionally translate to agent's language
+#### 2. Language Detection ✅
+**Status**: Detection implemented in Version 2.0
+**Future**: Translation workflow integration
 
 **Implementation**:
-```ruby
-# Enhanced API call with language parameter
-response = self.class.post(
-  '/audio/transcriptions',
-  body: {
-    model: 'whisper-1',
-    file: audio_file,
-    language: 'en', # Optional: force specific language
-    response_format: 'verbose_json' # Returns detected language
-  }
-)
+- Using `verbose_json` response format
+- Language detected and stored in message metadata
+- Duration tracking included
+- Available for automation rules and routing
 
-# Response includes language
+**Response Structure**:
+```json
 {
   "text": "Transcription...",
   "language": "es",
@@ -877,37 +1022,21 @@ response = self.class.post(
 }
 ```
 
-**Benefits**:
-- Automatic language routing
-- Translation workflow integration
-- Better multilingual support
+#### 3. Retry Logic with Exponential Backoff ✅
+**Status**: Implemented in Version 2.0
 
-#### 3. Retry Logic with Exponential Backoff
-**Problem**: Temporary API failures result in permanent transcription loss
+**Implementation**:
+- Sidekiq retry mechanism with exponential backoff
+- Retry delays: 2s, 4s, 8s
+- Custom exception classes for smart retry decisions
+- Transient failures (rate limits, network): Auto-retry
+- Permanent failures (invalid file, auth): Discard
 
-**Solution**:
-```ruby
-# app/services/openai/audio_transcription_service.rb
-def request_transcription_with_retry(audio_file, max_retries: 3)
-  retries = 0
-  begin
-    request_transcription(audio_file)
-  rescue RateLimitError => e
-    retries += 1
-    if retries < max_retries
-      sleep(2 ** retries) # Exponential backoff: 2s, 4s, 8s
-      retry
-    else
-      Rails.logger.error "Max retries exceeded for transcription"
-      nil
-    end
-  end
-end
-```
-
-**Benefits**:
-- Better resilience to transient errors
-- Higher transcription success rate
+**Exception Handling**:
+- `Openai::RateLimitError` → Retry
+- `Openai::NetworkError` → Retry
+- `Openai::InvalidFileError` → Discard
+- `Openai::AuthenticationError` → Discard
 
 ### Priority 2: Medium Value
 
@@ -1310,6 +1439,39 @@ Message:
 
 ## Changelog
 
+### Version 2.0 (Enhanced Multi-Channel Support)
+**Date**: 2025-01-04 (Q1 2025)
+**Status**: In Development
+
+**Features**:
+- Multi-channel support via listener pattern (API, Widget, WhatsApp, Email, etc.)
+- Background job processing with Sidekiq
+- Real-time UI updates via ActionCable
+- Integration-based API key configuration (per-account)
+- Language detection using verbose_json format
+- Retry logic with exponential backoff (2s, 4s, 8s)
+- Custom exception classes for error handling
+- Enhanced logging and monitoring
+
+**Architecture Changes**:
+- Listener pattern replaces controller-specific logic
+- Asynchronous processing (non-blocking)
+- Event-driven design for scalability
+
+**Files Added**:
+- `app/listeners/audio_transcription_listener.rb`
+- `app/jobs/transcribe_audio_message_job.rb`
+- `app/services/openai/exceptions.rb`
+- `config/initializers/listeners.rb`
+
+**Files Modified**:
+- `app/services/openai/audio_transcription_service.rb` (API key resolution, verbose_json)
+- `app/controllers/api/v1/accounts/conversations/messages_controller.rb` (simplified)
+- `config/integration/apps.yml` (new integration fields)
+
+**Breaking Changes**: None (backward compatible)
+**Migration Required**: No (automatic enablement via feature flag)
+
 ### Version 1.0 (Initial Release)
 **Date**: 2025-01-04
 **Commit**: 11d2bc818
@@ -1338,55 +1500,166 @@ Message:
 
 ### Common Issues
 
-#### Issue: Transcriptions not appearing
-**Symptoms**: Audio messages have no transcribed text
+#### Issue: Transcriptions not appearing (Version 2.0)
+**Symptoms**: Audio messages don't have transcriptions
 
 **Diagnosis**:
 ```bash
-# Check API key configured
+# Check API key configuration (integration or ENV)
 rails console
-> ENV['OPENAI_API_KEY'].present?
+> account = Account.find(123)
+> integration = account.integrations.find_by(name: 'openai')
+> integration&.settings&.dig('api_key').present? || ENV['OPENAI_API_KEY'].present?
 # Should return true
 
+# Check Sidekiq is running
+> Sidekiq.redis { |c| c.info }
+
+# Check background jobs
+> TranscribeAudioMessageJob.jobs.count
+
 # Check logs for errors
-tail -f log/development.log | grep -i transcription
+tail -f log/sidekiq.log | grep -i transcription
 ```
 
 **Solutions**:
-1. Verify OPENAI_API_KEY is set correctly
-2. Check OpenAI account has available credits
-3. Review Rails logs for specific errors
-4. Test API key with curl:
-```bash
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPENAI_API_KEY"
-```
+1. Verify API key configured (Integration UI or ENV)
+2. Ensure Sidekiq worker is running: `ps aux | grep sidekiq`
+3. Check OpenAI account has available credits
+4. Review Sidekiq logs for specific errors: `tail -f log/sidekiq.log`
+5. Verify listener is active: `AudioTranscriptionListener.subscribers.count > 0`
 
-#### Issue: Slow transcription times
-**Symptoms**: Messages take >60s to create
+#### Issue: Background jobs not processing
+**Symptoms**: Jobs enqueued but not executed
 
 **Diagnosis**:
-- Check audio file size
-- Check network latency to OpenAI
-- Review OpenAI service status
+```bash
+# Check Sidekiq queue depth
+redis-cli
+> LLEN queue:default
+
+# Check failed jobs
+rails console
+> Sidekiq::RetrySet.new.size
+> Sidekiq::DeadSet.new.size
+```
 
 **Solutions**:
-1. Implement background job processing
-2. Add timeout configuration
-3. Consider queueing for large files
+1. Start Sidekiq if not running: `bundle exec sidekiq`
+2. Check Redis connectivity: `redis-cli ping`
+3. Review failed jobs: Sidekiq Web UI at `/sidekiq`
+4. Increase worker concurrency if queue is backed up
 
-#### Issue: High costs
+#### Issue: Integration API key not being used
+**Symptoms**: Environment variable used instead of integration config
+
+**Diagnosis**:
+```ruby
+# Rails console
+account = Account.find(123)
+integration = account.integrations.find_by(name: 'openai')
+puts integration.settings.inspect
+# Should show api_key if configured
+```
+
+**Solutions**:
+1. Verify integration saved correctly in Settings UI
+2. Check integration schema in `config/integration/apps.yml`
+3. Review API key resolution logic in `AudioTranscriptionService`
+4. Clear Rails cache: `Rails.cache.clear`
+
+#### Issue: ActionCable broadcasts not received
+**Symptoms**: Transcriptions don't appear without page refresh
+
+**Diagnosis**:
+```javascript
+// Browser developer console
+window.App.cable.connection.isActive()
+// Should return true
+
+// Check subscription
+window.App.cable.subscriptions.subscriptions.length
+// Should show active subscriptions
+```
+
+**Solutions**:
+1. Verify ActionCable is configured and running
+2. Check WebSocket connection in browser Network tab
+3. Review broadcast code in `TranscribeAudioMessageJob`
+4. Ensure user is subscribed to conversation channel
+5. Check for CORS or proxy issues blocking WebSocket
+
+#### Issue: Retry exhaustion (persistent failures)
+**Symptoms**: Jobs fail after 3 retry attempts
+
+**Diagnosis**:
+```bash
+# Check dead jobs
+rails console
+> dead_jobs = Sidekiq::DeadSet.new
+> dead_jobs.select { |j| j.klass == 'TranscribeAudioMessageJob' }
+
+# Review error patterns
+> dead_jobs.map { |j| j.item['error_class'] }.tally
+```
+
+**Solutions**:
+1. **Rate Limit Errors (429)**: Wait for rate limit reset, increase retry delay
+2. **Authentication Errors (401/403)**: Verify API key is valid and not expired
+3. **Invalid File Errors (400)**: Check audio file format and size
+4. **Network Errors**: Check connectivity to OpenAI API, consider proxy issues
+5. Review custom exceptions in logs for specific error types
+
+#### Issue: Slow transcription times (Version 2.0)
+**Symptoms**: Transcriptions take >60s to appear
+
+**Diagnosis**:
+```bash
+# Check Sidekiq latency
+rails console
+> Sidekiq::Queue.new('default').latency
+# Should be < 10 seconds
+
+# Check queue depth
+> Sidekiq::Queue.new('default').size
+
+# Check OpenAI API status
+curl https://status.openai.com/api/v2/status.json
+```
+
+**Solutions**:
+1. Scale Sidekiq workers: `SIDEKIQ_CONCURRENCY=25`
+2. Add dedicated transcription queue with higher priority
+3. Check network latency to OpenAI: `ping api.openai.com`
+4. Review OpenAI rate limits in dashboard
+5. Consider chunking very long audio files
+
+#### Issue: High costs (Version 2.0)
 **Symptoms**: Unexpected OpenAI bills
 
 **Diagnosis**:
-- Check volume of audio messages
-- Review average audio duration
-- Check for repeated transcriptions (bugs)
+```bash
+# Check transcription volume
+rails console
+> Message.joins(:attachments)
+  .where('attachments.content_type LIKE ?', 'audio/%')
+  .where('messages.created_at > ?', 1.month.ago)
+  .count
+
+# Check average audio duration
+> # Review metadata in additional_attributes
+
+# Check for duplicate transcriptions
+> TranscribeAudioMessageJob.jobs.group_by { |j| j['args'][0] }.select { |k, v| v.size > 1 }
+```
 
 **Solutions**:
-1. Implement usage caps
-2. Add file duration limits
-3. Provide opt-out for high-volume accounts
+1. Implement per-account usage caps and alerts
+2. Add file duration limits (e.g., max 5 minutes)
+3. Use integration-based config for per-workspace billing visibility
+4. Monitor usage via OpenAI dashboard
+5. Provide opt-out mechanism for high-volume accounts
+6. Review and optimize retry logic to avoid unnecessary re-processing
 
 ### Getting Help
 
@@ -1505,8 +1778,13 @@ AUDIO_TRANSCRIPTION_ENABLED=true     # Enable/disable feature
 - **Feature Name**: Audio Message Transcription
 - **Created**: 2025-01-04
 - **Last Updated**: 2025-01-04
-- **Status**: Implemented
+- **Status**: Enhanced (Version 2.0 in development)
 - **Owner**: Engineering Team
 - **Stakeholders**: Product, Support, Engineering
-- **Related Commits**: 11d2bc818
-- **Documentation Version**: 1.0
+- **Related Commits**:
+  - Version 1.0: 11d2bc818
+  - Version 2.0: In development
+- **Documentation Version**: 2.0
+- **Related Documents**:
+  - Migration Guide: `docs/features/FEAT-003/migration-v1-to-v2.md`
+  - Implementation Story: `docs/features/FEAT-003/enhancement-story.md`

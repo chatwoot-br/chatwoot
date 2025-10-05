@@ -11,6 +11,8 @@ import { timeStampAppendedURL } from 'dashboard/helper/URLHelper';
 import { downloadFile } from '@chatwoot/utils';
 import { useEmitter } from 'dashboard/composables/emitter';
 import { emitter } from 'shared/helpers/mitt';
+import { useMessageContext } from '../provider.js';
+import { useI18n } from 'vue-i18n';
 
 const { attachment } = defineProps({
   attachment: {
@@ -22,6 +24,9 @@ const { attachment } = defineProps({
 defineOptions({
   inheritAttrs: false,
 });
+
+const { t } = useI18n();
+const { content, contentAttributes } = useMessageContext();
 
 const timeStampURL = computed(() => {
   return timeStampAppendedURL(attachment.dataUrl);
@@ -118,6 +123,55 @@ const downloadAudio = async () => {
   const { fileType, dataUrl, extension } = attachment;
   downloadFile({ url: dataUrl, type: fileType, extension });
 };
+
+// Compute transcription state
+const transcriptionData = computed(() => {
+  return contentAttributes.value?.transcription;
+});
+
+const hasTranscription = computed(() => {
+  return !!transcriptionData.value?.language;
+});
+
+const isTranscribing = computed(() => {
+  // Audio attachment exists but no transcription metadata yet
+  return !hasTranscription.value;
+});
+
+const transcriptionText = computed(() => {
+  // Extract transcription from message content
+  // Backend appends transcription after double newline
+  const messageContent = content.value || '';
+  const parts = messageContent.split('\n\n');
+
+  // If there are multiple parts, the transcription is after the first double newline
+  return parts.length > 1 ? parts.slice(1).join('\n\n').trim() : '';
+});
+
+const languageName = computed(() => {
+  const code = transcriptionData.value?.language;
+  if (!code) return '';
+
+  const languages = {
+    en: 'English',
+    es: 'Spanish',
+    fr: 'French',
+    de: 'German',
+    pt: 'Portuguese',
+    it: 'Italian',
+    nl: 'Dutch',
+    pl: 'Polish',
+    ru: 'Russian',
+    ja: 'Japanese',
+    ko: 'Korean',
+    zh: 'Chinese',
+    ar: 'Arabic',
+    hi: 'Hindi',
+    tr: 'Turkish',
+  };
+
+  return languages[code] || code.toUpperCase();
+});
 </script>
 
 <template>
@@ -181,11 +235,30 @@ const downloadAudio = async () => {
       </button>
     </div>
 
+    <!-- Transcription Loading Indicator -->
     <div
-      v-if="attachment.transcribedText"
-      class="text-n-slate-12 p-3 text-sm bg-n-alpha-1 rounded-lg w-full break-words"
+      v-if="isTranscribing"
+      class="flex items-center gap-2 px-3 py-2 text-sm text-n-slate-11 w-full"
     >
-      {{ attachment.transcribedText }}
+      <Icon class="size-4 animate-spin" icon="i-lucide-loader-circle" />
+      <span>{{ t('CONVERSATION.TRANSCRIBING') }}</span>
+    </div>
+
+    <!-- Transcription Content -->
+    <div
+      v-else-if="hasTranscription && transcriptionText"
+      class="flex flex-col gap-1 p-3 text-sm bg-n-alpha-1 rounded-lg w-full"
+    >
+      <div class="flex items-center gap-2 text-xs text-n-slate-11">
+        <Icon icon="i-lucide-text" class="size-3" />
+        <span>{{ t('CONVERSATION.TRANSCRIPTION') }}</span>
+        <span v-if="languageName" class="text-xs text-n-slate-10">
+          ({{ languageName }})
+        </span>
+      </div>
+      <p class="text-n-slate-12 whitespace-pre-wrap break-words">
+        {{ transcriptionText }}
+      </p>
     </div>
   </div>
 </template>
