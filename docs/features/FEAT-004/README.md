@@ -223,6 +223,37 @@ end
 - Log error with media_path for debugging
 - Show placeholder in UI with error message
 
+### Audio Files with MIME Type Parameters
+
+**Issue**: WhatsApp Web service saves audio files with MIME parameters in the filename (e.g., `file.ogg; codecs=opus`), causing 404 errors when downloading
+
+**Root Cause**:
+- Go WhatsApp Web stores files with full MIME type in filename: `statics/media/file.ogg; codecs=opus`
+- If we sanitize the path before downloading, we get: `statics/media/file.ogg`
+- File doesn't exist at sanitized path → 404 Not Found
+
+**Solution**:
+- Keep original unsanitized path for downloading from WhatsApp Web service
+- Sanitize filename only when creating ActiveStorage attachment
+- Implementation in `IncomingMessageWhatsappWebService`:
+  ```ruby
+  # In extract_media_info: Keep original path
+  media_info[:id] = media_data[:media_path] || media_data[:id]
+
+  # In attach_files: Sanitize when saving
+  sanitized_filename = sanitize_media_path(original_filename)
+
+  # Helper method
+  def sanitize_media_path(media_path)
+    media_path.to_s.split(';').first&.strip
+  end
+  ```
+
+**Result**:
+- Download succeeds with original path: `GET /5521995539939/statics/media/file.ogg; codecs=opus`
+- Attachment saved with clean name: `file.ogg`
+- Audio transcription works correctly (FEAT-003 integration)
+
 ### Duplicate Webhooks
 
 **Issue**: Same event may be delivered multiple times

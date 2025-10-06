@@ -421,30 +421,32 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     media_info = {}
 
     # Handle different media payload structures
+    # NOTE: Do NOT sanitize media_path here - we need the original path to download from WhatsApp Web service
+    # The sanitization will happen later when we create the attachment
     if payload[:image].present?
       media_data = payload[:image]
-      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+      media_info[:id] = media_data[:media_path] || media_data[:id]
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:video].present?
       media_data = payload[:video]
-      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+      media_info[:id] = media_data[:media_path] || media_data[:id]
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:audio].present?
       media_data = payload[:audio]
-      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+      media_info[:id] = media_data[:media_path] || media_data[:id]
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
     elsif payload[:document].present?
       media_data = payload[:document]
-      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+      media_info[:id] = media_data[:media_path] || media_data[:id]
       media_info[:mime_type] = media_data[:mime_type]
       media_info[:caption] = media_data[:caption]
       media_info[:filename] = media_data[:filename]
     elsif payload[:sticker].present?
       media_data = payload[:sticker]
-      media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+      media_info[:id] = media_data[:media_path] || media_data[:id]
       media_info[:mime_type] = media_data[:mime_type]
     else
       # Legacy format fallback
@@ -537,12 +539,41 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     status_map[receipt_type&.downcase] || 'delivered'
   end
 
+  def attach_files
+    return if %w[text button interactive location contacts reaction].include?(message_type)
+
+    attachment_payload = @processed_params[:messages].first[message_type.to_sym]
+    @message.content ||= attachment_payload[:caption]
+
+    attachment_file = download_attachment_file(attachment_payload)
+    return if attachment_file.blank?
+
+    # Sanitize the filename to remove mime type parameters (e.g., "; codecs=opus")
+    original_filename = attachment_file.original_filename
+    sanitized_filename = sanitize_media_path(original_filename)
+    Rails.logger.debug { "WhatsApp Web: Sanitized attachment filename: '#{original_filename}' => '#{sanitized_filename}'" }
+
+    @message.attachments.new(
+      account_id: @message.account_id,
+      file_type: file_content_type(message_type),
+      file: {
+        io: attachment_file,
+        filename: sanitized_filename,
+        content_type: attachment_file.content_type
+      }
+    )
+  end
+
   def download_attachment_file(attachment_payload)
     # Use the same pattern as WhatsApp Cloud service
+    Rails.logger.debug { "WhatsApp Web: Attachment payload ID: #{attachment_payload[:id]}" }
     media_url = inbox.channel.media_url(attachment_payload[:id])
+    Rails.logger.debug { "WhatsApp Web: Constructed media URL: #{media_url}" }
     Down.download(media_url, headers: inbox.channel.api_headers)
   rescue StandardError => e
     Rails.logger.error "Error downloading WhatsApp Web media: #{e.message}"
+    Rails.logger.error "WhatsApp Web: Failed media URL: #{media_url}"
+    Rails.logger.error "WhatsApp Web: Attachment payload: #{attachment_payload.inspect}"
     nil
   end
 
