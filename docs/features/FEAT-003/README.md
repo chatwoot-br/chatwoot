@@ -13,10 +13,11 @@ Automatically transcribe audio message attachments to text using OpenAI's Whispe
 - **Multi-language Support**: Whisper-1 automatically detects and transcribes 99+ languages
 
 ### Feature Status
-- **Version**: 2.1 (Error Handling & Retry Improvements)
+- **Version**: 2.2 (Code Quality & Enterprise Integration)
 - **Availability**: Core OSS feature
-- **Release**: v2.1 - January 2025
+- **Release**: v2.2 - October 2025
 - **Previous Versions**:
+  - v2.1 (Error Handling & Retry Improvements) - January 2025
   - v2.0 (Multi-Channel Support) - January 2025
   - v1.0 (API-only, synchronous) - commit `11d2bc818`
 
@@ -139,12 +140,12 @@ Implement automatic speech-to-text transcription using OpenAI's Whisper-1 model,
 - Subscribe to MESSAGE_CREATED events across all channels
 - Detect audio attachments in messages
 - Check transcription enablement (feature flag + API key)
-- Enqueue background jobs for processing
+- Enqueue background jobs for processing with 2-second delay (v2.2)
 
 **Multi-Channel Support**:
 - API messages
 - Widget uploads
-- WhatsApp voice messages
+- WhatsApp voice messages (with special handling for opus/ogg formats)
 - Email audio attachments
 - Telegram voice notes
 - All other channels with audio support
@@ -154,6 +155,12 @@ Implement automatic speech-to-text transcription using OpenAI's Whisper-1 model,
 - Non-blocking message creation
 - Automatic API key availability check
 - Comprehensive logging
+- 2-second job delay to avoid ActiveStorage race conditions (v2.2)
+
+**API Key Resolution** (v2.2):
+- Uses enhanced `AudioTranscriptionService` with `audio_url:` named parameter
+- Checks integration-based API key first, then ENV fallback
+- Graceful error handling when API key unavailable
 
 #### 2. Transcription Background Job
 **File**: `app/jobs/transcribe_audio_message_job.rb`
@@ -161,58 +168,81 @@ Implement automatic speech-to-text transcription using OpenAI's Whisper-1 model,
 **Responsibilities**:
 - Asynchronous transcription processing (non-blocking)
 - Retry logic with exponential backoff (2s, 4s, 8s)
-- Message content updates
-- Metadata storage (language, duration)
+- Message content updates via content_attributes (v2.1+)
+- Metadata storage (language, duration, transcription text)
 - ActionCable broadcast for real-time UI updates
+- Error state broadcasting for failed transcriptions (v2.1+)
 
 **Retry Strategy**:
 - Transient failures (rate limits, network): Auto-retry with backoff
-- Permanent failures (invalid file, auth): Immediate discard
+- Permanent failures (invalid file, auth): Immediate discard with error callback
 - Maximum 3 retry attempts
+- 2-second delay before job execution to avoid ActiveStorage race conditions (v2.2)
 
-**Error Handling**:
-- `Openai::RateLimitError` → Retry with backoff
-- `Openai::NetworkError` → Retry with backoff
-- `Openai::InvalidFileError` → Discard (log error)
-- `Openai::AuthenticationError` → Discard (log error)
+**Error Handling** (v2.2 - Updated namespace):
+- `Openai::Exceptions::RateLimitError` → Retry with backoff
+- `Openai::Exceptions::NetworkError` → Retry with backoff
+- `Openai::Exceptions::InvalidFileError` → Discard with error callback
+- `Openai::Exceptions::AuthenticationError` → Discard with error callback
+- Error callbacks store failure metadata in content_attributes and broadcast to UI
 
 #### 3. Audio Transcription Service (Enhanced)
 **File**: `app/services/openai/audio_transcription_service.rb`
 
-**New Capabilities** (Version 2.0):
-- Integration-based API key resolution
-- Language detection via `verbose_json` format
-- Structured response (text, language, duration)
-- Custom exception classes for error handling
-- Enhanced logging with API key source tracking
+**Capabilities** (Version 2.2):
+- Integration-based API key resolution (v2.0)
+- Language detection via `verbose_json` format (v2.0)
+- Structured response (text, language, duration) (v2.0)
+- Custom exception classes for error handling (v2.0)
+- Enhanced logging with API key source tracking (v2.0)
+- Direct ActiveStorage blob access (v2.1)
+- Intelligent mime type to extension mapping (v2.1)
+- Filename sanitization for WhatsApp compatibility (v2.1)
+- Opus/OGG format handling (v2.1)
+- Improved error handling with specific exception types (v2.2)
 
 **Key Methods**:
 - `process`: Main entry point, orchestrates transcription workflow
 - `resolve_api_key`: Checks integration first, then ENV variable
-- `download_audio_file`: Downloads audio using Down gem
+- `download_audio_file`: Downloads audio using Down gem or ActiveStorage blob directly
+- `open_blob_file`: Opens ActiveStorage blob with proper extension mapping (v2.1)
+- `mime_type_to_extension`: Maps MIME types to OpenAI-compatible extensions (v2.1)
+- `sanitize_audio_filename`: Removes mime type parameters from filenames (v2.1)
 - `request_transcription`: Makes multipart POST to OpenAI API with verbose_json
 - `cleanup_file`: Ensures temporary files are removed
 
+**Constructor Changes** (v2.2):
+- Now accepts `audio_url:` (named parameter) or `attachment:` object
+- `attachment` parameter preferred for direct blob access
+- Backward compatible with URL-based downloads
+
 **Dependencies**:
 - HTTParty for API communication
-- Down gem for file downloading
+- Down gem for URL-based file downloading
+- ActiveStorage for direct blob access
 - Ruby Tempfile for temporary storage
-- Custom exception classes
+- Custom exception classes under Openai::Exceptions namespace
 
 #### 4. Custom Exceptions
 **File**: `app/services/openai/exceptions.rb`
 
-**Exception Hierarchy**:
-- `Openai::TranscriptionError` (base)
-  - `Openai::RateLimitError` (429 responses)
-  - `Openai::NetworkError` (timeouts, 5xx)
-  - `Openai::InvalidFileError` (400 bad format)
-  - `Openai::AuthenticationError` (401/403)
+**Exception Hierarchy** (v2.2 - Updated Namespace):
+- `Openai::Exceptions::TranscriptionError` (base)
+  - `Openai::Exceptions::RateLimitError` (429 responses)
+  - `Openai::Exceptions::NetworkError` (timeouts, 5xx, network failures)
+  - `Openai::Exceptions::InvalidFileError` (400 bad format, file not found)
+  - `Openai::Exceptions::AuthenticationError` (401/403)
 
 **Usage**:
 - Enables specific error handling in retry logic
 - Better error messages and logging
 - Distinguishes retryable vs permanent failures
+- Proper module namespacing prevents global scope pollution
+
+**Key Improvements in v2.2**:
+- Organized under `Openai::Exceptions` module namespace
+- Enhanced network error handling (ActiveStorage::FileNotFoundError, Down::Error, Errno::ENOENT)
+- Improved error raising with context-specific messages
 
 ### Data Flow
 
@@ -447,6 +477,39 @@ AUDIO_TRANSCRIPTION_ENABLED=true
 1. Account integration API key (if configured)
 2. Environment variable `OPENAI_API_KEY` (fallback)
 3. Disabled (if neither available)
+
+### Enterprise Edition Configuration (v2.2)
+
+**Feature Flag Control**:
+Enterprise edition includes additional feature flag support for granular control over transcription enablement.
+
+**Implementation**:
+```ruby
+# enterprise/app/models/enterprise/concerns/attachment.rb
+def enqueue_audio_transcription
+  return unless file_type.to_sym == :audio
+  return unless message&.account&.feature_enabled?('captain_integration')
+
+  Messages::AudioTranscriptionJob.perform_later(id)
+end
+```
+
+**Benefits**:
+- **Account-level control**: Enable/disable transcription per enterprise account
+- **Usage management**: Control costs by limiting which accounts can transcribe
+- **Gradual rollout**: Enable for specific accounts during testing
+- **Compliance**: Disable for accounts with strict data processing requirements
+
+**Configuration Steps**:
+1. Navigate to Account Settings → Features
+2. Enable "Captain Integration" feature flag
+3. Configure OpenAI integration as described above
+4. Audio transcription will activate for that account only
+
+**OSS Compatibility**:
+- Core transcription logic remains in open-source edition
+- Enterprise adds optional feature flag layer
+- OSS users get transcription automatically when API key configured
 
 ### Environment Variables
 
@@ -722,16 +785,51 @@ rescue StandardError => e
 
 **Handling**:
 - Original text content preserved
-- Transcription appended after double newline
-- Format: `{original_content}\n\n{transcription}`
-- Both content types visible to agent
+- Transcription stored in content_attributes.transcription (v2.1+)
+- Both content types visible to agent in UI
 
 **Example**:
 ```
 User's typed message: "Here's my issue"
 
-Transcription: "I tried to log in but it says my password is wrong"
+Transcription (in metadata): "I tried to log in but it says my password is wrong"
 ```
+
+### 9. WhatsApp Opus Audio Files with Codec Parameters (v2.2)
+
+**Scenario**: WhatsApp sends audio files with mime type parameters in filename (e.g., `file.ogg; codecs=opus`)
+
+**Problem**:
+- WhatsApp media paths can include mime type parameters: `audio_file.ogg; codecs=opus`
+- OpenAI API rejects files with invalid extensions containing semicolons
+- Previously caused "Invalid file format" errors for all WhatsApp voice messages
+
+**Handling** (v2.2):
+- `sanitize_media_path` method strips mime type parameters from WhatsApp media filenames
+- Applied to all media types: image, video, audio, document, sticker
+- Cleans filenames before storage: `file.ogg; codecs=opus` → `file.ogg`
+- Mime type to extension mapping handles opus/ogg conversion
+- Direct blob access avoids filename corruption issues
+
+**Implementation**:
+```ruby
+# app/services/whatsapp/incoming_message_whatsapp_web_service.rb
+def sanitize_media_path(media_path)
+  return media_path if media_path.blank?
+
+  # Remove mime type parameters (e.g., "; codecs=opus")
+  media_path.to_s.split(';').first&.strip
+end
+
+# Applied to all media extractions
+media_info[:id] = sanitize_media_path(media_data[:media_path] || media_data[:id])
+```
+
+**Result**:
+- WhatsApp voice messages transcribe successfully
+- Opus codec files automatically mapped to .ogg extension
+- OpenAI API accepts cleaned filenames
+- Zero user intervention required
 
 ### 6. Network Timeouts
 
@@ -1557,6 +1655,54 @@ Message:
 
 ## Changelog
 
+### Version 2.2 (Code Quality & Enterprise Integration)
+**Date**: 2025-10-05
+**Status**: ✅ Completed
+**Commits**: `2d6fe9f81`, `edc49558a`, `259db1ecd`, `85488140c`
+
+**Refactoring & Code Quality**:
+- **Exception namespace organization**: Moved exceptions to `Openai::Exceptions` module for better code organization
+- **Removed require_relative statements**: Leverages Rails autoloading for cleaner dependency management
+- **Named parameters**: Enhanced `AudioTranscriptionService` constructor to use `audio_url:` and `attachment:` named parameters
+- **Improved error handling**: Enhanced exception raising with specific error types (ActiveStorage::FileNotFoundError, Down::Error, Errno::ENOENT)
+
+**WhatsApp Integration Enhancements**:
+- **Media path sanitization**: Added `sanitize_media_path` method to remove mime type parameters from WhatsApp media filenames
+- **Fixes codec suffix issues**: Removes `; codecs=opus` and similar parameters that corrupt filenames
+- **Backward compatible**: Works with existing WhatsApp message processing
+
+**Enterprise Edition Integration** (v2.2):
+- **Feature flag support**: Added `captain_integration` feature flag check in Enterprise attachment concern
+- **Conditional transcription**: Enterprise accounts can enable/disable transcription via feature flags
+- **Maintains OSS compatibility**: Core functionality remains in open-source edition
+
+**Job Execution Improvements**:
+- **Race condition fix**: Added 2-second delay before job execution to ensure ActiveStorage writes file to disk
+- **Prevents file-not-found errors**: Eliminates race condition where job starts before blob fully persisted
+- **Better error messaging**: Enhanced logging for file download and processing stages
+
+**Test Coverage Updates**:
+- Updated exception namespaces across all specs
+- Enhanced integration test coverage for error scenarios
+- Improved test reliability with proper exception handling
+
+**Files Modified** (v2.2):
+- `app/jobs/transcribe_audio_message_job.rb` (exception namespace, 2s delay)
+- `app/services/openai/audio_transcription_service.rb` (exception namespace, named params, error handling)
+- `app/services/openai/exceptions.rb` (module namespace refactor)
+- `app/listeners/audio_transcription_listener.rb` (2s delay, named param usage)
+- `app/services/whatsapp/incoming_message_whatsapp_web_service.rb` (sanitize_media_path)
+- `enterprise/app/models/enterprise/concerns/attachment.rb` (feature flag check)
+- `spec/**/*_spec.rb` (exception namespace updates)
+
+**Breaking Changes**: None (fully backward compatible)
+
+**Migration Notes**:
+- No database migrations required
+- Existing code using old exception names will need updates if extending the service
+- All internal code updated to use `Openai::Exceptions::` namespace
+- Enterprise edition requires feature flag configuration for account-level control
+
 ### Version 2.1 (Error Handling & Retry Improvements)
 **Date**: 2025-01-05
 **Status**: ✅ Completed
@@ -1820,6 +1966,77 @@ rails console
 5. Provide opt-out mechanism for high-volume accounts
 6. Review and optimize retry logic to avoid unnecessary re-processing
 
+#### Issue: WhatsApp audio messages fail with "Invalid file format" (v2.2)
+**Symptoms**: WhatsApp voice messages consistently fail transcription
+
+**Diagnosis**:
+```bash
+# Check Rails logs for OpenAI API errors
+tail -f log/production.log | grep -i "invalid file"
+
+# Look for mime type parameters in filenames
+# Example error: "file.ogg; codecs=opus" rejected by OpenAI
+```
+
+**Solutions**:
+1. Verify running v2.2+ with WhatsApp sanitization
+2. Check that `sanitize_media_path` is applied in WhatsApp service
+3. Confirm mime type mapping includes opus → ogg conversion
+4. Use direct blob access (attachment parameter) instead of URL download
+5. Review file header logs to verify file integrity
+
+**Prevention**:
+- v2.2+ automatically sanitizes WhatsApp media paths
+- Direct blob access bypasses filename corruption
+- No user intervention required
+
+#### Issue: ActiveStorage race condition (file not found)
+**Symptoms**: Transcription jobs fail immediately with "Audio file not found in storage"
+
+**Diagnosis**:
+```bash
+# Check for rapid job execution
+rails console
+> TranscribeAudioMessageJob.jobs.first['enqueued_at']
+# Compare with message creation time - should be >2 seconds apart
+```
+
+**Solutions**:
+1. Verify v2.2+ includes 2-second job delay
+2. Check that listener uses `.set(wait: 2.seconds).perform_later`
+3. Increase delay if storage backend is slow (e.g., S3 in high latency regions)
+4. Monitor ActiveStorage async analysis jobs
+
+**Code Check**:
+```ruby
+# app/listeners/audio_transcription_listener.rb
+# Should include:
+TranscribeAudioMessageJob.set(wait: 2.seconds).perform_later(message.id, attachment.id)
+```
+
+#### Issue: Enterprise feature flag not working
+**Symptoms**: Enterprise accounts not transcribing despite configuration
+
+**Diagnosis**:
+```ruby
+# Rails console
+account = Account.find(123)
+account.feature_enabled?('captain_integration')
+# Should return true
+
+# Check attachment concern
+attachment = Attachment.find(456)
+attachment.file_type
+# Should be :audio
+```
+
+**Solutions**:
+1. Enable "Captain Integration" feature flag in account settings
+2. Verify feature flag system is configured
+3. Check enterprise edition is properly installed
+4. Confirm OpenAI integration configured separately
+5. Review enterprise attachment concern for proper hook
+
 ### Getting Help
 
 **Internal**:
@@ -1936,14 +2153,23 @@ AUDIO_TRANSCRIPTION_ENABLED=true     # Enable/disable feature
 - **Feature ID**: FEAT-003
 - **Feature Name**: Audio Message Transcription
 - **Created**: 2025-01-04
-- **Last Updated**: 2025-01-04
-- **Status**: Enhanced (Version 2.0 in development)
+- **Last Updated**: 2025-10-05
+- **Current Version**: 2.2 (Code Quality & Enterprise Integration)
+- **Status**: Production Ready
 - **Owner**: Engineering Team
 - **Stakeholders**: Product, Support, Engineering
 - **Related Commits**:
-  - Version 1.0: 11d2bc818
-  - Version 2.0: In development
-- **Documentation Version**: 2.0
+  - Version 1.0: `11d2bc818`
+  - Version 2.0: `2d6fe9f81` (squashed)
+  - Version 2.1: `edc49558a`
+  - Version 2.2: `259db1ecd`, `85488140c`
+- **Documentation Version**: 2.2
 - **Related Documents**:
   - Migration Guide: `docs/features/FEAT-003/migration-v1-to-v2.md`
   - Implementation Story: `docs/features/FEAT-003/enhancement-story.md`
+- **Key Changes in v2.2**:
+  - Exception namespace refactoring (Openai::Exceptions)
+  - WhatsApp media path sanitization
+  - Enterprise feature flag integration
+  - ActiveStorage race condition fixes
+  - Improved error handling and logging
