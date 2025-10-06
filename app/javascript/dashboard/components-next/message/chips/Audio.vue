@@ -152,11 +152,15 @@ const hasTranscriptionError = computed(() => {
   return !!transcriptionData.value?.error;
 });
 
-const isTranscribing = computed(() => {
-  // Audio attachment exists but no transcription metadata yet
-  // Don't show transcribing if there's an error
-  return !hasTranscription.value && !hasTranscriptionError.value;
-});
+// Removed: We can't reliably distinguish between "actively transcribing" vs "never transcribed"
+// Users can transcribe old messages via the context menu "Transcribe audio" option
+// const isTranscribing = computed(() => {
+//   return (
+//     audioTranscriptionEnabled.value &&
+//     !hasTranscription.value &&
+//     !hasTranscriptionError.value
+//   );
+// });
 
 const transcriptionText = computed(() => {
   // Get transcription text from content attributes
@@ -250,18 +254,9 @@ const languageName = computed(() => {
       </button>
     </div>
 
-    <!-- Transcription Loading Indicator -->
-    <div
-      v-if="isTranscribing"
-      class="flex items-center gap-2 px-3 py-2 text-sm text-n-slate-11 w-full"
-    >
-      <Icon class="size-4 animate-spin" icon="i-lucide-loader-circle" />
-      <span>{{ t('CONVERSATION.TRANSCRIBING') }}</span>
-    </div>
-
     <!-- Transcription Error -->
     <div
-      v-else-if="hasTranscriptionError"
+      v-if="hasTranscriptionError"
       class="flex items-center justify-between gap-2 px-3 py-2 text-sm w-full"
     >
       <div class="flex items-center gap-2 text-n-red-11">
@@ -285,7 +280,7 @@ const languageName = computed(() => {
 
     <!-- Transcription Content -->
     <div
-      v-else-if="hasTranscription && transcriptionText"
+      v-if="hasTranscription && transcriptionText"
       class="flex flex-col gap-1 p-3 text-sm bg-n-alpha-1 rounded-lg w-full"
     >
       <div class="flex items-center gap-2 text-xs text-n-slate-11">

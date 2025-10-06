@@ -1,6 +1,5 @@
 <script>
 import { useAlert } from 'dashboard/composables';
-import { mapGetters } from 'vuex';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import ContextMenu from 'dashboard/components/ui/ContextMenu.vue';
 import AddCannedModal from 'dashboard/routes/dashboard/settings/canned/AddCanned.vue';
@@ -60,10 +59,6 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({
-      getAccount: 'accounts/getAccount',
-      currentAccountId: 'getCurrentAccountId',
-    }),
     plainTextContent() {
       return this.getPlainText(this.messageContent);
     },
@@ -94,6 +89,29 @@ export default {
       // Fallback: check if content_attributes has transcription data
       // This indicates it's an audio message
       return !!this.contentAttributes?.transcription;
+    },
+    hasTranscription() {
+      return !!this.contentAttributes?.transcription?.language;
+    },
+    hasTranscriptionError() {
+      return !!this.contentAttributes?.transcription?.error;
+    },
+    canRetryTranscription() {
+      // Show retry option when there's an error
+      // Transcription is automatically attempted if OpenAI API key is configured
+      return this.hasAudioAttachment && this.hasTranscriptionError;
+    },
+    canTranscribeAudio() {
+      // Show transcribe option when:
+      // 1. Has audio attachment
+      // 2. No transcription exists yet
+      // 3. No transcription error
+      // Note: Transcription is automatically attempted if OpenAI API key is configured
+      return (
+        this.hasAudioAttachment &&
+        !this.hasTranscription &&
+        !this.hasTranscriptionError
+      );
     },
   },
   methods: {
@@ -250,7 +268,16 @@ export default {
           @click.stop="handleTranslate"
         />
         <MenuItem
-          v-if="hasAudioAttachment"
+          v-if="canTranscribeAudio"
+          :option="{
+            icon: 'text',
+            label: $t('CONVERSATION.CONTEXT_MENU.TRANSCRIBE_AUDIO'),
+          }"
+          variant="icon"
+          @click.stop="handleRetryTranscription"
+        />
+        <MenuItem
+          v-if="canRetryTranscription"
           :option="{
             icon: 'arrow-clockwise',
             label: $t('CONVERSATION.CONTEXT_MENU.RETRY_TRANSCRIPTION'),

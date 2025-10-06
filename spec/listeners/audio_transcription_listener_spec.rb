@@ -14,76 +14,74 @@ describe AudioTranscriptionListener do
       let!(:audio_attachment) { create_audio_attachment(message) }
       let!(:event) { Events::Base.new(event_name, Time.zone.now, message: message) }
 
-      context 'when feature is enabled and API key is available' do
-        before do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-          allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return('test-api-key')
-        end
-
-        it 'enqueues transcription job for each audio attachment' do
-          expect(TranscribeAudioMessageJob).to receive(:perform_later).with(message.id, audio_attachment.id)
-          listener.message_created(event)
-        end
-      end
-
-      context 'when feature is disabled' do
-        before do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('false')
-        end
-
-        it 'does not enqueue transcription job' do
-          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
-          listener.message_created(event)
-        end
-      end
-
-      context 'when API key is not available' do
-        before do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-          allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return(nil)
-        end
-
-        it 'does not enqueue transcription job' do
-          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
-          listener.message_created(event)
-        end
-      end
-
-      context 'when account has OpenAI integration' do
+      context 'when OpenAI integration is enabled with audio_transcription' do
         let!(:openai_hook) do
           create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
-                                     settings: { 'api_key' => 'account-specific-key' })
+                                     settings: { 'api_key' => 'test-api-key', 'audio_transcription' => true })
         end
 
-        before do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-          allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return(nil)
-        end
-
-        it 'enqueues transcription job using account-specific API key' do
+        it 'enqueues transcription job' do
           expect(TranscribeAudioMessageJob).to receive(:perform_later).with(message.id, audio_attachment.id)
           listener.message_created(event)
         end
       end
 
-      context 'when account has disabled OpenAI integration' do
+      context 'when OpenAI integration exists but audio_transcription is disabled' do
         let!(:openai_hook) do
-          create(:integrations_hook, account: account, app_id: 'openai', status: 'disabled',
-                                     settings: { 'api_key' => 'account-specific-key' })
-        end
-
-        before do
-          allow(ENV).to receive(:fetch).and_call_original
-          allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-          allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return(nil)
+          create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                     settings: { 'api_key' => 'test-api-key', 'audio_transcription' => false })
         end
 
         it 'does not enqueue transcription job' do
           expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
+          expect(Rails.logger).to receive(:debug).with(/audio_transcription setting is disabled/)
+          listener.message_created(event)
+        end
+      end
+
+      context 'when OpenAI integration exists but audio_transcription is not set' do
+        let!(:openai_hook) do
+          create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                     settings: { 'api_key' => 'test-api-key' })
+        end
+
+        it 'does not enqueue transcription job' do
+          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
+          expect(Rails.logger).to receive(:debug).with(/audio_transcription setting is disabled/)
+          listener.message_created(event)
+        end
+      end
+
+      context 'when OpenAI integration is disabled' do
+        let!(:openai_hook) do
+          create(:integrations_hook, account: account, app_id: 'openai', status: 'disabled',
+                                     settings: { 'api_key' => 'test-api-key', 'audio_transcription' => true })
+        end
+
+        it 'does not enqueue transcription job' do
+          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
+          expect(Rails.logger).to receive(:debug).with(/No enabled OpenAI integration/)
+          listener.message_created(event)
+        end
+      end
+
+      context 'when OpenAI integration has no API key' do
+        let!(:openai_hook) do
+          create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                     settings: { 'audio_transcription' => true })
+        end
+
+        it 'does not enqueue transcription job' do
+          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
+          expect(Rails.logger).to receive(:debug).with(/No API key configured/)
+          listener.message_created(event)
+        end
+      end
+
+      context 'when no OpenAI integration exists' do
+        it 'does not enqueue transcription job' do
+          expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
+          expect(Rails.logger).to receive(:debug).with(/No enabled OpenAI integration/)
           listener.message_created(event)
         end
       end
@@ -94,11 +92,9 @@ describe AudioTranscriptionListener do
       let!(:audio_attachment1) { create_audio_attachment(message) }
       let!(:audio_attachment2) { create_audio_attachment(message) }
       let!(:event) { Events::Base.new(event_name, Time.zone.now, message: message) }
-
-      before do
-        allow(ENV).to receive(:fetch).and_call_original
-        allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-        allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return('test-api-key')
+      let!(:openai_hook) do
+        create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                   settings: { 'api_key' => 'test-api-key', 'audio_transcription' => true })
       end
 
       it 'enqueues transcription job for each audio attachment' do
@@ -111,11 +107,9 @@ describe AudioTranscriptionListener do
     context 'when message has no audio attachments' do
       let!(:message) { create(:message, message_type: 'incoming', account: account, inbox: inbox, conversation: conversation) }
       let!(:event) { Events::Base.new(event_name, Time.zone.now, message: message) }
-
-      before do
-        allow(ENV).to receive(:fetch).and_call_original
-        allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-        allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return('test-api-key')
+      let!(:openai_hook) do
+        create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                   settings: { 'api_key' => 'test-api-key', 'audio_transcription' => true })
       end
 
       it 'does not enqueue transcription job' do
@@ -129,11 +123,9 @@ describe AudioTranscriptionListener do
       let!(:audio_attachment) { create_audio_attachment(message) }
       let!(:image_attachment) { create_image_attachment(message) }
       let!(:event) { Events::Base.new(event_name, Time.zone.now, message: message) }
-
-      before do
-        allow(ENV).to receive(:fetch).and_call_original
-        allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-        allow(ENV).to receive(:fetch).with('OPENAI_API_KEY', nil).and_return('test-api-key')
+      let!(:openai_hook) do
+        create(:integrations_hook, account: account, app_id: 'openai', status: 'enabled',
+                                   settings: { 'api_key' => 'test-api-key', 'audio_transcription' => true })
       end
 
       it 'only enqueues transcription job for audio attachments' do
@@ -142,19 +134,17 @@ describe AudioTranscriptionListener do
       end
     end
 
-    context 'when API key check raises an error' do
+    context 'when integration check raises an error' do
       let!(:message) { create(:message, message_type: 'incoming', account: account, inbox: inbox, conversation: conversation) }
       let!(:audio_attachment) { create_audio_attachment(message) }
       let!(:event) { Events::Base.new(event_name, Time.zone.now, message: message) }
 
       before do
-        allow(ENV).to receive(:fetch).and_call_original
-        allow(ENV).to receive(:fetch).with('AUDIO_TRANSCRIPTION_ENABLED', 'true').and_return('true')
-        allow_any_instance_of(Openai::AudioTranscriptionService).to receive(:send).and_raise(StandardError.new('API error'))
+        allow(account).to receive(:hooks).and_raise(StandardError.new('Database error'))
       end
 
       it 'handles the error gracefully and does not enqueue job' do
-        expect(Rails.logger).to receive(:error).with(/Error checking API key availability/)
+        expect(Rails.logger).to receive(:error).with(/Error checking transcription settings/)
         expect(TranscribeAudioMessageJob).not_to receive(:perform_later)
         listener.message_created(event)
       end
