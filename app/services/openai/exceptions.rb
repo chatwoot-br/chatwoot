@@ -1,4 +1,4 @@
-module Openai
+module Openai::Exceptions
   class TranscriptionError < StandardError; end
   class RateLimitError < TranscriptionError; end
   class NetworkError < TranscriptionError; end

@@ -196,7 +196,7 @@ RSpec.describe Openai::AudioTranscriptionService do
           double(success?: false, code: 401, body: 'Invalid API key')
         )
 
-        expect { service.process }.to raise_error(Openai::AuthenticationError, /Authentication failed/)
+        expect { service.process }.to raise_error(Openai::Exceptions::AuthenticationError, /Authentication failed/)
       end
 
       it 'raises rate limit error for 429' do
@@ -204,7 +204,7 @@ RSpec.describe Openai::AudioTranscriptionService do
           double(success?: false, code: 429, body: 'Rate limit exceeded')
         )
 
-        expect { service.process }.to raise_error(Openai::RateLimitError, /Rate limit exceeded/)
+        expect { service.process }.to raise_error(Openai::Exceptions::RateLimitError, /Rate limit exceeded/)
       end
 
       it 'raises invalid file error for 400' do
@@ -212,7 +212,7 @@ RSpec.describe Openai::AudioTranscriptionService do
           double(success?: false, code: 400, body: 'Invalid audio file')
         )
 
-        expect { service.process }.to raise_error(Openai::InvalidFileError, /Invalid file/)
+        expect { service.process }.to raise_error(Openai::Exceptions::InvalidFileError, /Invalid file/)
       end
 
       it 'ensures file cleanup even when error occurs' do
@@ -220,7 +220,7 @@ RSpec.describe Openai::AudioTranscriptionService do
           double(success?: false, code: 500, body: 'Server error')
         )
 
-        expect { service.process }.to raise_error(Openai::NetworkError)
+        expect { service.process }.to raise_error(Openai::Exceptions::NetworkError)
         expect(tempfile).to have_received(:close)
         expect(tempfile).to have_received(:unlink)
       end

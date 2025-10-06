@@ -218,7 +218,7 @@ RSpec.describe 'Audio Transcription Flow', type: :integration do
           perform_enqueued_jobs do
             TranscribeAudioMessageJob.perform_later(message.id, attachment.id)
           end
-        end.to raise_error(Openai::RateLimitError)
+        end.to raise_error(Openai::Exceptions::RateLimitError)
 
         # Job should be scheduled for retry
         expect(TranscribeAudioMessageJob).to have_been_enqueued.exactly(3).times

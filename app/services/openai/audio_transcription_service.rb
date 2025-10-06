@@ -68,13 +68,13 @@ class Openai::AudioTranscriptionService
     sanitized_file
   rescue ActiveStorage::FileNotFoundError => e
     Rails.logger.error "Audio file not found in storage: #{e.message}"
-    raise Openai::InvalidFileError, "Audio file not found: #{e.message}"
+    raise Openai::Exceptions::InvalidFileError, "Audio file not found: #{e.message}"
   rescue Down::Error, Errno::ENOENT, OpenURI::HTTPError => e
     Rails.logger.error "Network error downloading audio: #{e.message}"
-    raise Openai::NetworkError, "Failed to download audio file: #{e.message}"
+    raise Openai::Exceptions::NetworkError, "Failed to download audio file: #{e.message}"
   rescue StandardError => e
     Rails.logger.error "Error downloading audio file: #{e.message}\n#{e.backtrace.join("\n")}"
-    raise Openai::NetworkError, "Unexpected error downloading audio: #{e.message}"
+    raise Openai::Exceptions::NetworkError, "Unexpected error downloading audio: #{e.message}"
   end
 
   def request_transcription(audio_file)
@@ -127,15 +127,15 @@ class Openai::AudioTranscriptionService
 
     case response.code
     when 429
-      raise Openai::RateLimitError, "Rate limit exceeded: #{error_message}"
+      raise Openai::Exceptions::RateLimitError, "Rate limit exceeded: #{error_message}"
     when 400
-      raise Openai::InvalidFileError, "Invalid file: #{error_message}"
+      raise Openai::Exceptions::InvalidFileError, "Invalid file: #{error_message}"
     when 401, 403
-      raise Openai::AuthenticationError, "Authentication failed: #{error_message}"
+      raise Openai::Exceptions::AuthenticationError, "Authentication failed: #{error_message}"
     when 500..599
-      raise Openai::NetworkError, "Server error: #{error_message}"
+      raise Openai::Exceptions::NetworkError, "Server error: #{error_message}"
     else
-      raise Openai::TranscriptionError, "Unknown error: #{error_message}"
+      raise Openai::Exceptions::TranscriptionError, "Unknown error: #{error_message}"
     end
   end
 

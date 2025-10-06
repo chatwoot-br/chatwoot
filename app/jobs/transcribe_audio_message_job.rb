@@ -1,18 +1,16 @@
-require_relative '../services/openai/exceptions'
-
 class TranscribeAudioMessageJob < ApplicationJob
   queue_as :default
 
   # Retry configuration for transient errors
-  retry_on Openai::RateLimitError, wait: :polynomially_longer, attempts: 3
-  retry_on Openai::NetworkError, wait: :polynomially_longer, attempts: 3
+  retry_on Openai::Exceptions::RateLimitError, wait: :polynomially_longer, attempts: 3
+  retry_on Openai::Exceptions::NetworkError, wait: :polynomially_longer, attempts: 3
 
   # Discard on permanent failures with error handling
-  discard_on Openai::InvalidFileError do |job, error|
+  discard_on Openai::Exceptions::InvalidFileError do |job, error|
     job.handle_transcription_error(error)
   end
 
-  discard_on Openai::AuthenticationError do |job, error|
+  discard_on Openai::Exceptions::AuthenticationError do |job, error|
     job.handle_transcription_error(error)
   end
 
