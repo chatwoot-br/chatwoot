@@ -42,6 +42,14 @@ This feature adds support for the **Go WhatsApp Web Multidevice** application as
    - Request/response examples
    - Common patterns and best practices
 
+### Known Issues
+
+1. **[ISSUE-001: Message Loss on Profile Picture Fetch](./ISSUE-001-message-loss-on-profile-picture-fetch.md)**
+   - Critical bug causing message loss in production
+   - Gateway panic on PrivacyToken in whatsmeow library
+   - Connection refused errors during gateway restarts
+   - Proposed solutions and workarounds
+
 ## Quick Start for Developers
 
 ### Understanding the Feature
@@ -271,6 +279,18 @@ end
 - Validate connection during inbox creation (`/app/devices`)
 - Return clear error message
 - Provide link to service UI for login
+
+### Gateway Connection Refused Errors
+
+**Issue**: Chatwoot fails to process messages with "Connection refused" errors when calling gateway API
+
+**Root Cause**: Gateway service may be restarting due to panics (e.g., profile picture fetch issues)
+
+**Solution**:
+- Implement retry logic in Chatwoot API calls
+- Make contact info/avatar fetch non-blocking
+- Add panic recovery in gateway service
+- See [ISSUE-001](./ISSUE-001-message-loss-on-profile-picture-fetch.md) for detailed analysis and fixes
 
 ## Testing Strategy
 
