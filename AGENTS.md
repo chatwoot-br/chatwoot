@@ -73,3 +73,22 @@ Practical checklist for any change impacting core logic or public APIs
 - Keep request/response contracts stable across OSS and Enterprise; update both sets of routes/controllers when introducing new APIs.
 - When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
 - Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
+
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
