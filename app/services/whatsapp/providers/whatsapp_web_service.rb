@@ -102,41 +102,70 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def contact_info(identifier)
-    # Check if this is a group identifier
-    if identifier.include?('@g.us')
-      # Use group info endpoint for groups
-      response = HTTParty.get(
-        "#{api_path}/group/info",
-        headers: api_headers,
-        query: { group_id: identifier }
-      )
+    # Retry configuration for transient connection failures
+    max_retries = 3
+    current_retry = 0
+    backoff_seconds = 1
 
-      raise StandardError, "Gateway group info failed: #{response.message}" unless response.success?
+    begin
+      # Check if this is a group identifier
+      if identifier.include?('@g.us')
+        # Use group info endpoint for groups
+        response = HTTParty.get(
+          "#{api_path}/group/info",
+          headers: api_headers,
+          query: { group_id: identifier },
+          timeout: 10
+        )
 
-      # Return group name and info
-      group_data = response.dig('results')
-      group_name = group_data&.dig('name') || group_data&.dig('Name')
-      return { name: group_name, type: 'group' } if group_data.present?
-    else
-      # Use user info endpoint for individual contacts
-      response = HTTParty.get(
-        "#{api_path}/user/info",
-        headers: api_headers,
-        query: { phone: identifier }
-      )
+        raise StandardError, "Gateway group info failed: #{response.message}" unless response.success?
 
-      if response.success? && response.dig('results').present?
-        user_data = response.dig('results')
-        user_name = user_data&.dig('pushname') || user_data&.dig('name') || user_data&.dig('Name')
-        return { name: user_name, type: 'contact' }
+        # Return group name and info
+        group_data = response.dig('results')
+        group_name = group_data&.dig('name') || group_data&.dig('Name')
+        return { name: group_name, type: 'group' } if group_data.present?
+      else
+        # Use user info endpoint for individual contacts
+        response = HTTParty.get(
+          "#{api_path}/user/info",
+          headers: api_headers,
+          query: { phone: identifier },
+          timeout: 10
+        )
+
+        if response.success? && response.dig('results').present?
+          user_data = response.dig('results')
+          user_name = user_data&.dig('pushname') || user_data&.dig('name') || user_data&.dig('Name')
+          return { name: user_name, type: 'contact' }
+        end
+
+        # Fallback: extract phone number from identifier for display
+        phone = identifier.split('@').first
+        return { name: "+#{phone}", type: 'contact' }
       end
 
-      # Fallback: extract phone number from identifier for display
-      phone = identifier.split('@').first
-      return { name: "+#{phone}", type: 'contact' }
-    end
+      nil
+    rescue Errno::ECONNREFUSED, Net::OpenTimeout => e
+      # Retry on transient connection errors with exponential backoff
+      current_retry += 1
 
-    nil
+      if current_retry <= max_retries
+        Rails.logger.info(
+          "WhatsApp Web: Retrying contact_info for #{identifier} after #{backoff_seconds}s " \
+          "(retry #{current_retry}/#{max_retries}, error: #{e.class.name})"
+        )
+
+        sleep(backoff_seconds)
+        backoff_seconds *= 2 # Exponential backoff: 1s, 2s, 4s
+        retry
+      else
+        # Exhausted all retries - re-raise error for upstream handling
+        Rails.logger.error(
+          "WhatsApp Web: Failed to fetch contact_info for #{identifier} after #{max_retries} retries: #{e.message}"
+        )
+        raise e
+      end
+    end
   end
 
   def send_text_message(phone_number, message)

@@ -269,6 +269,99 @@ describe Whatsapp::IncomingMessageWhatsappWebService do
       end
     end
 
+    context 'when group message and contact_info fails with connection error' do
+      let(:params) do
+        {
+          event: 'message',
+          payload: {
+            sender_id: '554130898206',
+            chat_id: '120363230235309595@g.us',
+            from: '554130898206:3@s.whatsapp.net in 120363230235309595@g.us',
+            timestamp: '2025-10-07T18:31:04Z',
+            pushname: 'Test User',
+            message: {
+              text: 'Hello from group',
+              id: '3FAAB0E5F16480E454D7',
+              replied_id: '',
+              quoted_message: ''
+            },
+            type: 'text'
+          }
+        }.with_indifferent_access
+      end
+
+      it 'processes message and creates contact with fallback name when gateway is unavailable' do
+        # Simulate gateway connection failure
+        allow_any_instance_of(Whatsapp::Providers::WhatsappWebService)
+          .to receive(:contact_info)
+          .and_raise(Errno::ECONNREFUSED)
+
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        end.to change(Message, :count).by(1)
+
+        # Verify message was created
+        message = whatsapp_channel.inbox.messages.last
+        expect(message.content).to eq('Hello from group')
+
+        # Verify group contact was created with fallback name
+        group_contact = whatsapp_channel.inbox.contact_inboxes.find_by(source_id: '120363230235309595@g.us')
+        expect(group_contact).to be_present
+        expect(group_contact.contact.name).to eq('Group 120363230235309595')
+      end
+
+      it 'logs warning when contact_info fails' do
+        allow_any_instance_of(Whatsapp::Providers::WhatsappWebService)
+          .to receive(:contact_info)
+          .and_raise(Errno::ECONNREFUSED.new('Connection refused'))
+
+        expect(Rails.logger).to receive(:warn) do |log_message|
+          parsed_log = JSON.parse(log_message)
+          expect(parsed_log['context']).to eq('WhatsApp Web: Contact info fetch failed')
+          expect(parsed_log['error_type']).to eq('Errno::ECONNREFUSED')
+          expect(parsed_log['fallback_used']).to eq(true)
+        end
+
+        described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+      end
+    end
+
+    context 'when contact_info fails with timeout error' do
+      let(:params) do
+        {
+          event: 'message',
+          payload: {
+            sender_id: '554130898206',
+            chat_id: '120363230235309595@g.us',
+            from: '554130898206:3@s.whatsapp.net in 120363230235309595@g.us',
+            timestamp: '2025-10-07T18:31:04Z',
+            pushname: 'Test User',
+            message: {
+              text: 'Hello from group',
+              id: '3FAAB0E5F16480E454D8',
+              replied_id: '',
+              quoted_message: ''
+            },
+            type: 'text'
+          }
+        }.with_indifferent_access
+      end
+
+      it 'processes message when gateway times out' do
+        allow_any_instance_of(Whatsapp::Providers::WhatsappWebService)
+          .to receive(:contact_info)
+          .and_raise(Net::OpenTimeout)
+
+        expect do
+          described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
+        end.to change(Message, :count).by(1)
+
+        # Verify group contact was created with fallback name
+        group_contact = whatsapp_channel.inbox.contact_inboxes.find_by(source_id: '120363230235309595@g.us')
+        expect(group_contact).to be_present
+      end
+    end
+
     # TODO: Fix reaction message test - functionality is implemented but test needs debugging
     # context 'when reaction message params from go-whatsapp-web-multidevice' do
     #   let(:params) do

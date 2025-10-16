@@ -122,20 +122,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       return
     end
 
-    Rails.logger.debug { "WhatsApp Web: Updating contact avatar for identifier: #{identifier}" }
+    Rails.logger.debug { "WhatsApp Web: Enqueuing avatar fetch job for identifier: #{identifier}" }
 
-    # Use the full identifier (not just phone number) for avatar request
-    avatar_url = inbox.channel.avatar_url(identifier)
-    update_contact_avatar(@contact, avatar_url)
+    # Enqueue background job to fetch avatar asynchronously
+    # This prevents blocking message processing if the gateway is slow or unavailable
+    Whatsapp::FetchContactAvatarJob.perform_later(@contact.id, inbox.id, identifier)
   rescue StandardError => e
-    Rails.logger.error "WhatsApp Web: Error updating contact avatar: #{e.message}"
+    Rails.logger.error "WhatsApp Web: Error enqueuing avatar fetch job: #{e.message}"
     Rails.logger.error "WhatsApp Web: Identifier: #{identifier}"
     Rails.logger.error "WhatsApp Web: Backtrace: #{e.backtrace.join("\n")}"
     nil
-  end
-
-  def update_contact_avatar(contact, avatar_url)
-    ::Avatar::AvatarFromUrlJob.perform_later(contact, avatar_url) if avatar_url
   end
 
   def normalize_payload
@@ -666,18 +662,53 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       return
     end
 
-    group_name = inbox.channel.contact_info(source_id)
+    # Fetch contact info with fallback for connection failures
+    # This prevents message loss when the gateway is temporarily unavailable
+    group_name = fetch_group_name_with_fallback(source_id, group_contact_params)
+
     contact_inbox = ::ContactInboxWithContactBuilder.new(
       source_id: source_id,
       inbox: inbox,
       contact_attributes: {
         identifier: source_id,
-        name: group_name[:name]
+        name: group_name
       }
     ).perform
 
     @contact_inbox = contact_inbox
     @contact = contact_inbox.contact
+  end
+
+  # Fetch group name from gateway with fallback to webhook data if gateway is unavailable
+  def fetch_group_name_with_fallback(source_id, _group_contact_params)
+    contact_info = inbox.channel.contact_info(source_id)
+    contact_info[:name]
+  rescue Errno::ECONNREFUSED, Net::OpenTimeout, Net::ReadTimeout => e
+    # Gateway is temporarily unavailable - log warning and use fallback
+    fallback_name = extract_fallback_group_name(source_id)
+    log_contact_fetch_failure(source_id, e, fallback_name)
+    fallback_name
+  end
+
+  # Extract a fallback group name from the identifier when gateway is unavailable
+  def extract_fallback_group_name(source_id)
+    # Extract phone/group number from identifier for display
+    # Format: 120363230235309595@g.us => "Group 120363230235309595"
+    group_number = source_id.split('@').first
+    "Group #{group_number}"
+  end
+
+  # Log contact info fetch failure with structured data for debugging
+  def log_contact_fetch_failure(identifier, error, fallback_name)
+    Rails.logger.warn({
+      context: 'WhatsApp Web: Contact info fetch failed',
+      identifier: identifier,
+      error_type: error.class.name,
+      error_message: error.message,
+      message_id: @processed_params.dig(:messages, 0, 'id'),
+      fallback_used: true,
+      fallback_name: fallback_name
+    }.to_json)
   end
 
   # Setup company contact for outgoing messages
