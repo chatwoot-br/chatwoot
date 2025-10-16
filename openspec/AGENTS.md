@@ -52,9 +52,19 @@ Track these steps as TODOs and complete them one by one.
 2. **Read design.md** (if exists) - Review technical decisions
 3. **Read tasks.md** - Get implementation checklist
 4. **Implement tasks sequentially** - Complete in order
+   - Use Serena MCP tools for code navigation and editing
+   - Use Context7 MCP for library documentation
 5. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
 6. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
 7. **Approval gate** - Do not start implementation until the proposal is reviewed and approved
+
+**Implementation with MCP Tools:**
+- **Code Discovery**: Use `mcp__serena__find_symbol` to locate existing code
+- **Understanding**: Use `mcp__serena__get_symbols_overview` for file structure
+- **References**: Use `mcp__serena__find_referencing_symbols` to track dependencies
+- **Editing**: Prefer `mcp__serena__replace_symbol_body` for complete symbol changes
+- **Documentation**: Use `mcp__context7__get-library-docs` for framework guidance
+- **Memory**: Use `mcp__serena__write_memory` to document complex implementations
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:
@@ -78,7 +88,16 @@ After deployment, create separate PR to:
 - Use `openspec show [spec]` to review current state
 - If request is ambiguous, ask 1–2 clarifying questions before scaffolding
 
-### Search Guidance
+### Search Guidance with MCP Tools
+
+**Using Serena MCP for Code Exploration:**
+- `mcp__serena__list_dir` - List openspec directory structure efficiently
+- `mcp__serena__find_file` - Find spec files matching patterns (e.g., "*.md" in openspec/)
+- `mcp__serena__search_for_pattern` - Search for requirements/scenarios across specs
+  - Example: Search for "Requirement:" or "Scenario:" patterns
+  - More efficient than reading entire files
+
+**OpenSpec CLI Commands:**
 - Enumerate specs: `openspec spec list --long` (or `--json` for scripts)
 - Enumerate changes: `openspec list` (or `openspec change list --json` - deprecated but available)
 - Show details:
@@ -404,12 +423,44 @@ Only add complexity with:
 
 ## Tool Selection Guide
 
-| Task | Tool | Why |
-|------|------|-----|
-| Find files by pattern | Glob | Fast pattern matching |
-| Search code content | Grep | Optimized regex search |
-| Read specific files | Read | Direct file access |
-| Explore unknown scope | Task | Multi-step investigation |
+### Native Tools vs MCP Tools
+
+| Task | Native Tool | MCP Tool | When to Use MCP |
+|------|------------|----------|-----------------|
+| Find files by pattern | Glob | `mcp__serena__find_file` | Use MCP for codebase navigation |
+| Search code content | Grep | `mcp__serena__search_for_pattern` | Use MCP for semantic search |
+| Read specific files | Read | `mcp__serena__get_symbols_overview` | Use MCP for understanding code structure |
+| Explore unknown scope | Task | `mcp__serena__find_symbol` + depth | Use MCP for targeted exploration |
+| Edit entire functions | Edit | `mcp__serena__replace_symbol_body` | Use MCP for complete symbol changes |
+| Add imports/top-level code | Write | `mcp__serena__insert_before_symbol` | Use MCP for precise insertions |
+| Find references | Grep | `mcp__serena__find_referencing_symbols` | Always use MCP for reference tracking |
+| Get library docs | WebFetch | `mcp__context7__get-library-docs` | Always use Context7 for library docs |
+
+### MCP Tool Workflow Examples
+
+**1. Understanding a new file:**
+```bash
+# Instead of: cat app/services/foo_service.rb
+# Use: mcp__serena__get_symbols_overview with relative_path="app/services/foo_service.rb"
+```
+
+**2. Finding all uses of a class:**
+```bash
+# Instead of: rg "FooService" app/
+# Use: mcp__serena__find_referencing_symbols with name_path="FooService"
+```
+
+**3. Modifying a method:**
+```bash
+# Use: mcp__serena__find_symbol to locate it (with include_body=true)
+# Then: mcp__serena__replace_symbol_body to change it
+```
+
+**4. Getting Rails/Vue documentation:**
+```bash
+# Use: mcp__context7__resolve-library-id with libraryName="rails"
+# Then: mcp__context7__get-library-docs with the resolved ID
+```
 
 ## Error Recovery
 

@@ -74,6 +74,40 @@ Practical checklist for any change impacting core logic or public APIs
 - When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
 - Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
 
+## MCP Tool Integration
+
+### When to Use MCP Tools
+
+**Serena MCP (Code Navigation & Editing):**
+- Use for semantic code exploration instead of reading entire files
+- Prefer for symbol-based editing (functions, classes, methods)
+- Essential for finding references and understanding code relationships
+- Store project knowledge with memory tools for future tasks
+
+**Context7 MCP (Documentation):**
+- Always use for Rails, Vue 3, Tailwind CSS documentation
+- Get up-to-date library docs with code examples
+- Use when implementing framework-specific features
+
+### Quick MCP Tool Reference
+
+**Code Exploration:**
+- `mcp__serena__get_symbols_overview` - Understand file structure
+- `mcp__serena__find_symbol` - Search symbols by name/path
+- `mcp__serena__find_referencing_symbols` - Find all references
+- `mcp__serena__search_for_pattern` - Pattern search across codebase
+
+**Code Editing:**
+- `mcp__serena__replace_symbol_body` - Replace entire symbols
+- `mcp__serena__insert_before_symbol` - Add imports/top-level code
+- `mcp__serena__insert_after_symbol` - Add code after symbols
+
+**Documentation:**
+- `mcp__context7__resolve-library-id` - Find library ID
+- `mcp__context7__get-library-docs` - Get library documentation
+
+See `/openspec/project.md` for complete MCP tool documentation.
+
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions
 

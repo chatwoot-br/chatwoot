@@ -250,3 +250,61 @@ Chatwoot is an open-source customer support platform and alternative to Intercom
 - Overmind or Foreman (process management)
 - Docker & Docker Compose (optional local setup)
 - Heroku or DigitalOcean (deployment options)
+
+## MCP Tool Integration
+
+### Serena MCP Tools
+When working with the codebase, use Serena MCP tools for intelligent, semantic code exploration and editing:
+
+**Code Navigation & Search:**
+- `mcp__serena__get_symbols_overview` - Get high-level overview of symbols in a file
+- `mcp__serena__find_symbol` - Search for symbols by name/path with depth control
+- `mcp__serena__find_referencing_symbols` - Find all references to a symbol
+- `mcp__serena__search_for_pattern` - Flexible pattern search across codebase
+- `mcp__serena__list_dir` - List files and directories efficiently
+- `mcp__serena__find_file` - Find files matching patterns
+
+**Code Editing (Symbol-based):**
+- `mcp__serena__replace_symbol_body` - Replace entire symbol definitions precisely
+- `mcp__serena__insert_before_symbol` - Insert code before a symbol
+- `mcp__serena__insert_after_symbol` - Insert code after a symbol
+- `mcp__serena__rename_symbol` - Rename symbols across entire codebase
+
+**Project Memory:**
+- `mcp__serena__write_memory` - Store project-specific knowledge for future tasks
+- `mcp__serena__read_memory` - Retrieve stored project knowledge
+- `mcp__serena__list_memories` - View available project memories
+
+**Onboarding & Setup:**
+- `mcp__serena__check_onboarding_performed` - Check if project setup is complete
+- `mcp__serena__onboarding` - Initialize project understanding
+- `mcp__serena__think_about_collected_information` - Verify gathered context is complete
+- `mcp__serena__think_about_task_adherence` - Ensure staying on track with requirements
+
+### Context7 MCP Tools
+For library documentation and code examples:
+
+**Library Documentation:**
+- `mcp__context7__resolve-library-id` - Find the correct library ID from package name
+- `mcp__context7__get-library-docs` - Retrieve up-to-date documentation for any library
+  - Useful for Rails, Vue 3, Tailwind CSS, and all project dependencies
+  - Provides code examples and best practices
+
+### Tool Usage Best Practices
+
+**For Code Exploration:**
+1. Start with `mcp__serena__get_symbols_overview` to understand file structure
+2. Use `mcp__serena__find_symbol` with appropriate depth to explore specific symbols
+3. Track references with `mcp__serena__find_referencing_symbols`
+4. Only read full files when absolutely necessary (token efficiency)
+
+**For Code Editing:**
+1. Prefer symbol-based editing tools over line-based when modifying entire functions/classes
+2. Use `mcp__serena__replace_symbol_body` for complete symbol replacements
+3. Use `mcp__serena__insert_before_symbol` for imports and top-level additions
+4. Always check for Enterprise Edition overrides before modifying core files
+
+**For Documentation:**
+1. Use `mcp__context7__resolve-library-id` first to get the correct library ID
+2. Then use `mcp__context7__get-library-docs` with specific topics for targeted docs
+3. Reference documentation when implementing framework-specific features
