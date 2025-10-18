@@ -90,6 +90,18 @@ After deployment, create separate PR to:
 
 ### Search Guidance with MCP Tools
 
+**Using DeepWiki MCP for Repository Understanding:**
+- `mcp__deepwiki__ask_question` - Ask questions about Chatwoot architecture and features
+  - Use repo: `"chatwoot/chatwoot"`
+  - Example: "How does the conversation routing system work?"
+  - Use BEFORE diving into code to understand context
+- `mcp__deepwiki__read_wiki_structure` - Explore available documentation topics
+  - Use repo: `"chatwoot/chatwoot"`
+  - Understand what documentation is available
+- `mcp__deepwiki__read_wiki_contents` - View comprehensive repository documentation
+  - Use repo: `"chatwoot/chatwoot"`
+  - Get full architectural overview
+
 **Using Serena MCP for Code Exploration:**
 - `mcp__serena__list_dir` - List openspec directory structure efficiently
 - `mcp__serena__find_file` - Find spec files matching patterns (e.g., "*.md" in openspec/)
@@ -427,6 +439,9 @@ Only add complexity with:
 
 | Task | Native Tool | MCP Tool | When to Use MCP |
 |------|------------|----------|-----------------|
+| Understand architecture | Read docs | `mcp__deepwiki__ask_question` | Always use DeepWiki for Chatwoot features |
+| Learn domain concepts | Read docs | `mcp__deepwiki__read_wiki_contents` | Use DeepWiki for comprehensive understanding |
+| Find implementation patterns | Grep | `mcp__deepwiki__ask_question` | Use DeepWiki before exploring code |
 | Find files by pattern | Glob | `mcp__serena__find_file` | Use MCP for codebase navigation |
 | Search code content | Grep | `mcp__serena__search_for_pattern` | Use MCP for semantic search |
 | Read specific files | Read | `mcp__serena__get_symbols_overview` | Use MCP for understanding code structure |
@@ -438,25 +453,47 @@ Only add complexity with:
 
 ### MCP Tool Workflow Examples
 
-**1. Understanding a new file:**
+**1. Understanding Chatwoot architecture before implementing:**
+```bash
+# Start with: mcp__deepwiki__ask_question
+# Question: "How does the conversation assignment system work?"
+# Repo: "chatwoot/chatwoot"
+# This gives you high-level understanding before diving into code
+```
+
+**2. Exploring available documentation:**
+```bash
+# Use: mcp__deepwiki__read_wiki_structure
+# Repo: "chatwoot/chatwoot"
+# See all available documentation topics
+```
+
+**3. Getting comprehensive architectural overview:**
+```bash
+# Use: mcp__deepwiki__read_wiki_contents
+# Repo: "chatwoot/chatwoot"
+# Comprehensive view of architecture, features, and patterns
+```
+
+**4. Understanding a new file:**
 ```bash
 # Instead of: cat app/services/foo_service.rb
 # Use: mcp__serena__get_symbols_overview with relative_path="app/services/foo_service.rb"
 ```
 
-**2. Finding all uses of a class:**
+**5. Finding all uses of a class:**
 ```bash
 # Instead of: rg "FooService" app/
 # Use: mcp__serena__find_referencing_symbols with name_path="FooService"
 ```
 
-**3. Modifying a method:**
+**6. Modifying a method:**
 ```bash
 # Use: mcp__serena__find_symbol to locate it (with include_body=true)
 # Then: mcp__serena__replace_symbol_body to change it
 ```
 
-**4. Getting Rails/Vue documentation:**
+**7. Getting Rails/Vue documentation:**
 ```bash
 # Use: mcp__context7__resolve-library-id with libraryName="rails"
 # Then: mcp__context7__get-library-docs with the resolved ID

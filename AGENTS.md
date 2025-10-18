@@ -78,6 +78,14 @@ Practical checklist for any change impacting core logic or public APIs
 
 ### When to Use MCP Tools
 
+**DeepWiki MCP (Chatwoot Repository Documentation):**
+- Use to understand Chatwoot architecture and features before coding
+- Essential for learning domain concepts (conversations, inboxes, contacts, etc.)
+- Ask questions about how features work (e.g., "How does conversation routing work?")
+- Explore available documentation topics with read_wiki_structure
+- Get comprehensive architectural overview with read_wiki_contents
+- Always use repo format: `"chatwoot/chatwoot"`
+
 **Serena MCP (Code Navigation & Editing):**
 - Use for semantic code exploration instead of reading entire files
 - Prefer for symbol-based editing (functions, classes, methods)
@@ -91,6 +99,11 @@ Practical checklist for any change impacting core logic or public APIs
 
 ### Quick MCP Tool Reference
 
+**Repository Understanding:**
+- `mcp__deepwiki__ask_question` - Ask questions about Chatwoot (repo: "chatwoot/chatwoot")
+- `mcp__deepwiki__read_wiki_structure` - Explore documentation topics (repo: "chatwoot/chatwoot")
+- `mcp__deepwiki__read_wiki_contents` - Get architectural overview (repo: "chatwoot/chatwoot")
+
 **Code Exploration:**
 - `mcp__serena__get_symbols_overview` - Understand file structure
 - `mcp__serena__find_symbol` - Search symbols by name/path
@@ -102,7 +115,7 @@ Practical checklist for any change impacting core logic or public APIs
 - `mcp__serena__insert_before_symbol` - Add imports/top-level code
 - `mcp__serena__insert_after_symbol` - Add code after symbols
 
-**Documentation:**
+**Library Documentation:**
 - `mcp__context7__resolve-library-id` - Find library ID
 - `mcp__context7__get-library-docs` - Get library documentation
 

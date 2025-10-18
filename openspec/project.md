@@ -290,7 +290,42 @@ For library documentation and code examples:
   - Useful for Rails, Vue 3, Tailwind CSS, and all project dependencies
   - Provides code examples and best practices
 
+### DeepWiki MCP Tools
+For exploring Chatwoot repository documentation and understanding codebase architecture:
+
+**Repository Documentation:**
+- `mcp__deepwiki__read_wiki_structure` - Get list of available documentation topics
+  - Use repo format: `"chatwoot/chatwoot"`
+  - Returns structured overview of documentation sections
+- `mcp__deepwiki__read_wiki_contents` - View complete repository documentation
+  - Use repo format: `"chatwoot/chatwoot"`
+  - Comprehensive view of architecture, features, and patterns
+- `mcp__deepwiki__ask_question` - Ask specific questions about the Chatwoot codebase
+  - Use repo format: `"chatwoot/chatwoot"`
+  - Natural language queries about features, implementation, or architecture
+  - Example: "How does the conversation assignment system work?"
+
+**When to Use DeepWiki:**
+- Understanding high-level architecture before implementing features
+- Finding existing implementation patterns for similar features
+- Learning domain concepts (conversations, inboxes, contacts, etc.)
+- Discovering where specific functionality is implemented
+- Understanding relationships between different system components
+- Answering "how does X work?" questions before diving into code
+
+**DeepWiki vs Other Tools:**
+- **DeepWiki**: Repository-level documentation and architecture understanding
+- **Serena**: File-level code navigation and editing
+- **Context7**: Framework/library documentation and API references
+
 ### Tool Usage Best Practices
+
+**For Understanding Architecture & Features:**
+1. Start with `mcp__deepwiki__ask_question` for high-level feature understanding
+   - Example: "How does the multi-channel inbox system work?"
+2. Use `mcp__deepwiki__read_wiki_structure` to explore available documentation topics
+3. Use `mcp__deepwiki__read_wiki_contents` for comprehensive architecture overview
+4. Then drill down with Serena tools for specific code exploration
 
 **For Code Exploration:**
 1. Start with `mcp__serena__get_symbols_overview` to understand file structure
@@ -308,3 +343,10 @@ For library documentation and code examples:
 1. Use `mcp__context7__resolve-library-id` first to get the correct library ID
 2. Then use `mcp__context7__get-library-docs` with specific topics for targeted docs
 3. Reference documentation when implementing framework-specific features
+
+**Recommended Workflow:**
+1. **Understand** → DeepWiki (architecture & patterns)
+2. **Locate** → Serena (find relevant code)
+3. **Learn APIs** → Context7 (framework documentation)
+4. **Implement** → Serena (edit code)
+5. **Verify** → Serena (check references & dependencies)
