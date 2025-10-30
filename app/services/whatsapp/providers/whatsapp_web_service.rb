@@ -316,34 +316,52 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_file_message(phone_number, attachment, message)
-    # Get the appropriate URL for the attachment
-    file_url = get_accessible_attachment_url(attachment)
-
-    if file_url.blank?
-      Rails.logger.error "[WHATSAPP WEB] No accessible URL available for file attachment #{attachment.id}"
+    # The /send/file endpoint requires multipart/form-data upload
+    # Download the file from ActiveStorage
+    unless attachment.file.attached?
+      Rails.logger.error "[WHATSAPP WEB] No file attached for attachment #{attachment.id}"
       return nil
     end
 
-    Rails.logger.debug { "[WHATSAPP WEB] Using file URL: #{file_url}" }
+    begin
+      # Download file content from ActiveStorage
+      file_content = attachment.file.download
+      file_name = attachment.file.filename.to_s
+      content_type = attachment.file.content_type || 'application/octet-stream'
 
-    # Build the request body according to API spec
-    body_params = {
-      phone: phone_number,
-      caption: message.outgoing_content.presence || '',
-      file_url: file_url
-    }
+      Rails.logger.debug { "[WHATSAPP WEB] Uploading file: #{file_name} (#{content_type}, #{file_content.bytesize} bytes)" }
 
-    # Add reply context if this is a reply
-    reply_id = extract_reply_message_id(message)
-    body_params[:reply_message_id] = reply_id if reply_id.present?
+      # Create a temporary file for multipart upload
+      Tempfile.create(['upload', File.extname(file_name)]) do |temp_file|
+        temp_file.binmode
+        temp_file.write(file_content)
+        temp_file.rewind
 
-    response = HTTParty.post(
-      "#{api_path}/send/file",
-      headers: api_headers,
-      body: body_params.to_json
-    )
+        # Build multipart form data
+        body_params = {
+          phone: phone_number,
+          caption: message.outgoing_content.presence || '',
+          file: temp_file
+        }
 
-    process_response(response, message)
+        # Add reply context if this is a reply
+        reply_id = extract_reply_message_id(message)
+        body_params[:reply_message_id] = reply_id if reply_id.present?
+
+        response = HTTParty.post(
+          "#{api_path}/send/file",
+          headers: multipart_headers,
+          body: body_params,
+          multipart: true
+        )
+
+        process_response(response, message)
+      end
+    rescue StandardError => e
+      Rails.logger.error "[WHATSAPP WEB] File upload failed: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      nil
+    end
   end
 
   def error_message(response)
