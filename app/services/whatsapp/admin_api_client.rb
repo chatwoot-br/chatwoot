@@ -14,6 +14,10 @@ class Whatsapp::AdminApiClient
   class NotFoundError < AdminApiError; end
   class ConflictError < AdminApiError; end
 
+  TIMEOUT_MUTATION = 30
+  TIMEOUT_QUERY = 15
+  TIMEOUT_HEALTH = 10
+
   def initialize(account)
     @account = account
     validate_configuration!
@@ -36,7 +40,7 @@ class Whatsapp::AdminApiClient
       "#{base_url}/admin/instances",
       headers: api_headers,
       body: body.to_json,
-      timeout: 30
+      timeout: TIMEOUT_MUTATION
     )
 
     handle_response(response, 'create_instance')
@@ -47,7 +51,7 @@ class Whatsapp::AdminApiClient
     response = HTTParty.get(
       "#{base_url}/admin/instances",
       headers: api_headers,
-      timeout: 15
+      timeout: TIMEOUT_QUERY
     )
 
     handle_response(response, 'list_instances')
@@ -58,7 +62,7 @@ class Whatsapp::AdminApiClient
     response = HTTParty.get(
       "#{base_url}/admin/instances/#{port}",
       headers: api_headers,
-      timeout: 15
+      timeout: TIMEOUT_QUERY
     )
 
     handle_response(response, 'get_instance')
@@ -70,7 +74,7 @@ class Whatsapp::AdminApiClient
       "#{base_url}/admin/instances/#{port}",
       headers: api_headers,
       body: config.to_json,
-      timeout: 30
+      timeout: TIMEOUT_MUTATION
     )
 
     handle_response(response, 'update_instance')
@@ -81,7 +85,7 @@ class Whatsapp::AdminApiClient
     response = HTTParty.delete(
       "#{base_url}/admin/instances/#{port}",
       headers: api_headers,
-      timeout: 30
+      timeout: TIMEOUT_MUTATION
     )
 
     handle_response(response, 'delete_instance')
@@ -91,7 +95,7 @@ class Whatsapp::AdminApiClient
   def health_check
     response = HTTParty.get(
       "#{base_url}/healthz",
-      timeout: 10
+      timeout: TIMEOUT_HEALTH
     )
 
     response.success?
@@ -104,7 +108,7 @@ class Whatsapp::AdminApiClient
   def readiness_check
     response = HTTParty.get(
       "#{base_url}/readyz",
-      timeout: 10
+      timeout: TIMEOUT_HEALTH
     )
 
     response.success?
@@ -115,7 +119,7 @@ class Whatsapp::AdminApiClient
 
   # Helper to check if Admin API is configured and healthy
   def self.configured_for?(account)
-    account.whatsapp_admin_api_base_url.present? && account.whatsapp_admin_api_token.present?
+    account.whatsapp_admin_api_configured?
   end
 
   def self.healthy?(account)

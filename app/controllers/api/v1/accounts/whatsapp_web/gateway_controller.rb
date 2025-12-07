@@ -1,4 +1,5 @@
 class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::BaseController
+  before_action :check_admin_authorization?, only: [:admin_api_status, :provision_instance, :available_instances]
   before_action :set_inbox, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
   before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
 
@@ -233,8 +234,9 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     api_token = params[:api_token].presence || Current.account.whatsapp_admin_api_token
     configured = base_url.present? && api_token.present?
 
-    healthy = configured && test_admin_api_connection(base_url, api_token)
-    available_ports = healthy ? calculate_available_ports(base_url, api_token) : 0
+    client = configured ? build_temp_admin_client(base_url, api_token) : nil
+    healthy = configured && test_admin_api_connection(client)
+    available_ports = healthy ? calculate_available_ports(client) : 0
 
     {
       configured: configured,
@@ -246,51 +248,33 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
 
   def account_port_range
     {
-      start: Current.account.whatsapp_admin_port_range_start || 3001,
-      end: Current.account.whatsapp_admin_port_range_end || 3100
+      start: Current.account.whatsapp_admin_port_range_start || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_START,
+      end: Current.account.whatsapp_admin_port_range_end || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_END
     }
   end
 
-  def calculate_available_ports(base_url, api_token)
-    instances = fetch_instances(base_url, api_token)
+  def calculate_available_ports(client)
+    instances = client.list_instances
     used_count = instances.is_a?(Array) ? instances.length : 0
     range = account_port_range
     (range[:end] - range[:start] + 1) - used_count
+  rescue StandardError
+    0
   end
 
-  # Test connection with an authenticated endpoint to validate both URL and token
-  def test_admin_api_connection(base_url, api_token)
-    # Use /admin/instances which requires authentication
-    response = HTTParty.get(
-      "#{base_url.chomp('/')}/admin/instances",
-      headers: {
-        'Authorization' => "Bearer #{api_token}",
-        'Content-Type' => 'application/json'
-      },
-      timeout: 10
+  # Build a temporary admin client with provided credentials (for testing before saving)
+  def build_temp_admin_client(base_url, api_token)
+    temp_account = OpenStruct.new(
+      whatsapp_admin_api_base_url: base_url,
+      whatsapp_admin_api_token: api_token
     )
-    response.success?
-  rescue StandardError => e
-    Rails.logger.error "[WHATSAPP ADMIN API] Connection test failed: #{e.message}"
+    Whatsapp::AdminApiClient.new(temp_account)
+  end
+
+  # Test connection using the AdminApiClient
+  def test_admin_api_connection(client)
+    client.health_check
+  rescue StandardError
     false
-  end
-
-  def fetch_instances(base_url, api_token)
-    response = HTTParty.get(
-      "#{base_url.chomp('/')}/admin/instances",
-      headers: {
-        'Authorization' => "Bearer #{api_token}",
-        'Content-Type' => 'application/json'
-      },
-      timeout: 15
-    )
-
-    return [] unless response.success?
-
-    parsed = JSON.parse(response.body)
-    parsed['data'] || parsed
-  rescue StandardError => e
-    Rails.logger.error "[WHATSAPP ADMIN API] List instances failed: #{e.message}"
-    []
   end
 end

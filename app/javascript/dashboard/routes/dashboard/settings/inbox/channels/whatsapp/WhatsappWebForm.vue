@@ -1,4 +1,6 @@
-<script>
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
 import { useAlert } from 'dashboard/composables';
 import { required } from '@vuelidate/validators';
@@ -9,379 +11,370 @@ import QRCodeModal from 'dashboard/components/QRCodeModal.vue';
 import WhatsappWebGatewayApi from 'dashboard/api/whatsappWebGateway';
 import WhatsappAdminApi from 'dashboard/api/whatsappAdminApi';
 
-export default {
-  name: 'WhatsappWebForm',
-  components: {
-    NextButton,
-    QRCodeModal,
+const props = defineProps({
+  inbox: {
+    type: Object,
+    default: () => ({}),
   },
-  props: {
-    inbox: {
-      type: Object,
-      default: () => ({}),
-    },
-    isLoading: {
-      type: Boolean,
-      default: false,
-    },
-    mode: {
-      type: String,
-      default: 'create', // 'create' or 'edit'
-      validator: value => ['create', 'edit'].includes(value),
-    },
+  isLoading: {
+    type: Boolean,
+    default: false,
   },
-  emits: ['submit'],
-  setup() {
-    return { v$: useVuelidate() };
+  mode: {
+    type: String,
+    default: 'create', // 'create' or 'edit'
+    validator: value => ['create', 'edit'].includes(value),
   },
-  data() {
-    return {
-      inboxName: '',
-      phoneNumber: '',
-      gatewayBaseUrl: '',
-      basicAuthUser: '',
-      basicAuthPassword: '',
-      webhookSecret: '',
-      includeSignature: true,
-      showQRModal: false,
-      connectionStatus: null,
-      isLoadingStatus: false,
-      isDisconnecting: false,
-      isReconnecting: false,
-      connectionMode: 'existing', // 'existing' or 'provision'
-      adminApiConfigured: false,
-      isCheckingAdminApi: false,
-      isProvisioning: false,
-      provisionedPort: null,
-      isProvisionedInstance: false,
-    };
-  },
-  computed: {
-    gatewayConfig() {
-      return {
-        gatewayBaseUrl: this.gatewayBaseUrl,
-        phoneNumber: this.phoneNumber,
-        basicAuthUser: this.basicAuthUser,
-        basicAuthPassword: this.basicAuthPassword,
-      };
-    },
-    canShowQRCode() {
-      return this.gatewayBaseUrl && this.gatewayBaseUrl.trim() !== '';
-    },
-    submitButtonLabel() {
-      return this.mode === 'create'
-        ? this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.SUBMIT_BUTTON')
-        : this.$t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_SECTION_UPDATE_BUTTON');
-    },
-    showInboxNameField() {
-      return this.mode === 'create';
-    },
-    connectionStatusText() {
-      if (this.isLoadingStatus) return 'CHECKING';
-      if (!this.connectionStatus) return 'UNKNOWN';
+});
 
-      // Parse the status response based on QRCodeModal logic
-      if (this.connectionStatus.code === 'SUCCESS') {
-        // Check if logged in (similar to QRCodeModal logic)
-        if (this.connectionStatus.results?.is_logged_in) {
-          return 'CONNECTED';
-        }
+const emit = defineEmits(['submit']);
 
-        // Check status string for more detailed info
-        const status = this.connectionStatus.results?.status || '';
-        if (status.includes('connected') || status.includes('authenticated')) {
-          return 'CONNECTED';
-        }
-        if (
-          status.includes('disconnected') ||
-          status.includes('not authenticated')
-        ) {
-          return 'DISCONNECTED';
-        }
-        if (status.includes('qr') || status.includes('waiting')) {
-          return 'WAITING_QR';
-        }
+const { t } = useI18n();
 
-        // Default to disconnected if success but no logged in flag
-        return 'DISCONNECTED';
-      }
-      return 'ERROR';
-    },
-    connectionStatusColor() {
-      switch (this.connectionStatusText) {
-        case 'CONNECTED':
-          return 'text-green-600 bg-green-50 border-green-200';
-        case 'DISCONNECTED':
-        case 'ERROR':
-          return 'text-red-600 bg-red-50 border-red-200';
-        case 'WAITING_QR':
-          return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-        case 'CHECKING':
-          return 'text-blue-600 bg-blue-50 border-blue-200';
-        default:
-          return 'text-gray-600 bg-gray-50 border-gray-200';
-      }
-    },
-    connectionStatusLabel() {
-      const statusKey = this.connectionStatusText;
-      const translationKey = `INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.${statusKey}`;
-      return this.$t(translationKey);
-    },
-    showConnectButton() {
-      return this.connectionStatusText !== 'CONNECTED';
-    },
-    showDisconnectButton() {
-      return this.connectionStatusText === 'CONNECTED';
-    },
-    showReconnectButton() {
-      // Reconnect should be available when connected (to restart connection)
-      // or when there are connection issues
-      return (
-        this.connectionStatusText === 'CONNECTED' ||
-        this.connectionStatusText === 'DISCONNECTED' ||
-        this.connectionStatusText === 'ERROR'
-      );
-    },
-    showConnectionModeToggle() {
-      return this.mode === 'create' && this.adminApiConfigured;
-    },
-    isProvisioningMode() {
-      return this.connectionMode === 'provision';
-    },
-  },
-  validations() {
-    const baseValidations = {
-      phoneNumber: { required, isPhoneE164OrEmpty },
-      webhookSecret: { required },
-    };
+const inboxName = ref('');
+const phoneNumber = ref('');
+const gatewayBaseUrl = ref('');
+const basicAuthUser = ref('');
+const basicAuthPassword = ref('');
+const webhookSecret = ref('');
+const includeSignature = ref(true);
+const showQRModal = ref(false);
+const connectionStatus = ref(null);
+const isLoadingStatus = ref(false);
+const isDisconnecting = ref(false);
+const isReconnecting = ref(false);
+const connectionMode = ref('existing'); // 'existing' or 'provision'
+const adminApiConfigured = ref(false);
+const isCheckingAdminApi = ref(false);
+const isProvisioning = ref(false);
+const provisionedPort = ref(null);
+const isProvisionedInstance = ref(false);
 
-    // In provisioning mode, we don't need gateway URL and basic auth
-    if (!this.isProvisioningMode) {
-      baseValidations.gatewayBaseUrl = { required };
-      baseValidations.basicAuthUser = {};
-      baseValidations.basicAuthPassword = {};
+const gatewayConfig = computed(() => ({
+  gatewayBaseUrl: gatewayBaseUrl.value,
+  phoneNumber: phoneNumber.value,
+  basicAuthUser: basicAuthUser.value,
+  basicAuthPassword: basicAuthPassword.value,
+}));
+
+const canShowQRCode = computed(() => {
+  return gatewayBaseUrl.value && gatewayBaseUrl.value.trim() !== '';
+});
+
+const submitButtonLabel = computed(() => {
+  return props.mode === 'create'
+    ? t('INBOX_MGMT.ADD.WHATSAPP_WEB.SUBMIT_BUTTON')
+    : t('INBOX_MGMT.SETTINGS_POPUP.WHATSAPP_SECTION_UPDATE_BUTTON');
+});
+
+const showInboxNameField = computed(() => {
+  return props.mode === 'create';
+});
+
+const connectionStatusText = computed(() => {
+  if (isLoadingStatus.value) return 'CHECKING';
+  if (!connectionStatus.value) return 'UNKNOWN';
+
+  // Parse the status response based on QRCodeModal logic
+  if (connectionStatus.value.code === 'SUCCESS') {
+    // Check if logged in (similar to QRCodeModal logic)
+    if (connectionStatus.value.results?.is_logged_in) {
+      return 'CONNECTED';
     }
 
-    if (this.mode === 'create') {
-      baseValidations.inboxName = { required };
+    // Check status string for more detailed info
+    const status = connectionStatus.value.results?.status || '';
+    if (status.includes('connected') || status.includes('authenticated')) {
+      return 'CONNECTED';
+    }
+    if (
+      status.includes('disconnected') ||
+      status.includes('not authenticated')
+    ) {
+      return 'DISCONNECTED';
+    }
+    if (status.includes('qr') || status.includes('waiting')) {
+      return 'WAITING_QR';
     }
 
-    return baseValidations;
-  },
-  watch: {
-    inbox: {
-      immediate: true,
-      handler(newInbox) {
-        if (newInbox && this.mode === 'edit') {
-          this.setDefaults(newInbox);
-          this.checkConnectionStatus();
-        }
-      },
-    },
-  },
-  mounted() {
-    if (this.mode === 'create') {
-      this.checkAdminApiStatus();
-    }
-  },
-  methods: {
-    setDefaults(inbox) {
-      if (!inbox) return;
+    // Default to disconnected if success but no logged in flag
+    return 'DISCONNECTED';
+  }
+  return 'ERROR';
+});
 
-      this.inboxName = inbox.name || '';
-      this.phoneNumber = inbox.phone_number || '';
+const connectionStatusColor = computed(() => {
+  switch (connectionStatusText.value) {
+    case 'CONNECTED':
+      return 'text-green-600 bg-green-50 border-green-200';
+    case 'DISCONNECTED':
+    case 'ERROR':
+      return 'text-red-600 bg-red-50 border-red-200';
+    case 'WAITING_QR':
+      return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    case 'CHECKING':
+      return 'text-blue-600 bg-blue-50 border-blue-200';
+    default:
+      return 'text-gray-600 bg-gray-50 border-gray-200';
+  }
+});
 
-      if (inbox.provider_config) {
-        this.gatewayBaseUrl = inbox.provider_config.gateway_base_url || '';
-        this.basicAuthUser = inbox.provider_config.basic_auth_user || '';
-        this.basicAuthPassword =
-          inbox.provider_config.basic_auth_password || '';
-        this.webhookSecret = inbox.provider_config.webhook_secret || '';
-        this.includeSignature =
-          inbox.provider_config.include_signature !== false;
-      }
-    },
+const connectionStatusLabel = computed(() => {
+  const statusKey = connectionStatusText.value;
+  const translationKey = `INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_STATUS.${statusKey}`;
+  return t(translationKey);
+});
 
-    openQRModal() {
-      if (!this.canShowQRCode) {
-        useAlert(
-          this.$t(
-            'INBOX_MGMT.ADD.WHATSAPP_WEB.TEST_CONNECTION.VALIDATION_ERROR'
-          )
-        );
-        return;
-      }
-      this.showQRModal = true;
-    },
+const showConnectButton = computed(() => {
+  return connectionStatusText.value !== 'CONNECTED';
+});
 
-    closeQRModal() {
-      this.showQRModal = false;
-    },
+const showDisconnectButton = computed(() => {
+  return connectionStatusText.value === 'CONNECTED';
+});
 
-    async handleWhatsAppConnected() {
-      this.closeQRModal();
-      // Refresh the connection status after successful connection
-      await this.checkConnectionStatus();
-    },
+const showReconnectButton = computed(() => {
+  // Reconnect should be available when connected (to restart connection)
+  // or when there are connection issues
+  return (
+    connectionStatusText.value === 'CONNECTED' ||
+    connectionStatusText.value === 'DISCONNECTED' ||
+    connectionStatusText.value === 'ERROR'
+  );
+});
 
-    async checkAdminApiStatus() {
-      this.isCheckingAdminApi = true;
-      try {
-        const response = await WhatsappAdminApi.checkAdminApiStatus();
-        this.adminApiConfigured =
-          response.data.configured && response.data.healthy;
-      } catch (error) {
-        this.adminApiConfigured = false;
-      } finally {
-        this.isCheckingAdminApi = false;
-      }
-    },
+const showConnectionModeToggle = computed(() => {
+  return props.mode === 'create' && adminApiConfigured.value;
+});
 
-    async handleSubmit() {
-      this.v$.$touch();
-      if (this.v$.$invalid) {
-        return;
-      }
+const isProvisioningMode = computed(() => {
+  return connectionMode.value === 'provision';
+});
 
-      // If provisioning mode, provision the instance first
-      if (this.isProvisioningMode) {
-        this.isProvisioning = true;
-        try {
-          const provisionResponse = await WhatsappAdminApi.provisionInstance(
-            this.phoneNumber,
-            this.webhookSecret
-          );
+const validationRules = computed(() => {
+  const baseValidations = {
+    phoneNumber: { required, isPhoneE164OrEmpty },
+    webhookSecret: { required },
+  };
 
-          // Response is { success: true, data: { gateway_base_url, port, ... } }
-          const provisionedData = provisionResponse.data.data;
-          const {
-            gateway_base_url,
-            basic_auth_user,
-            basic_auth_password,
-            port,
-          } = provisionedData;
+  // In provisioning mode, we don't need gateway URL and basic auth
+  if (!isProvisioningMode.value) {
+    baseValidations.gatewayBaseUrl = { required };
+    baseValidations.basicAuthUser = {};
+    baseValidations.basicAuthPassword = {};
+  }
 
-          // Use the provisioned credentials
-          this.gatewayBaseUrl = gateway_base_url;
-          this.basicAuthUser = basic_auth_user;
-          this.basicAuthPassword = basic_auth_password;
-          // Store provisioning info for teardown later
-          this.provisionedPort = port;
-          this.isProvisionedInstance = true;
+  if (props.mode === 'create') {
+    baseValidations.inboxName = { required };
+  }
 
-          useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.SUCCESS'));
-        } catch (error) {
-          this.isProvisioning = false;
-          const errorMessage = error.response?.data?.error || error.message;
+  return baseValidations;
+});
 
-          if (errorMessage.includes('No available ports')) {
-            useAlert(
-              this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.NO_PORTS')
-            );
-          } else {
-            useAlert(
-              errorMessage ||
-                this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.ERROR')
-            );
-          }
-          return;
-        } finally {
-          this.isProvisioning = false;
-        }
-      }
+const v$ = useVuelidate(validationRules, {
+  inboxName,
+  phoneNumber,
+  gatewayBaseUrl,
+  basicAuthUser,
+  basicAuthPassword,
+  webhookSecret,
+});
 
-      // Build provider_config, omitting optional Basic Auth if left blank
-      const providerConfig = {
-        gateway_base_url: this.gatewayBaseUrl,
-        webhook_secret: this.webhookSecret,
-        include_signature: this.includeSignature,
-      };
+const setDefaults = inbox => {
+  if (!inbox) return;
 
-      if (this.basicAuthUser && this.basicAuthPassword) {
-        providerConfig.basic_auth_user = this.basicAuthUser;
-        providerConfig.basic_auth_password = this.basicAuthPassword;
-      }
+  inboxName.value = inbox.name || '';
+  phoneNumber.value = inbox.phone_number || '';
 
-      // Mark as provisioned instance so teardown service can clean up
-      if (this.isProvisionedInstance) {
-        providerConfig.provisioned = true;
-        providerConfig.instance_port = this.provisionedPort;
-      }
-
-      const formData = {
-        name: this.inboxName,
-        phone_number: this.phoneNumber,
-        provider_config: providerConfig,
-      };
-
-      this.$emit('submit', formData);
-    },
-
-    async checkConnectionStatus() {
-      if (this.mode !== 'edit' || !this.inbox?.id) return;
-
-      this.isLoadingStatus = true;
-      try {
-        const response = await WhatsappWebGatewayApi.getStatus(this.inbox.id);
-        this.connectionStatus = response.data.data;
-      } catch (error) {
-        // Connection status check failed
-        this.connectionStatus = { code: 'ERROR', error: error.message };
-      } finally {
-        this.isLoadingStatus = false;
-      }
-    },
-
-    async refreshConnectionStatus() {
-      await this.checkConnectionStatus();
-    },
-
-    async disconnectWhatsApp() {
-      if (!this.inbox?.id) return;
-
-      // Show confirmation dialog
-      const confirmed = window.confirm(
-        this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.CONFIRMATION')
-      );
-
-      if (!confirmed) return;
-
-      this.isDisconnecting = true;
-      try {
-        await WhatsappWebGatewayApi.logout(this.inbox.id);
-        useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.SUCCESS'));
-        // Refresh status after successful disconnect
-        await this.checkConnectionStatus();
-      } catch (error) {
-        useAlert(
-          error.message ||
-            this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.ERROR')
-        );
-      } finally {
-        this.isDisconnecting = false;
-      }
-    },
-
-    async reconnectWhatsApp() {
-      if (!this.inbox?.id) return;
-
-      this.isReconnecting = true;
-      try {
-        await WhatsappWebGatewayApi.reconnect(this.inbox.id);
-        useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.SUCCESS'));
-        // Refresh status after successful reconnect
-        await this.checkConnectionStatus();
-      } catch (error) {
-        useAlert(
-          error.message ||
-            this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.ERROR')
-        );
-      } finally {
-        this.isReconnecting = false;
-      }
-    },
-  },
+  if (inbox.provider_config) {
+    gatewayBaseUrl.value = inbox.provider_config.gateway_base_url || '';
+    basicAuthUser.value = inbox.provider_config.basic_auth_user || '';
+    basicAuthPassword.value = inbox.provider_config.basic_auth_password || '';
+    webhookSecret.value = inbox.provider_config.webhook_secret || '';
+    includeSignature.value = inbox.provider_config.include_signature !== false;
+  }
 };
+
+const openQRModal = () => {
+  if (!canShowQRCode.value) {
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.TEST_CONNECTION.VALIDATION_ERROR'));
+    return;
+  }
+  showQRModal.value = true;
+};
+
+const closeQRModal = () => {
+  showQRModal.value = false;
+};
+
+const checkConnectionStatus = async () => {
+  if (props.mode !== 'edit' || !props.inbox?.id) return;
+
+  isLoadingStatus.value = true;
+  try {
+    const response = await WhatsappWebGatewayApi.getStatus(props.inbox.id);
+    connectionStatus.value = response.data.data;
+  } catch (error) {
+    // Connection status check failed
+    connectionStatus.value = { code: 'ERROR', error: error.message };
+  } finally {
+    isLoadingStatus.value = false;
+  }
+};
+
+const handleWhatsAppConnected = async () => {
+  closeQRModal();
+  // Refresh the connection status after successful connection
+  await checkConnectionStatus();
+};
+
+const checkAdminApiStatus = async () => {
+  isCheckingAdminApi.value = true;
+  try {
+    const response = await WhatsappAdminApi.checkAdminApiStatus();
+    adminApiConfigured.value =
+      response.data.configured && response.data.healthy;
+  } catch (error) {
+    adminApiConfigured.value = false;
+  } finally {
+    isCheckingAdminApi.value = false;
+  }
+};
+
+const handleSubmit = async () => {
+  v$.value.$touch();
+  if (v$.value.$invalid) {
+    return;
+  }
+
+  // If provisioning mode, provision the instance first
+  if (isProvisioningMode.value) {
+    isProvisioning.value = true;
+    try {
+      const provisionResponse = await WhatsappAdminApi.provisionInstance(
+        phoneNumber.value,
+        webhookSecret.value
+      );
+
+      // Response is { success: true, data: { gateway_base_url, port, ... } }
+      const provisionedData = provisionResponse.data.data;
+      const { gateway_base_url, basic_auth_user, basic_auth_password, port } =
+        provisionedData;
+
+      // Use the provisioned credentials
+      gatewayBaseUrl.value = gateway_base_url;
+      basicAuthUser.value = basic_auth_user;
+      basicAuthPassword.value = basic_auth_password;
+      // Store provisioning info for teardown later
+      provisionedPort.value = port;
+      isProvisionedInstance.value = true;
+
+      useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.SUCCESS'));
+    } catch (error) {
+      isProvisioning.value = false;
+      const errorMessage = error.response?.data?.error || error.message;
+
+      if (errorMessage.includes('No available ports')) {
+        useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.NO_PORTS'));
+      } else {
+        useAlert(
+          errorMessage || t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.ERROR')
+        );
+      }
+      return;
+    } finally {
+      isProvisioning.value = false;
+    }
+  }
+
+  // Build provider_config, omitting optional Basic Auth if left blank
+  const providerConfig = {
+    gateway_base_url: gatewayBaseUrl.value,
+    webhook_secret: webhookSecret.value,
+    include_signature: includeSignature.value,
+  };
+
+  if (basicAuthUser.value && basicAuthPassword.value) {
+    providerConfig.basic_auth_user = basicAuthUser.value;
+    providerConfig.basic_auth_password = basicAuthPassword.value;
+  }
+
+  // Mark as provisioned instance so teardown service can clean up
+  if (isProvisionedInstance.value) {
+    providerConfig.provisioned = true;
+    providerConfig.instance_port = provisionedPort.value;
+  }
+
+  const formData = {
+    name: inboxName.value,
+    phone_number: phoneNumber.value,
+    provider_config: providerConfig,
+  };
+
+  emit('submit', formData);
+};
+
+const refreshConnectionStatus = async () => {
+  await checkConnectionStatus();
+};
+
+const disconnectWhatsApp = async () => {
+  if (!props.inbox?.id) return;
+
+  // Show confirmation dialog
+  const confirmed = window.confirm(
+    t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.CONFIRMATION')
+  );
+
+  if (!confirmed) return;
+
+  isDisconnecting.value = true;
+  try {
+    await WhatsappWebGatewayApi.logout(props.inbox.id);
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.SUCCESS'));
+    // Refresh status after successful disconnect
+    await checkConnectionStatus();
+  } catch (error) {
+    useAlert(
+      error.message || t('INBOX_MGMT.ADD.WHATSAPP_WEB.DISCONNECT.ERROR')
+    );
+  } finally {
+    isDisconnecting.value = false;
+  }
+};
+
+const reconnectWhatsApp = async () => {
+  if (!props.inbox?.id) return;
+
+  isReconnecting.value = true;
+  try {
+    await WhatsappWebGatewayApi.reconnect(props.inbox.id);
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.SUCCESS'));
+    // Refresh status after successful reconnect
+    await checkConnectionStatus();
+  } catch (error) {
+    useAlert(error.message || t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.ERROR'));
+  } finally {
+    isReconnecting.value = false;
+  }
+};
+
+watch(
+  () => props.inbox,
+  newInbox => {
+    if (newInbox && props.mode === 'edit') {
+      setDefaults(newInbox);
+      checkConnectionStatus();
+    }
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  if (props.mode === 'create') {
+    checkAdminApiStatus();
+  }
+});
 </script>
 
 <template>
