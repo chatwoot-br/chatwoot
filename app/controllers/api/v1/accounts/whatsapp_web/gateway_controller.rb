@@ -233,7 +233,7 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     api_token = params[:api_token].presence || Current.account.whatsapp_admin_api_token
     configured = base_url.present? && api_token.present?
 
-    healthy = configured && test_admin_api_health(base_url)
+    healthy = configured && test_admin_api_connection(base_url, api_token)
     available_ports = healthy ? calculate_available_ports(base_url, api_token) : 0
 
     {
@@ -258,14 +258,20 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     (range[:end] - range[:start] + 1) - used_count
   end
 
-  def test_admin_api_health(base_url)
+  # Test connection with an authenticated endpoint to validate both URL and token
+  def test_admin_api_connection(base_url, api_token)
+    # Use /admin/instances which requires authentication
     response = HTTParty.get(
-      "#{base_url.chomp('/')}/healthz",
+      "#{base_url.chomp('/')}/admin/instances",
+      headers: {
+        'Authorization' => "Bearer #{api_token}",
+        'Content-Type' => 'application/json'
+      },
       timeout: 10
     )
     response.success?
   rescue StandardError => e
-    Rails.logger.error "[WHATSAPP ADMIN API] Health check failed: #{e.message}"
+    Rails.logger.error "[WHATSAPP ADMIN API] Connection test failed: #{e.message}"
     false
   end
 
