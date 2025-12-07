@@ -70,7 +70,9 @@ class Whatsapp::InstanceProvisioningService
 
   def build_webhook_url(phone_number)
     base = ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
-    "#{base}/webhooks/whatsapp_web/#{phone_number}"
+    # Remove + prefix and non-digit characters from phone number for URL
+    clean_phone = phone_number.to_s.gsub(/[^\d]/, '')
+    "#{base}/webhooks/whatsapp_web/#{clean_phone}"
   end
 
   def build_gateway_url(port)
