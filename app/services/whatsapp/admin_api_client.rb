@@ -26,6 +26,7 @@ class Whatsapp::AdminApiClient
       webhook: webhook,
       webhook_secret: webhook_secret,
       basic_auth: basic_auth,
+      base_path: options[:base_path],
       debug: options[:debug] || false,
       auto_mark_read: options[:auto_mark_read] || true,
       chat_storage: options[:chat_storage] || false

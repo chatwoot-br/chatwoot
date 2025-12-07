@@ -36,9 +36,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def validate_provider_config?
-    # For newly provisioned instances, just check if gateway is reachable
-    # Use the base URL without phone number - /app/devices works even without WhatsApp connection
-    response = HTTParty.get("#{api_base_path}/app/devices", headers: api_headers, timeout: 10)
+    # Use the full api_path with phone number - /app/devices works even without WhatsApp connection
+    response = HTTParty.get("#{api_path}/app/devices", headers: api_headers, timeout: 10)
     Rails.logger.debug { "[WHATSAPP] Provider config validation response: #{response.inspect}" }
     response.success?
   rescue StandardError => e
