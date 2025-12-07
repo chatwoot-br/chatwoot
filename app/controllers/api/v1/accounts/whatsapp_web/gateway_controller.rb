@@ -1,6 +1,6 @@
 class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::BaseController
-  before_action :set_inbox, except: [:test_connection, :test_devices]
-  before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices]
+  before_action :set_inbox, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
+  before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/gateway/test_connection
   def test_connection
@@ -52,32 +52,14 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 
-  # GET /api/v1/accounts/:account_id/whatsapp_web/gateway/admin_api_status
+  # GET/POST /api/v1/accounts/:account_id/whatsapp_web/gateway/admin_api_status
+  # When called with params, tests those values directly (before saving)
+  # When called without params, checks saved account settings
   def admin_api_status
-    configured = Current.account.whatsapp_admin_api_configured?
-    healthy = configured ? Whatsapp::AdminApiClient.healthy?(Current.account) : false
-
-    available_ports = 0
-    if configured && healthy
-      client = Whatsapp::AdminApiClient.new(Current.account)
-      instances = client.list_instances
-      used_count = instances.is_a?(Array) ? instances.length : 0
-      range_start = Current.account.whatsapp_admin_port_range_start || 3001
-      range_end = Current.account.whatsapp_admin_port_range_end || 3100
-      available_ports = (range_end - range_start + 1) - used_count
-    end
-
-    render json: {
-      configured: configured,
-      healthy: healthy,
-      available_ports: available_ports,
-      port_range: {
-        start: Current.account.whatsapp_admin_port_range_start || 3001,
-        end: Current.account.whatsapp_admin_port_range_end || 3100
-      }
-    }
+    result = build_admin_api_status_response
+    render json: result
   rescue StandardError => e
-    render json: { configured: configured, healthy: false, error: e.message }
+    render json: { configured: false, healthy: false, error: e.message }
   end
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/gateway/provision_instance
@@ -244,5 +226,65 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     Whatsapp::Providers::WhatsappWebService.new(
       whatsapp_channel: temp_channel
     )
+  end
+
+  def build_admin_api_status_response
+    base_url = params[:base_url].presence || Current.account.whatsapp_admin_api_base_url
+    api_token = params[:api_token].presence || Current.account.whatsapp_admin_api_token
+    configured = base_url.present? && api_token.present?
+
+    healthy = configured && test_admin_api_health(base_url)
+    available_ports = healthy ? calculate_available_ports(base_url, api_token) : 0
+
+    {
+      configured: configured,
+      healthy: healthy,
+      available_ports: available_ports,
+      port_range: account_port_range
+    }
+  end
+
+  def account_port_range
+    {
+      start: Current.account.whatsapp_admin_port_range_start || 3001,
+      end: Current.account.whatsapp_admin_port_range_end || 3100
+    }
+  end
+
+  def calculate_available_ports(base_url, api_token)
+    instances = fetch_instances(base_url, api_token)
+    used_count = instances.is_a?(Array) ? instances.length : 0
+    range = account_port_range
+    (range[:end] - range[:start] + 1) - used_count
+  end
+
+  def test_admin_api_health(base_url)
+    response = HTTParty.get(
+      "#{base_url.chomp('/')}/healthz",
+      timeout: 10
+    )
+    response.success?
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP ADMIN API] Health check failed: #{e.message}"
+    false
+  end
+
+  def fetch_instances(base_url, api_token)
+    response = HTTParty.get(
+      "#{base_url.chomp('/')}/admin/instances",
+      headers: {
+        'Authorization' => "Bearer #{api_token}",
+        'Content-Type' => 'application/json'
+      },
+      timeout: 15
+    )
+
+    return [] unless response.success?
+
+    parsed = JSON.parse(response.body)
+    parsed['data'] || parsed
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP ADMIN API] List instances failed: #{e.message}"
+    []
   end
 end

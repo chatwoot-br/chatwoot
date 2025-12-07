@@ -6,8 +6,12 @@ class WhatsappAdminApi extends ApiClient {
     super('whatsapp_web/gateway', { accountScoped: true });
   }
 
-  checkAdminApiStatus() {
-    return axios.get(`${this.url}/admin_api_status`);
+  checkAdminApiStatus(baseUrl = null, apiToken = null) {
+    const params = {};
+    if (baseUrl) params.base_url = baseUrl;
+    if (apiToken) params.api_token = apiToken;
+
+    return axios.get(`${this.url}/admin_api_status`, { params });
   }
 
   provisionInstance(phoneNumber, webhookSecret) {

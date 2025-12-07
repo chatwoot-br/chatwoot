@@ -48,9 +48,18 @@ const connectionStatusText = computed(() => {
 });
 
 const testConnection = async () => {
+  if (!baseUrl.value || !apiToken.value) {
+    connectionStatus.value = 'not_configured';
+    return;
+  }
+
   isTesting.value = true;
   try {
-    const response = await WhatsappAdminApi.checkAdminApiStatus();
+    // Pass form values to test them directly (even before saving)
+    const response = await WhatsappAdminApi.checkAdminApiStatus(
+      baseUrl.value,
+      apiToken.value
+    );
     if (response.data.healthy) {
       connectionStatus.value = 'connected';
       availablePorts.value = response.data.available_ports || 0;
