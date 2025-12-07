@@ -298,3 +298,11 @@ leadsquared:
       'conversation_activity_score',
       'transcript_activity_score',
     ]
+
+whatsapp_web:
+  id: whatsapp_web
+  logo: whatsapp_web.png
+  i18n_key: whatsapp_web
+  action: /whatsapp_web
+  hook_type: account
+  allow_multiple_hooks: false

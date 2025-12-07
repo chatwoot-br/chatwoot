@@ -340,6 +340,34 @@
         "CONFIRM": "Yes, delete",
         "CANCEL": "Cancel"
       }
+    },
+    "WHATSAPP_WEB": {
+      "TITLE": "WhatsApp Instance Management",
+      "DESCRIPTION": "Configure the Admin API to automatically provision WhatsApp instances when creating new inboxes.",
+      "CONNECTION_STATUS": "Connection Status",
+      "BASE_URL": {
+        "LABEL": "Admin API URL",
+        "PLACEHOLDER": "http://admin-api:8088"
+      },
+      "TOKEN": {
+        "LABEL": "Admin API Token",
+        "PLACEHOLDER": "Enter your admin token"
+      },
+      "PORT_RANGE": {
+        "START_LABEL": "Port Range Start",
+        "END_LABEL": "Port Range End"
+      },
+      "TEST_CONNECTION": "Test Connection",
+      "SAVE": "Save Settings",
+      "SAVE_SUCCESS": "WhatsApp Admin API settings saved successfully",
+      "SAVE_ERROR": "Failed to save WhatsApp Admin API settings",
+      "AVAILABLE_PORTS": "{count} ports available",
+      "STATUS": {
+        "CONNECTED": "Connected",
+        "NOT_CONFIGURED": "Not Configured",
+        "FAILED": "Connection Failed",
+        "UNKNOWN": "Unknown"
+      }
     }
   },
   "CAPTAIN": {

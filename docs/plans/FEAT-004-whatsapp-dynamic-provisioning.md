@@ -95,17 +95,29 @@ end
 **Accounts Controller** (`app/controllers/api/v1/accounts_controller.rb`)
 - Permit new settings params
 
-### Phase 4: Frontend - Account Settings
+### Phase 4: Frontend - Integrations Page
 
-**New Component** (`app/javascript/dashboard/routes/dashboard/settings/account/components/WhatsappAdminApi.vue`)
+> **Note:** WhatsApp Instance Management was moved from Account Settings to the Integrations page for better discoverability and consistency with other integrations.
+
+**Integration Configuration** (`config/integration/apps.yml`)
+- Added `whatsapp_web` integration entry
+
+**New Component** (`app/javascript/dashboard/routes/dashboard/settings/integrations/WhatsappWeb/Index.vue`)
 - Admin API URL input
 - Admin Token input (password field)
 - Port range inputs (start/end)
 - Test connection button
 - Save settings
+- Connection status display
 
-**Account Settings Index** (`app/javascript/dashboard/routes/dashboard/settings/account/Index.vue`)
-- Import and add WhatsappAdminApi component
+**Routes** (`app/javascript/dashboard/routes/dashboard/settings/integrations/integrations.routes.js`)
+- Added `/integrations/whatsapp_web` route
+
+**Vuex Store** (`app/javascript/dashboard/store/modules/integrations.js`)
+- Updated `getAppIntegrations` getter to compute enabled status from account settings
+
+**i18n** (`app/javascript/dashboard/i18n/locale/en/integrations.json`)
+- Added `INTEGRATION_SETTINGS.WHATSAPP_WEB` section
 
 ### Phase 5: Frontend - Inbox Creation
 
@@ -132,7 +144,15 @@ provisionInstance(phoneNumber, webhookSecret)
 - `PROVISIONING_MODE.LABEL/CREATE_NEW/CONNECT_EXISTING`
 - `PROVISIONING.IN_PROGRESS/SUCCESS/ERROR/NO_PORTS_AVAILABLE`
 
-**settings.json** - Add `WHATSAPP_ADMIN_API` section
+**integrations.json** - Add `INTEGRATION_SETTINGS.WHATSAPP_WEB` section:
+- `TITLE`, `DESCRIPTION`, `CONNECTION_STATUS`
+- `BASE_URL.LABEL/PLACEHOLDER`, `TOKEN.LABEL/PLACEHOLDER`
+- `PORT_RANGE.START_LABEL/END_LABEL`
+- `TEST_CONNECTION`, `SAVE`, `SAVE_SUCCESS`, `SAVE_ERROR`
+- `AVAILABLE_PORTS`, `STATUS.CONNECTED/NOT_CONFIGURED/FAILED/UNKNOWN`
+
+**config/locales/en.yml** - Add under `integration_apps`:
+- `whatsapp_web.name`, `whatsapp_web.short_description`, `whatsapp_web.description`
 
 ---
 
@@ -147,6 +167,10 @@ provisionInstance(phoneNumber, webhookSecret)
 | `app/services/whatsapp/instance_teardown_service.rb` | NEW - Cleanup |
 | `app/controllers/api/v1/accounts/whatsapp_web/gateway_controller.rb` | Add endpoints |
 | `config/routes.rb` | Add routes |
+| `config/integration/apps.yml` | Add whatsapp_web integration |
+| `app/javascript/dashboard/routes/dashboard/settings/integrations/WhatsappWeb/Index.vue` | NEW - Integration config UI |
+| `app/javascript/dashboard/routes/dashboard/settings/integrations/integrations.routes.js` | Add route |
+| `app/javascript/dashboard/store/modules/integrations.js` | Compute enabled status |
 | `WhatsappWebForm.vue` | Add provisioning toggle |
 | `app/javascript/dashboard/api/whatsappAdminApi.js` | NEW - API client |
 
@@ -192,7 +216,7 @@ User → Frontend → Backend → Admin API
 1. Backend services (AdminApiClient, ProvisioningService, TeardownService)
 2. Account model changes + controller params
 3. Gateway controller endpoints + routes
-4. Frontend account settings component
+4. Frontend integrations page component (WhatsApp Instance Management)
 5. Frontend WhatsappWebForm provisioning toggle
 6. i18n translations
 7. Manual testing

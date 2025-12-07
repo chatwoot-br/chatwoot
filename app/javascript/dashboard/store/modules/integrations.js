@@ -20,8 +20,19 @@ const state = {
 };
 
 export const getters = {
-  getAppIntegrations($state) {
-    return $state.records;
+  getAppIntegrations($state, _getters, rootState) {
+    return $state.records.map(record => {
+      if (record.id === 'whatsapp_web') {
+        const currentAccount = rootState.accounts?.currentAccount || {};
+        const settings = currentAccount.settings || {};
+        const isConfigured = !!(
+          settings.whatsapp_admin_api_base_url &&
+          settings.whatsapp_admin_api_token
+        );
+        return { ...record, enabled: isConfigured };
+      }
+      return record;
+    });
   },
   getIntegration:
     $state =>
