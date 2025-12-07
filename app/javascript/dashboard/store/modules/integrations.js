@@ -12,6 +12,7 @@ const state = {
     isFetchingItem: false,
     isUpdating: false,
     isCreatingHook: false,
+    isUpdatingHook: false,
     isDeletingHook: false,
     isCreatingSlack: false,
     isUpdatingSlack: false,
@@ -20,16 +21,12 @@ const state = {
 };
 
 export const getters = {
-  getAppIntegrations($state, _getters, rootState) {
+  getAppIntegrations($state) {
     return $state.records.map(record => {
       if (record.id === 'whatsapp_web') {
-        const currentAccount = rootState.accounts?.currentAccount || {};
-        const settings = currentAccount.settings || {};
-        const isConfigured = !!(
-          settings.whatsapp_admin_api_base_url &&
-          settings.whatsapp_admin_api_token
-        );
-        return { ...record, enabled: isConfigured };
+        // Enabled is determined by hook existence (same pattern as OpenAI)
+        const hasHook = record.hooks && record.hooks.length > 0;
+        return { ...record, enabled: hasHook };
       }
       return record;
     });
@@ -135,6 +132,17 @@ export const actions = {
       throw new Error(error);
     }
   },
+  updateHook: async ({ commit }, { hookId, hookData }) => {
+    commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isUpdatingHook: true });
+    try {
+      const response = await IntegrationsAPI.updateHook(hookId, hookData);
+      commit(types.default.UPDATE_INTEGRATION_HOOK, response.data);
+      commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isUpdatingHook: false });
+    } catch (error) {
+      commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isUpdatingHook: false });
+      throwErrorMessage(error);
+    }
+  },
   deleteHook: async ({ commit }, { appId, hookId }) => {
     commit(types.default.SET_INTEGRATIONS_UI_FLAG, { isDeletingHook: true });
     try {
@@ -161,6 +169,17 @@ export const mutations = {
         return {
           ...record,
           hooks: [...record.hooks, data],
+        };
+      }
+      return record;
+    });
+  },
+  [types.default.UPDATE_INTEGRATION_HOOK]: ($state, data) => {
+    $state.records = $state.records.map(record => {
+      if (record.id === data.app_id) {
+        return {
+          ...record,
+          hooks: record.hooks.map(hook => (hook.id === data.id ? data : hook)),
         };
       }
       return record;

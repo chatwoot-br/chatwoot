@@ -9,9 +9,10 @@ class Whatsapp::InstanceProvisioningService
   GATEWAY_READY_TIMEOUT = 10
   HTTP_TIMEOUT = 3
 
-  def initialize(account)
-    @account = account
-    @admin_client = Whatsapp::AdminApiClient.new(account)
+  def initialize(hook)
+    @hook = hook
+    @account = hook.account
+    @admin_client = Whatsapp::AdminApiClient.new(hook)
   end
 
   def provision(phone_number:, webhook_secret:)
@@ -82,8 +83,8 @@ class Whatsapp::InstanceProvisioningService
     existing = @admin_client.list_instances
     used_ports = existing.is_a?(Array) ? existing.pluck('port') : []
 
-    range_start = @account.whatsapp_admin_port_range_start || DEFAULT_PORT_RANGE_START
-    range_end = @account.whatsapp_admin_port_range_end || DEFAULT_PORT_RANGE_END
+    range_start = @hook.settings['port_range_start'] || DEFAULT_PORT_RANGE_START
+    range_end = @hook.settings['port_range_end'] || DEFAULT_PORT_RANGE_END
 
     Rails.logger.debug { "[WHATSAPP] Searching for available port in range #{range_start}..#{range_end}, used ports: #{used_ports}" }
 
@@ -106,7 +107,7 @@ class Whatsapp::InstanceProvisioningService
   end
 
   def build_gateway_url(port)
-    base_url = @account.whatsapp_admin_api_base_url.chomp('/')
+    base_url = @hook.settings['base_url'].chomp('/')
     # Extract host from Admin API URL and use same for gateway
     uri = URI.parse(base_url)
     "#{uri.scheme}://#{uri.host}:#{port}"

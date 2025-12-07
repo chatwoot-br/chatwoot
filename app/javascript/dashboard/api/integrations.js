@@ -29,6 +29,17 @@ class IntegrationsAPI extends ApiClient {
     return axios.post(`${this.baseUrl()}/integrations/hooks`, hookData);
   }
 
+  showHook(hookId) {
+    return axios.get(`${this.baseUrl()}/integrations/hooks/${hookId}`);
+  }
+
+  updateHook(hookId, hookData) {
+    return axios.patch(
+      `${this.baseUrl()}/integrations/hooks/${hookId}`,
+      hookData
+    );
+  }
+
   deleteHook(hookId) {
     return axios.delete(`${this.baseUrl()}/integrations/hooks/${hookId}`);
   }

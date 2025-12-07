@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
-import { useAccount } from 'dashboard/composables/useAccount';
 import { useAlert } from 'dashboard/composables';
 import Integration from '../Integration.vue';
 import WithLabel from 'v3/components/Form/WithLabel.vue';
@@ -13,7 +12,6 @@ import WhatsappAdminApi from 'dashboard/api/whatsappAdminApi';
 
 const { t } = useI18n();
 const store = useStore();
-const { currentAccount, updateAccount } = useAccount();
 
 const integrationLoaded = ref(false);
 const baseUrl = ref('');
@@ -27,6 +25,11 @@ const availablePorts = ref(0);
 
 const integration = computed(() => {
   return store.getters['integrations/getIntegration']('whatsapp_web');
+});
+
+// Get existing hook (same pattern as OpenAI)
+const existingHook = computed(() => {
+  return integration.value?.hooks?.[0] || null;
 });
 
 const isConfigured = computed(() => {
@@ -86,15 +89,16 @@ const testConnection = async () => {
   }
 };
 
+// Load settings from hook (same pattern as OpenAI)
 watch(
-  currentAccount,
-  account => {
-    if (account) {
-      const settings = account.settings || {};
-      baseUrl.value = settings.whatsapp_admin_api_base_url || '';
-      apiToken.value = settings.whatsapp_admin_api_token || '';
-      portRangeStart.value = settings.whatsapp_admin_port_range_start || 3001;
-      portRangeEnd.value = settings.whatsapp_admin_port_range_end || 3100;
+  integration,
+  int => {
+    if (int?.hooks?.[0]) {
+      const settings = int.hooks[0].settings || {};
+      baseUrl.value = settings.base_url || '';
+      apiToken.value = settings.api_token || '';
+      portRangeStart.value = settings.port_range_start || 3001;
+      portRangeEnd.value = settings.port_range_end || 3100;
 
       if (baseUrl.value && apiToken.value) {
         testConnection();
@@ -104,15 +108,31 @@ watch(
   { immediate: true }
 );
 
+// Save settings (all in settings object, like OpenAI)
 const saveSettings = async () => {
   isSaving.value = true;
   try {
-    await updateAccount({
-      whatsapp_admin_api_base_url: baseUrl.value,
-      whatsapp_admin_api_token: apiToken.value,
-      whatsapp_admin_port_range_start: parseInt(portRangeStart.value, 10),
-      whatsapp_admin_port_range_end: parseInt(portRangeEnd.value, 10),
-    });
+    const settings = {
+      base_url: baseUrl.value,
+      api_token: apiToken.value,
+      port_range_start: parseInt(portRangeStart.value, 10),
+      port_range_end: parseInt(portRangeEnd.value, 10),
+    };
+
+    if (existingHook.value) {
+      // Update existing hook
+      await store.dispatch('integrations/updateHook', {
+        hookId: existingHook.value.id,
+        hookData: { hook: { settings } },
+      });
+    } else {
+      // Create new hook
+      await store.dispatch('integrations/createHook', {
+        app_id: 'whatsapp_web',
+        settings,
+      });
+    }
+
     useAlert(t('INTEGRATION_SETTINGS.WHATSAPP_WEB.SAVE_SUCCESS'));
     await testConnection();
   } catch (error) {

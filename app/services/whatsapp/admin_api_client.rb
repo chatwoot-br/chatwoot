@@ -18,8 +18,8 @@ class Whatsapp::AdminApiClient
   TIMEOUT_QUERY = 15
   TIMEOUT_HEALTH = 10
 
-  def initialize(account)
-    @account = account
+  def initialize(hook)
+    @hook = hook
     validate_configuration!
   end
 
@@ -118,14 +118,16 @@ class Whatsapp::AdminApiClient
   end
 
   # Helper to check if Admin API is configured and healthy
-  def self.configured_for?(account)
-    account.whatsapp_admin_api_configured?
+  def self.configured_for?(hook)
+    return false if hook.nil?
+
+    hook.settings['base_url'].present? && hook.settings['api_token'].present?
   end
 
-  def self.healthy?(account)
-    return false unless configured_for?(account)
+  def self.healthy?(hook)
+    return false unless configured_for?(hook)
 
-    new(account).health_check
+    new(hook).health_check
   rescue NotConfiguredError
     false
   end
@@ -133,18 +135,18 @@ class Whatsapp::AdminApiClient
   private
 
   def validate_configuration!
-    return if @account.whatsapp_admin_api_base_url.present? && @account.whatsapp_admin_api_token.present?
+    return if @hook&.settings&.dig('base_url').present? && @hook&.settings&.dig('api_token').present?
 
     raise NotConfiguredError, 'WhatsApp Admin API is not configured for this account'
   end
 
   def base_url
-    @account.whatsapp_admin_api_base_url.chomp('/')
+    @hook.settings['base_url'].chomp('/')
   end
 
   def api_headers
     {
-      'Authorization' => "Bearer #{@account.whatsapp_admin_api_token}",
+      'Authorization' => "Bearer #{@hook.settings['api_token']}",
       'Content-Type' => 'application/json'
     }
   end

@@ -93,9 +93,7 @@ class Api::V1::AccountsController < Api::BaseController
 
   def settings_params
     params.permit(:auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting,
-                  :audio_transcriptions, :auto_resolve_label,
-                  :whatsapp_admin_api_base_url, :whatsapp_admin_api_token,
-                  :whatsapp_admin_port_range_start, :whatsapp_admin_port_range_end)
+                  :audio_transcriptions, :auto_resolve_label)
   end
 
   def check_signup_enabled

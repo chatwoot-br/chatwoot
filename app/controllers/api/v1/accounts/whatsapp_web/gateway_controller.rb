@@ -73,7 +73,12 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
       return
     end
 
-    service = Whatsapp::InstanceProvisioningService.new(Current.account)
+    if whatsapp_hook.blank?
+      render json: { success: false, error: 'WhatsApp Admin API not configured' }, status: :bad_request
+      return
+    end
+
+    service = Whatsapp::InstanceProvisioningService.new(whatsapp_hook)
     result = service.provision(phone_number: phone_number, webhook_secret: webhook_secret)
 
     render json: { success: true, data: result }
@@ -88,7 +93,12 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
 
   # GET /api/v1/accounts/:account_id/whatsapp_web/gateway/available_instances
   def available_instances
-    client = Whatsapp::AdminApiClient.new(Current.account)
+    if whatsapp_hook.blank?
+      render json: { success: false, error: 'WhatsApp Admin API not configured' }, status: :bad_request
+      return
+    end
+
+    client = Whatsapp::AdminApiClient.new(whatsapp_hook)
     instances = client.list_instances
 
     render json: { success: true, data: instances }
@@ -208,6 +218,10 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     render json: { error: 'Inbox must be a WhatsApp Web channel' }, status: :bad_request
   end
 
+  def whatsapp_hook
+    @whatsapp_hook ||= Current.account.hooks.find_by(app_id: 'whatsapp_web')
+  end
+
   def gateway_params
     params.permit(:id, :inbox_id, :phone, :path, :gateway_base_url, :basic_auth_user, :basic_auth_password, :phone_number)
   end
@@ -230,8 +244,11 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
   end
 
   def build_admin_api_status_response
-    base_url = params[:base_url].presence || Current.account.whatsapp_admin_api_base_url
-    api_token = params[:api_token].presence || Current.account.whatsapp_admin_api_token
+    # If params provided, test with those (before saving)
+    # Otherwise, read from existing hook settings
+    hook_settings = whatsapp_hook&.settings || {}
+    base_url = params[:base_url].presence || hook_settings['base_url']
+    api_token = params[:api_token].presence || hook_settings['api_token']
     configured = base_url.present? && api_token.present?
 
     client = configured ? build_temp_admin_client(base_url, api_token) : nil
@@ -242,21 +259,22 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
       configured: configured,
       healthy: healthy,
       available_ports: available_ports,
-      port_range: account_port_range
+      port_range: hook_port_range
     }
   end
 
-  def account_port_range
+  def hook_port_range
+    hook_settings = whatsapp_hook&.settings || {}
     {
-      start: Current.account.whatsapp_admin_port_range_start || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_START,
-      end: Current.account.whatsapp_admin_port_range_end || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_END
+      start: hook_settings['port_range_start'] || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_START,
+      end: hook_settings['port_range_end'] || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_END
     }
   end
 
   def calculate_available_ports(client)
     instances = client.list_instances
     used_count = instances.is_a?(Array) ? instances.length : 0
-    range = account_port_range
+    range = hook_port_range
     (range[:end] - range[:start] + 1) - used_count
   rescue StandardError
     0
@@ -264,11 +282,13 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
 
   # Build a temporary admin client with provided credentials (for testing before saving)
   def build_temp_admin_client(base_url, api_token)
-    temp_account = OpenStruct.new(
-      whatsapp_admin_api_base_url: base_url,
-      whatsapp_admin_api_token: api_token
+    temp_hook = OpenStruct.new(
+      settings: {
+        'base_url' => base_url,
+        'api_token' => api_token
+      }
     )
-    Whatsapp::AdminApiClient.new(temp_account)
+    Whatsapp::AdminApiClient.new(temp_hook)
   end
 
   # Test connection using the AdminApiClient
