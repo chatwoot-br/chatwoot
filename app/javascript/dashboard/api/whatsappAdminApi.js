@@ -14,10 +14,9 @@ class WhatsappAdminApi extends ApiClient {
     return axios.get(`${this.url}/admin_api_status`, { params });
   }
 
-  provisionInstance(phoneNumber, webhookSecret) {
+  provisionInstance(phoneNumber) {
     return axios.post(`${this.url}/provision_instance`, {
       phone_number: phoneNumber,
-      webhook_secret: webhookSecret,
     });
   }
 

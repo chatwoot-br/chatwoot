@@ -66,7 +66,7 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
   # POST /api/v1/accounts/:account_id/whatsapp_web/gateway/provision_instance
   def provision_instance
     phone_number = params[:phone_number]
-    webhook_secret = params[:webhook_secret] || SecureRandom.hex(16)
+    webhook_secret = SecureRandom.uuid
 
     if phone_number.blank?
       render json: { success: false, error: 'Phone number is required' }, status: :bad_request

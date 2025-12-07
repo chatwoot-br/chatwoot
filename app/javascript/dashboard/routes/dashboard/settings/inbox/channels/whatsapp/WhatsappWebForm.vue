@@ -48,6 +48,7 @@ const adminApiConfigured = ref(false);
 const isCheckingAdminApi = ref(false);
 const isProvisioning = ref(false);
 const provisionedPort = ref(null);
+const provisionedWebhookSecret = ref(null);
 const isProvisionedInstance = ref(false);
 
 const gatewayConfig = computed(() => ({
@@ -154,14 +155,14 @@ const isProvisioningMode = computed(() => {
 const validationRules = computed(() => {
   const baseValidations = {
     phoneNumber: { required, isPhoneE164OrEmpty },
-    webhookSecret: { required },
   };
 
-  // In provisioning mode, we don't need gateway URL and basic auth
+  // In provisioning mode, we don't need gateway URL, basic auth, or webhook secret
   if (!isProvisioningMode.value) {
     baseValidations.gatewayBaseUrl = { required };
     baseValidations.basicAuthUser = {};
     baseValidations.basicAuthPassword = {};
+    baseValidations.webhookSecret = { required };
   }
 
   if (props.mode === 'create') {
@@ -252,14 +253,18 @@ const handleSubmit = async () => {
     isProvisioning.value = true;
     try {
       const provisionResponse = await WhatsappAdminApi.provisionInstance(
-        phoneNumber.value,
-        webhookSecret.value
+        phoneNumber.value
       );
 
-      // Response is { success: true, data: { gateway_base_url, port, ... } }
+      // Response is { success: true, data: { gateway_base_url, port, webhook_secret, ... } }
       const provisionedData = provisionResponse.data.data;
-      const { gateway_base_url, basic_auth_user, basic_auth_password, port } =
-        provisionedData;
+      const {
+        gateway_base_url,
+        basic_auth_user,
+        basic_auth_password,
+        port,
+        webhook_secret,
+      } = provisionedData;
 
       // Use the provisioned credentials
       gatewayBaseUrl.value = gateway_base_url;
@@ -267,6 +272,7 @@ const handleSubmit = async () => {
       basicAuthPassword.value = basic_auth_password;
       // Store provisioning info for teardown later
       provisionedPort.value = port;
+      provisionedWebhookSecret.value = webhook_secret;
       isProvisionedInstance.value = true;
 
       useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.SUCCESS'));
@@ -290,7 +296,6 @@ const handleSubmit = async () => {
   // Build provider_config, omitting optional Basic Auth if left blank
   const providerConfig = {
     gateway_base_url: gatewayBaseUrl.value,
-    webhook_secret: webhookSecret.value,
     include_signature: includeSignature.value,
   };
 
@@ -303,6 +308,10 @@ const handleSubmit = async () => {
   if (isProvisionedInstance.value) {
     providerConfig.provisioned = true;
     providerConfig.instance_port = provisionedPort.value;
+    providerConfig.webhook_secret = provisionedWebhookSecret.value;
+  } else {
+    // For existing instances, use the user-provided webhook secret
+    providerConfig.webhook_secret = webhookSecret.value;
   }
 
   const formData = {
@@ -536,7 +545,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="flex-shrink-0 flex-grow-0">
+    <div v-if="!isProvisioningMode" class="flex-shrink-0 flex-grow-0">
       <label :class="{ error: v$.webhookSecret.$error }">
         <span>
           {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.WEBHOOK_SECRET.LABEL') }}
