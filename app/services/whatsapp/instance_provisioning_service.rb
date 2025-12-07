@@ -69,7 +69,9 @@ class Whatsapp::InstanceProvisioningService
   end
 
   def build_webhook_url(phone_number)
-    base = ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
+    # Use INTERNAL_API_URL for container-to-container communication (gateway -> Rails)
+    # Fall back to FRONTEND_URL for non-containerized setups
+    base = ENV.fetch('INTERNAL_API_URL', nil) || ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
     # Remove + prefix and non-digit characters from phone number for URL
     clean_phone = phone_number.to_s.gsub(/[^\d]/, '')
     "#{base}/webhooks/whatsapp_web/#{clean_phone}"
