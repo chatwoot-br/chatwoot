@@ -52,6 +52,8 @@ export default {
       adminApiConfigured: false,
       isCheckingAdminApi: false,
       isProvisioning: false,
+      provisionedPort: null,
+      isProvisionedInstance: false,
     };
   },
   computed: {
@@ -250,13 +252,22 @@ export default {
             this.webhookSecret
           );
 
-          const { gateway_base_url, basic_auth_user, basic_auth_password } =
-            provisionResponse.data;
+          // Response is { success: true, data: { gateway_base_url, port, ... } }
+          const provisionedData = provisionResponse.data.data;
+          const {
+            gateway_base_url,
+            basic_auth_user,
+            basic_auth_password,
+            port,
+          } = provisionedData;
 
           // Use the provisioned credentials
           this.gatewayBaseUrl = gateway_base_url;
           this.basicAuthUser = basic_auth_user;
           this.basicAuthPassword = basic_auth_password;
+          // Store provisioning info for teardown later
+          this.provisionedPort = port;
+          this.isProvisionedInstance = true;
 
           useAlert(this.$t('INBOX_MGMT.ADD.WHATSAPP_WEB.PROVISIONING.SUCCESS'));
         } catch (error) {
@@ -289,6 +300,12 @@ export default {
       if (this.basicAuthUser && this.basicAuthPassword) {
         providerConfig.basic_auth_user = this.basicAuthUser;
         providerConfig.basic_auth_password = this.basicAuthPassword;
+      }
+
+      // Mark as provisioned instance so teardown service can clean up
+      if (this.isProvisionedInstance) {
+        providerConfig.provisioned = true;
+        providerConfig.instance_port = this.provisionedPort;
       }
 
       const formData = {
