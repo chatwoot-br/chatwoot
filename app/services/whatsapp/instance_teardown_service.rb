@@ -14,7 +14,13 @@ class Whatsapp::InstanceTeardownService
     port = @channel.provider_config['instance_port']
     Rails.logger.info "[WHATSAPP] Tearing down provisioned instance on port #{port}"
 
-    admin_client = Whatsapp::AdminApiClient.new(@channel.account)
+    hook = @channel.account.hooks.find_by(app_id: 'whatsapp_web')
+    unless hook
+      Rails.logger.warn '[WHATSAPP] Cannot teardown instance - whatsapp_web hook not configured'
+      return
+    end
+
+    admin_client = Whatsapp::AdminApiClient.new(hook)
     admin_client.delete_instance(port)
 
     Rails.logger.info "[WHATSAPP] Successfully deleted instance on port #{port}"
