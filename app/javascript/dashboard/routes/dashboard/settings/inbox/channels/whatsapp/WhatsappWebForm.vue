@@ -218,10 +218,10 @@ export default {
       this.showQRModal = false;
     },
 
-    handleWhatsAppConnected() {
+    async handleWhatsAppConnected() {
       this.closeQRModal();
-      // You could add additional logic here, like auto-filling fields
-      // or proceeding to the next step
+      // Refresh the connection status after successful connection
+      await this.checkConnectionStatus();
     },
 
     async checkAdminApiStatus() {
