@@ -80,10 +80,12 @@ watch(
   currentAccount,
   account => {
     if (account) {
-      baseUrl.value = account.whatsapp_admin_api_base_url || '';
-      apiToken.value = account.whatsapp_admin_api_token || '';
-      portRangeStart.value = account.whatsapp_admin_port_range_start || 3001;
-      portRangeEnd.value = account.whatsapp_admin_port_range_end || 3100;
+      // Settings are stored in account.settings hash
+      const settings = account.settings || {};
+      baseUrl.value = settings.whatsapp_admin_api_base_url || '';
+      apiToken.value = settings.whatsapp_admin_api_token || '';
+      portRangeStart.value = settings.whatsapp_admin_port_range_start || 3001;
+      portRangeEnd.value = settings.whatsapp_admin_port_range_end || 3100;
 
       if (baseUrl.value && apiToken.value) {
         testConnection();
