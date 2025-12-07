@@ -86,6 +86,8 @@ class Whatsapp::InstanceProvisioningService
 
       if instance['state'] == 'RUNNING'
         Rails.logger.info "[WHATSAPP] Instance on port #{port} is now RUNNING"
+        # Wait for gateway to actually be ready to accept connections
+        wait_for_gateway_ready(port)
         return true
       end
 
@@ -94,6 +96,33 @@ class Whatsapp::InstanceProvisioningService
       end
 
       Rails.logger.debug { "[WHATSAPP] Instance state: #{instance['state']}, waiting..." }
+      sleep(interval)
+    end
+  end
+
+  def wait_for_gateway_ready(port, timeout: 10, interval: 1)
+    gateway_url = build_gateway_url(port)
+    Rails.logger.info "[WHATSAPP] Waiting for gateway at #{gateway_url} to accept connections"
+
+    start_time = Time.current
+    max_time = start_time + timeout.seconds
+
+    loop do
+      begin
+        response = HTTParty.get("#{gateway_url}/app/devices", timeout: 3)
+        if response.success?
+          Rails.logger.info "[WHATSAPP] Gateway at #{gateway_url} is ready"
+          return true
+        end
+      rescue StandardError => e
+        Rails.logger.debug { "[WHATSAPP] Gateway not ready yet: #{e.message}" }
+      end
+
+      if Time.current >= max_time
+        Rails.logger.warn '[WHATSAPP] Gateway readiness check timed out, proceeding anyway'
+        return true
+      end
+
       sleep(interval)
     end
   end
