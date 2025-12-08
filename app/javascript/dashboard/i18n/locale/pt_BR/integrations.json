@@ -343,6 +343,34 @@
         "CONFIRM": "Sim, excluir",
         "CANCEL": "Cancelar"
       }
+    },
+    "WHATSAPP_WEB": {
+      "TITLE": "Gerenciamento de Instâncias WhatsApp",
+      "DESCRIPTION": "Configure a API Admin para provisionar automaticamente instâncias do WhatsApp ao criar novas caixas de entrada.",
+      "CONNECTION_STATUS": "Status da Conexão",
+      "BASE_URL": {
+        "LABEL": "URL da API Admin",
+        "PLACEHOLDER": "http://admin-api:8088"
+      },
+      "TOKEN": {
+        "LABEL": "Token da API Admin",
+        "PLACEHOLDER": "Digite seu token admin"
+      },
+      "PORT_RANGE": {
+        "START_LABEL": "Início do Intervalo de Portas",
+        "END_LABEL": "Fim do Intervalo de Portas"
+      },
+      "TEST_CONNECTION": "Testar Conexão",
+      "SAVE": "Salvar Configurações",
+      "SAVE_SUCCESS": "Configurações da API Admin do WhatsApp salvas com sucesso",
+      "SAVE_ERROR": "Falha ao salvar configurações da API Admin do WhatsApp",
+      "AVAILABLE_PORTS": "{count} portas disponíveis",
+      "STATUS": {
+        "CONNECTED": "Conectado",
+        "NOT_CONFIGURED": "Não Configurado",
+        "FAILED": "Falha na Conexão",
+        "UNKNOWN": "Desconhecido"
+      }
     }
   },
   "CAPTAIN": {

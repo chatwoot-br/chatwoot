@@ -212,7 +212,7 @@ provisionInstance(phoneNumber, webhookSecret)
 | `config/integration/apps.yml` | DONE | Add whatsapp_web with settings_json_schema |
 | `app/services/whatsapp/admin_api_client.rb` | DONE | Accept hook, read from hook.settings |
 | `app/services/whatsapp/instance_provisioning_service.rb` | DONE | Accept hook |
-| `app/services/whatsapp/instance_teardown_service.rb` | TODO | Cleanup on inbox delete |
+| `app/services/whatsapp/instance_teardown_service.rb` | DONE | Cleanup on inbox delete |
 | `app/controllers/api/v1/accounts/whatsapp_web/gateway_controller.rb` | DONE | Read from hook via whatsapp_hook helper |
 | `app/models/account.rb` | DONE | Removed WhatsApp settings (migrated to hooks) |
 | `app/controllers/api/v1/accounts_controller.rb` | DONE | Removed WhatsApp params |
@@ -220,8 +220,8 @@ provisionInstance(phoneNumber, webhookSecret)
 | `app/javascript/dashboard/store/modules/integrations.js` | DONE | Add updateHook action/mutation |
 | `app/javascript/dashboard/store/mutation-types.js` | DONE | Add UPDATE_INTEGRATION_HOOK |
 | `WhatsappWeb/Index.vue` | DONE | Use hooks instead of account.settings |
-| `app/models/channel/whatsapp.rb` | TODO | Add teardown callback |
-| `WhatsappWebForm.vue` | TODO | Add provisioning toggle |
+| `app/models/channel/whatsapp.rb` | DONE | Add teardown callback |
+| `WhatsappWebForm.vue` | DONE | Add provisioning toggle |
 
 ---
 
@@ -263,11 +263,11 @@ User → Frontend → Backend → Admin API
 
 ## Implementation Progress
 
-- [x] Phase 1: Backend services (AdminApiClient, ProvisioningService)
+- [x] Phase 1: Backend services (AdminApiClient, ProvisioningService, TeardownService)
 - [x] Phase 2: Integration hook configuration (apps.yml schema)
 - [x] Phase 3: Gateway controller endpoints
 - [x] Phase 4: Frontend integrations page (WhatsappWeb/Index.vue)
-- [ ] Phase 5: Frontend inbox creation (WhatsappWebForm provisioning toggle)
-- [x] Phase 6: i18n translations (partial)
-- [ ] Instance teardown service
+- [x] Phase 5: Frontend inbox creation (WhatsappWebForm provisioning toggle)
+- [x] Phase 6: i18n translations (integrations.json, inboxMgmt.json, en.yml)
+- [x] Instance teardown service (with before_destroy callback)
 - [ ] Manual testing
