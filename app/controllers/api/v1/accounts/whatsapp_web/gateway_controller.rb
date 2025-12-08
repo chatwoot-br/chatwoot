@@ -1,4 +1,7 @@
 class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::BaseController
+  TempHook = Struct.new(:settings, keyword_init: true)
+  TempChannel = Struct.new(:provider_config, :phone_number, keyword_init: true)
+
   before_action :check_admin_authorization?, only: [:admin_api_status, :provision_instance, :available_instances]
   before_action :set_inbox, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
   before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
@@ -233,7 +236,7 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
       'basic_auth_password' => basic_auth_password
     }
 
-    temp_channel = OpenStruct.new(
+    temp_channel = TempChannel.new(
       provider_config: temp_config,
       phone_number: phone_number
     )
@@ -282,7 +285,7 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
 
   # Build a temporary admin client with provided credentials (for testing before saving)
   def build_temp_admin_client(base_url, api_token)
-    temp_hook = OpenStruct.new(
+    temp_hook = TempHook.new(
       settings: {
         'base_url' => base_url,
         'api_token' => api_token
