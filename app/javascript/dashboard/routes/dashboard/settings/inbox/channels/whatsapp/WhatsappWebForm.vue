@@ -43,7 +43,7 @@ const connectionStatus = ref(null);
 const isLoadingStatus = ref(false);
 const isDisconnecting = ref(false);
 const isReconnecting = ref(false);
-const connectionMode = ref('existing'); // 'existing' or 'provision'
+const connectionMode = ref('provision'); // 'existing' or 'provision'
 const adminApiConfigured = ref(false);
 const isCheckingAdminApi = ref(false);
 const isProvisioning = ref(false);
@@ -402,31 +402,6 @@ onMounted(() => {
         <label
           class="flex items-start p-3 border rounded-lg cursor-pointer transition-colors"
           :class="
-            connectionMode === 'existing'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
-          "
-        >
-          <input
-            v-model="connectionMode"
-            type="radio"
-            value="existing"
-            class="mt-1 mr-3"
-          />
-          <div>
-            <div class="font-medium text-slate-900 dark:text-slate-100">
-              {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_MODE.EXISTING') }}
-            </div>
-            <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">
-              {{
-                $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_MODE.EXISTING_DESC')
-              }}
-            </div>
-          </div>
-        </label>
-        <label
-          class="flex items-start p-3 border rounded-lg cursor-pointer transition-colors"
-          :class="
             connectionMode === 'provision'
               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
               : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
@@ -445,6 +420,31 @@ onMounted(() => {
             <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">
               {{
                 $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_MODE.PROVISION_DESC')
+              }}
+            </div>
+          </div>
+        </label>
+        <label
+          class="flex items-start p-3 border rounded-lg cursor-pointer transition-colors"
+          :class="
+            connectionMode === 'existing'
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+          "
+        >
+          <input
+            v-model="connectionMode"
+            type="radio"
+            value="existing"
+            class="mt-1 mr-3"
+          />
+          <div>
+            <div class="font-medium text-slate-900 dark:text-slate-100">
+              {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_MODE.EXISTING') }}
+            </div>
+            <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">
+              {{
+                $t('INBOX_MGMT.ADD.WHATSAPP_WEB.CONNECTION_MODE.EXISTING_DESC')
               }}
             </div>
           </div>
