@@ -414,6 +414,19 @@
           }
         },
         "SUBMIT_BUTTON": "Criar canal do WhatsApp Web",
+        "CONNECTION_MODE": {
+          "LABEL": "Modo de Conexão",
+          "EXISTING": "Conectar a instância existente",
+          "EXISTING_DESC": "Conectar a um gateway WhatsApp já configurado",
+          "PROVISION": "Provisionar nova instância",
+          "PROVISION_DESC": "Criar automaticamente uma nova instância do WhatsApp"
+        },
+        "PROVISIONING": {
+          "IN_PROGRESS": "Criando nova instância...",
+          "SUCCESS": "Instância criada com sucesso",
+          "ERROR": "Falha ao criar instância",
+          "NO_PORTS": "Não há portas disponíveis no intervalo configurado. Entre em contato com seu administrador."
+        },
         "API": {
           "ERROR_MESSAGE": "Não foi possível salvar o canal do WhatsApp Web"
         }

@@ -1,6 +1,10 @@
 class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::BaseController
-  before_action :set_inbox, except: [:test_connection, :test_devices]
-  before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices]
+  TempHook = Struct.new(:settings, keyword_init: true)
+  TempChannel = Struct.new(:provider_config, :phone_number, keyword_init: true)
+
+  before_action :check_admin_authorization?, only: [:admin_api_status, :provision_instance, :available_instances]
+  before_action :set_inbox, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
+  before_action :ensure_whatsapp_web_channel, except: [:test_connection, :test_devices, :admin_api_status, :provision_instance, :available_instances]
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/gateway/test_connection
   def test_connection
@@ -49,6 +53,61 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     render json: { success: true, data: result }
   rescue StandardError => e
     Rails.logger.error "[WHATSAPP_WEB] Test devices error: #{e.message}"
+    render json: { success: false, error: e.message }, status: :unprocessable_entity
+  end
+
+  # GET/POST /api/v1/accounts/:account_id/whatsapp_web/gateway/admin_api_status
+  # When called with params, tests those values directly (before saving)
+  # When called without params, checks saved account settings
+  def admin_api_status
+    result = build_admin_api_status_response
+    render json: result
+  rescue StandardError => e
+    render json: { configured: false, healthy: false, error: e.message }
+  end
+
+  # POST /api/v1/accounts/:account_id/whatsapp_web/gateway/provision_instance
+  def provision_instance
+    phone_number = params[:phone_number]
+    webhook_secret = SecureRandom.uuid
+
+    if phone_number.blank?
+      render json: { success: false, error: 'Phone number is required' }, status: :bad_request
+      return
+    end
+
+    if whatsapp_hook.blank?
+      render json: { success: false, error: 'WhatsApp Admin API not configured' }, status: :bad_request
+      return
+    end
+
+    service = Whatsapp::InstanceProvisioningService.new(whatsapp_hook)
+    result = service.provision(phone_number: phone_number, webhook_secret: webhook_secret)
+
+    render json: { success: true, data: result }
+  rescue Whatsapp::AdminApiClient::NotConfiguredError => e
+    render json: { success: false, error: e.message }, status: :bad_request
+  rescue Whatsapp::InstanceProvisioningService::NoPortsAvailableError => e
+    render json: { success: false, error: e.message }, status: :service_unavailable
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP] Provision instance error: #{e.message}"
+    render json: { success: false, error: e.message }, status: :unprocessable_entity
+  end
+
+  # GET /api/v1/accounts/:account_id/whatsapp_web/gateway/available_instances
+  def available_instances
+    if whatsapp_hook.blank?
+      render json: { success: false, error: 'WhatsApp Admin API not configured' }, status: :bad_request
+      return
+    end
+
+    client = Whatsapp::AdminApiClient.new(whatsapp_hook)
+    instances = client.list_instances
+
+    render json: { success: true, data: instances }
+  rescue Whatsapp::AdminApiClient::NotConfiguredError => e
+    render json: { success: false, error: e.message }, status: :bad_request
+  rescue StandardError => e
     render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 
@@ -162,6 +221,10 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     render json: { error: 'Inbox must be a WhatsApp Web channel' }, status: :bad_request
   end
 
+  def whatsapp_hook
+    @whatsapp_hook ||= Current.account.hooks.find_by(app_id: 'whatsapp_web')
+  end
+
   def gateway_params
     params.permit(:id, :inbox_id, :phone, :path, :gateway_base_url, :basic_auth_user, :basic_auth_password, :phone_number)
   end
@@ -173,7 +236,7 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
       'basic_auth_password' => basic_auth_password
     }
 
-    temp_channel = OpenStruct.new(
+    temp_channel = TempChannel.new(
       provider_config: temp_config,
       phone_number: phone_number
     )
@@ -181,5 +244,60 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     Whatsapp::Providers::WhatsappWebService.new(
       whatsapp_channel: temp_channel
     )
+  end
+
+  def build_admin_api_status_response
+    # If params provided, test with those (before saving)
+    # Otherwise, read from existing hook settings
+    hook_settings = whatsapp_hook&.settings || {}
+    base_url = params[:base_url].presence || hook_settings['base_url']
+    api_token = params[:api_token].presence || hook_settings['api_token']
+    configured = base_url.present? && api_token.present?
+
+    client = configured ? build_temp_admin_client(base_url, api_token) : nil
+    healthy = configured && test_admin_api_connection(client)
+    available_ports = healthy ? calculate_available_ports(client) : 0
+
+    {
+      configured: configured,
+      healthy: healthy,
+      available_ports: available_ports,
+      port_range: hook_port_range
+    }
+  end
+
+  def hook_port_range
+    hook_settings = whatsapp_hook&.settings || {}
+    {
+      start: hook_settings['port_range_start'] || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_START,
+      end: hook_settings['port_range_end'] || Whatsapp::InstanceProvisioningService::DEFAULT_PORT_RANGE_END
+    }
+  end
+
+  def calculate_available_ports(client)
+    instances = client.list_instances
+    used_count = instances.is_a?(Array) ? instances.length : 0
+    range = hook_port_range
+    (range[:end] - range[:start] + 1) - used_count
+  rescue StandardError
+    0
+  end
+
+  # Build a temporary admin client with provided credentials (for testing before saving)
+  def build_temp_admin_client(base_url, api_token)
+    temp_hook = TempHook.new(
+      settings: {
+        'base_url' => base_url,
+        'api_token' => api_token
+      }
+    )
+    Whatsapp::AdminApiClient.new(temp_hook)
+  end
+
+  # Test connection using the AdminApiClient
+  def test_admin_api_connection(client)
+    client.health_check
+  rescue StandardError
+    false
   end
 end

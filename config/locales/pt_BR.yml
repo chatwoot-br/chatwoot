@@ -299,6 +299,10 @@ pt_BR:
       name: 'LeadSquared'
       short_description: 'Sincronize seus contatos e conversas com LeadSquared CRM.'
       description: 'Sincronize seus contatos e conversas com LeadSquared CRM. Essa integração cria automaticamente leads em LeadSquared quando novos contatos são adicionados, e registra a atividade de conversação para fornecer à sua equipe de vendas um contexto completo.'
+    whatsapp_web:
+      name: 'Gerenciamento de Instâncias WhatsApp'
+      short_description: 'Configure a API Admin para provisionar automaticamente instâncias do WhatsApp.'
+      description: 'Configure a API Admin para provisionar automaticamente instâncias do WhatsApp ao criar novas caixas de entrada. Gerencie intervalos de portas e teste o status da conexão.'
   captain:
     copilot_message_required: A mensagem é obrigatória
     copilot_error: 'Conecte com um assistente a esta caixa de entrada para usar Copilot'

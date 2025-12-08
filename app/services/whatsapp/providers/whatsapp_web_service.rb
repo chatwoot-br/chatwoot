@@ -36,11 +36,12 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def validate_provider_config?
-    response = HTTParty.get("#{api_path}/app/status", headers: api_headers)
-    Rails.logger.debug { "[WHATSAPP] Webhook setup response: #{response.inspect}" }
+    # Use the full api_path with phone number - /app/devices works even without WhatsApp connection
+    response = HTTParty.get("#{api_path}/app/devices", headers: api_headers, timeout: 10)
+    Rails.logger.debug { "[WHATSAPP] Provider config validation response: #{response.inspect}" }
     response.success?
   rescue StandardError => e
-    Rails.logger.error "[WHATSAPP] Webhook setup failed: #{e.message}"
+    Rails.logger.error "[WHATSAPP] Provider config validation failed: #{e.message}"
     false
   end
 

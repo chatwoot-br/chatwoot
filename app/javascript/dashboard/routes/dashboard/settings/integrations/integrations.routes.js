@@ -10,6 +10,7 @@ import SettingsContent from '../Wrapper.vue';
 import Linear from './Linear.vue';
 import Notion from './Notion.vue';
 import Shopify from './Shopify.vue';
+import WhatsappWeb from './WhatsappWeb/Index.vue';
 
 export default {
   routes: [
@@ -109,6 +110,15 @@ export default {
             permissions: ['administrator'],
           },
           props: route => ({ error: route.query.error }),
+        },
+        {
+          path: 'whatsapp_web',
+          name: 'settings_integrations_whatsapp_web',
+          component: WhatsappWeb,
+          meta: {
+            featureFlag: FEATURE_FLAGS.INTEGRATIONS,
+            permissions: ['administrator'],
+          },
         },
         {
           path: ':integration_id',

@@ -324,6 +324,10 @@ en:
       name: 'LeadSquared'
       short_description: 'Sync your contacts and conversations with LeadSquared CRM.'
       description: 'Sync your contacts and conversations with LeadSquared CRM. This integration automatically creates leads in LeadSquared when new contacts are added, and logs conversation activity to provide your sales team with complete context.'
+    whatsapp_web:
+      name: 'WhatsApp Instance Management'
+      short_description: 'Configure Admin API to auto-provision WhatsApp instances.'
+      description: 'Configure the Admin API to automatically provision WhatsApp instances when creating new inboxes. Manage port ranges and test connection status.'
   captain:
     copilot_message_required: Message is required
     copilot_error: 'Please connect an assistant to this inbox to use Copilot'
