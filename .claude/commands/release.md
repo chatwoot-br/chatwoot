@@ -12,6 +12,10 @@ Follow these steps:
    - **Upstream sync**: Use new upstream version + reset fork rev to 1 (e.g., `v4.9.0+1`)
    - **Fork-only**: Keep upstream version + increment fork rev (e.g., `v4.8.0+1` → `v4.8.0+2`)
 
+   **Chart version:** Check if any changes touch `charts/` directory (templates, values, helpers).
+   - If chart files changed: bump chart version (e.g., `4.8.0` → `4.8.1`)
+   - If only app code changed: keep chart version unchanged
+
 2. **Run pre-release checks**:
    - Run Ruby tests: `bundle exec rspec`
    - Run JS tests: `pnpm test`
@@ -22,9 +26,9 @@ Follow these steps:
    - `VERSION_CW` line 1: `X.Y.Z+N` (e.g., `4.8.0+1`)
    - `VERSION_CWCTL` line 1: `X.Y.Z+N` (e.g., `4.8.0+1`)
    - `package.json` line 3: `"version": "X.Y.Z"` (base version only, no +N)
-   - `charts/chatwoot/Chart.yaml` line 32: `version: X.Y.Z` (upstream version)
+   - `charts/chatwoot/Chart.yaml` line 32: `version: X.Y.Z` (chart version - bump if chart files changed)
    - `charts/chatwoot/Chart.yaml` line 35: `appVersion: "vX.Y.Z-N"` (use `-` not `+` for Docker)
-   - `charts/chatwoot/values.yaml` line 7: `tag: vX.Y.Z-N` (use `-` not `+` for Docker)
+   - `charts/chatwoot/values.yaml` line 8: `# tag: vX.Y.Z-N` (use `-` not `+` for Docker)
 
 4. **Update CHANGELOG.md** at the top with the new version section:
 
