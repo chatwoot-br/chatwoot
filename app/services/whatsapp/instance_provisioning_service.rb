@@ -63,7 +63,7 @@ class Whatsapp::InstanceProvisioningService
           base_path: "/#{clean_phone}"
         )
 
-        wait_for_running(port, clean_phone)
+        wait_for_running(port, clean_phone, basic_auth: basic_auth[:combined])
         return port
       rescue Whatsapp::AdminApiClient::ConflictError => e
         retries += 1
@@ -113,7 +113,7 @@ class Whatsapp::InstanceProvisioningService
     "#{uri.scheme}://#{uri.host}:#{port}"
   end
 
-  def wait_for_running(port, phone_path, timeout: INSTANCE_RUNNING_TIMEOUT, interval: 2)
+  def wait_for_running(port, phone_path, basic_auth:, timeout: INSTANCE_RUNNING_TIMEOUT, interval: 2)
     Rails.logger.info "[WHATSAPP] Waiting for instance on port #{port} to become RUNNING"
     start_time = Time.current
     max_time = start_time + timeout.seconds
@@ -124,7 +124,7 @@ class Whatsapp::InstanceProvisioningService
       if instance['state'] == 'RUNNING'
         Rails.logger.info "[WHATSAPP] Instance on port #{port} is now RUNNING"
         # Wait for gateway to actually be ready to accept connections
-        wait_for_gateway_ready(port, phone_path)
+        wait_for_gateway_ready(port, phone_path, basic_auth: basic_auth)
         return true
       end
 
@@ -137,7 +137,7 @@ class Whatsapp::InstanceProvisioningService
     end
   end
 
-  def wait_for_gateway_ready(port, phone_path, timeout: GATEWAY_READY_TIMEOUT, interval: 1)
+  def wait_for_gateway_ready(port, phone_path, basic_auth:, timeout: GATEWAY_READY_TIMEOUT, interval: 1)
     gateway_url = build_gateway_url(port)
     check_url = "#{gateway_url}/#{phone_path}/app/devices"
     Rails.logger.info "[WHATSAPP] Waiting for gateway at #{check_url} to accept connections"
@@ -145,9 +145,12 @@ class Whatsapp::InstanceProvisioningService
     start_time = Time.current
     max_time = start_time + timeout.seconds
 
+    headers = {}
+    headers['Authorization'] = "Basic #{Base64.strict_encode64(basic_auth)}" if basic_auth.present?
+
     loop do
       begin
-        response = HTTParty.get(check_url, timeout: HTTP_TIMEOUT)
+        response = HTTParty.get(check_url, headers: headers, timeout: HTTP_TIMEOUT)
         if response.success?
           Rails.logger.info "[WHATSAPP] Gateway at #{check_url} is ready"
           return true
