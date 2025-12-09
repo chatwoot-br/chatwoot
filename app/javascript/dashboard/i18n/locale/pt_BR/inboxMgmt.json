@@ -366,6 +366,10 @@
           "LABEL": "Incluir assinatura do agente nas mensagens",
           "HELP_TEXT": "Adicionar nome de exibição do agente às mensagens enviadas (ex: *Nome de Exibição:* conteúdo da mensagem)"
         },
+        "IGNORE_GROUP_MESSAGES": {
+          "LABEL": "Ignorar mensagens de grupos",
+          "HELP_TEXT": "Ignorar o processamento de mensagens recebidas de grupos do WhatsApp"
+        },
         "CONNECTION_STATUS": {
           "LABEL": "Status da Conexão",
           "REFRESH": "Atualizar",

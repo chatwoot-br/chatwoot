@@ -146,7 +146,18 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     case event_type
     when 'message.ack'
       normalize_receipt_payload
-    when 'message', 'group.message'
+    when 'message'
+      # Only process if we have valid message data
+      return {}.with_indifferent_access if payload_data[:message].blank? && payload_data[:text].blank?
+
+      normalize_message_payload
+    when 'group.message'
+      # Check if group messages should be ignored
+      if inbox.channel.provider_config['ignore_group_messages'] == true
+        Rails.logger.debug { 'WhatsApp Web: Ignoring group message per inbox configuration' }
+        return {}.with_indifferent_access
+      end
+
       # Only process if we have valid message data
       return {}.with_indifferent_access if payload_data[:message].blank? && payload_data[:text].blank?
 

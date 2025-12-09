@@ -38,6 +38,7 @@ const basicAuthUser = ref('');
 const basicAuthPassword = ref('');
 const webhookSecret = ref('');
 const includeSignature = ref(true);
+const ignoreGroupMessages = ref(false);
 const showQRModal = ref(false);
 const connectionStatus = ref(null);
 const isLoadingStatus = ref(false);
@@ -197,6 +198,8 @@ const setDefaults = inbox => {
     basicAuthPassword.value = inbox.provider_config.basic_auth_password || '';
     webhookSecret.value = inbox.provider_config.webhook_secret || '';
     includeSignature.value = inbox.provider_config.include_signature !== false;
+    ignoreGroupMessages.value =
+      inbox.provider_config.ignore_group_messages === true;
   }
 };
 
@@ -301,6 +304,7 @@ const handleSubmit = async () => {
   const providerConfig = {
     gateway_base_url: gatewayBaseUrl.value,
     include_signature: includeSignature.value,
+    ignore_group_messages: ignoreGroupMessages.value,
   };
 
   if (basicAuthUser.value && basicAuthPassword.value) {
@@ -580,6 +584,18 @@ onMounted(() => {
       </label>
       <p class="text-xs text-slate-11 mt-1">
         {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.INCLUDE_SIGNATURE.HELP_TEXT') }}
+      </p>
+    </div>
+
+    <div class="flex-shrink-0 flex-grow-0">
+      <label class="flex items-center">
+        <input v-model="ignoreGroupMessages" type="checkbox" class="mr-2" />
+        <span>
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.IGNORE_GROUP_MESSAGES.LABEL') }}
+        </span>
+      </label>
+      <p class="text-xs text-slate-11 mt-1">
+        {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.IGNORE_GROUP_MESSAGES.HELP_TEXT') }}
       </p>
     </div>
 

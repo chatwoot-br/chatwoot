@@ -366,6 +366,10 @@
           "LABEL": "Include agent signature in messages",
           "HELP_TEXT": "Add agent's display name to outgoing messages (e.g., *Display Name:* message content)"
         },
+        "IGNORE_GROUP_MESSAGES": {
+          "LABEL": "Ignore messages from groups",
+          "HELP_TEXT": "Skip processing of incoming messages from WhatsApp groups"
+        },
         "CONNECTION_STATUS": {
           "LABEL": "Connection Status",
           "REFRESH": "Refresh",
