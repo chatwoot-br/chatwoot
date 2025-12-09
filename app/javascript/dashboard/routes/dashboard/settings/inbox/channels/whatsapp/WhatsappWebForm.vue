@@ -149,6 +149,10 @@ const showConnectionModeToggle = computed(() => {
 });
 
 const isProvisioningMode = computed(() => {
+  // In edit mode, always show gateway fields so users can update them
+  if (props.mode === 'edit') {
+    return false;
+  }
   return connectionMode.value === 'provision';
 });
 
