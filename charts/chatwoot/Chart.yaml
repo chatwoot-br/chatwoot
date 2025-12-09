@@ -32,4 +32,4 @@ sources:
 version: 4.8.1
 
 # This is the application version (use - for Docker tag compatibility).
-appVersion: "v4.8.0-2"
+appVersion: "v4.8.0-3"
