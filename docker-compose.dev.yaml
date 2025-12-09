@@ -41,7 +41,7 @@ services:
 
   # Evolution API Database Migration Init Container
   evolution-migration:
-    image: ghcr.io/chatwoot-br/evolution-api:next
+    image: ghcr.io/chatwoot-br/evolution-api:v2.3
     environment:
       - DOCKER_ENV=true
       - DATABASE_ENABLED=true
@@ -63,7 +63,7 @@ services:
 
   # Evolution API - WhatsApp Integration Service (Chatwoot BR Fork)
   evolution-api:
-    image: ghcr.io/chatwoot-br/evolution-api:next
+    image: ghcr.io/chatwoot-br/evolution-api:v2.3
     restart: always
     ports:
       - '8080:8080'
@@ -155,8 +155,8 @@ services:
     container_name: chatwoot-whatsapp-dev
     restart: unless-stopped
     ports:
-      # WhatsApp API and Web UI (using 3001 to avoid conflict with Chatwoot backend on 3000)
-      - '3001:3001'
+      # WhatsApp API and Web UI (using 3100 to avoid conflict with Chatwoot backend on 3000)
+      - '3100:3100'
     volumes:
       # Persistent storage for WhatsApp session data and media
       - whatsapp_storage:/app/storages
