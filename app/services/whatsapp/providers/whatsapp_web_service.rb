@@ -522,9 +522,9 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def fetch_messages(chat_jid:, limit: 50, offset: 0)
-    encoded_jid = URI.encode_www_form_component(chat_jid)
+    # JID should NOT be URL encoded - the API expects it as-is
     response = HTTParty.get(
-      "#{api_path}/chat/#{encoded_jid}/messages",
+      "#{api_path}/chat/#{chat_jid}/messages",
       headers: api_headers,
       query: { limit: limit, offset: offset },
       timeout: 30
