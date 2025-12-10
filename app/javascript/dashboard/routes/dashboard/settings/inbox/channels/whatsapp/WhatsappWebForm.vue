@@ -462,7 +462,9 @@ const syncHistory = async () => {
     useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
     // Start polling for completion
     setTimeout(pollSyncStatus, 2000);
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('History sync failed:', error);
     syncStatus.value = 'failed';
     isSyncing.value = false;
     useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.ERROR'));

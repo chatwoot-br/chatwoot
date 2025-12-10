@@ -1,9 +1,10 @@
 # Service to import historical messages from WhatsApp Web API
 # Used for syncing message history when a WhatsApp number connects
-# rubocop:disable Metrics
+# rubocop:disable Metrics/ClassLength
 class Whatsapp::MessageImportService
   BATCH_SIZE = 50
   MAX_CHATS = 100
+  MAX_MESSAGES_PER_CHAT = 1000
 
   attr_reader :inbox, :channel, :stats
 
@@ -13,6 +14,7 @@ class Whatsapp::MessageImportService
     @gateway_service = Whatsapp::Providers::WhatsappWebService.new(whatsapp_channel: @channel)
     @stats = { chats_processed: 0, messages_imported: 0, messages_skipped: 0, errors: [] }
     @company_contact = nil
+    @sender_contacts_cache = {}
   end
 
   def perform
@@ -240,7 +242,7 @@ class Whatsapp::MessageImportService
       offset += BATCH_SIZE
 
       # Safety limit to prevent infinite loops
-      break if offset >= 1000
+      break if offset >= MAX_MESSAGES_PER_CHAT
     end
 
     # Update conversation timestamps to match imported messages
@@ -453,6 +455,10 @@ class Whatsapp::MessageImportService
   def normalize_media_path(path)
     return path if path.blank?
 
+    # Validate path to prevent path traversal attacks
+    raise ArgumentError, 'Invalid path: contains ..' if path.include?('..')
+    raise ArgumentError, 'Invalid path: must start with /statics/ or /PHONE/statics/' unless path.match?(%r{^(/\d+)?/statics/})
+
     # Match pattern: /PHONE_NUMBER/statics/... or /PHONE_NUMBER/...
     # Strip the phone number prefix (digits only) from the start
     normalized = path.sub(%r{^/\d+/}, '/')
@@ -530,10 +536,14 @@ class Whatsapp::MessageImportService
     clean_jid = sender_jid.split(':').first
     clean_jid = "#{clean_jid}@s.whatsapp.net" unless clean_jid.include?('@')
 
+    # Check cache first to avoid N+1 queries
+    return @sender_contacts_cache[clean_jid] if @sender_contacts_cache.key?(clean_jid)
+
     # Check if contact already exists
     existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: clean_jid)
     if existing_contact_inbox
       enqueue_avatar_fetch(existing_contact_inbox.contact, clean_jid)
+      @sender_contacts_cache[clean_jid] = existing_contact_inbox.contact
       return existing_contact_inbox.contact
     end
 
@@ -549,6 +559,7 @@ class Whatsapp::MessageImportService
     ).perform
 
     enqueue_avatar_fetch(contact_inbox.contact, clean_jid)
+    @sender_contacts_cache[clean_jid] = contact_inbox.contact
     contact_inbox.contact
   end
 
@@ -624,4 +635,4 @@ class Whatsapp::MessageImportService
     )
   end
 end
-# rubocop:enable Metrics
+# rubocop:enable Metrics/ClassLength
