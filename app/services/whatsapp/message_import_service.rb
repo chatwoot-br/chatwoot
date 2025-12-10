@@ -183,6 +183,11 @@ class Whatsapp::MessageImportService
     attach_media(message, message_data) if media?(message_data)
 
     message.save!
+
+    # Preserve original timestamp after save (bypasses callbacks)
+    # rubocop:disable Rails/SkipsModelValidations
+    message.update_columns(created_at: timestamp) if timestamp.present?
+    # rubocop:enable Rails/SkipsModelValidations
     @stats[:messages_imported] += 1
   rescue StandardError => e
     Rails.logger.error "[HISTORY_SYNC] Error importing message #{source_id}: #{e.message}"
