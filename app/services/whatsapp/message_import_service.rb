@@ -242,13 +242,16 @@ class Whatsapp::MessageImportService
     file = download_media(media_url)
     return unless file
 
+    # Infer content type from media_type/filename since CDN returns octet-stream
+    content_type = infer_content_type(media_type, filename, file.content_type)
+
     message.attachments.new(
       account_id: message.account_id,
       file_type: file_content_type(media_type),
       file: {
         io: file,
         filename: filename,
-        content_type: file.content_type
+        content_type: content_type
       }
     )
   rescue StandardError => e
@@ -258,10 +261,26 @@ class Whatsapp::MessageImportService
   def download_media(url)
     # Build full URL if relative path
     full_url = url.start_with?('http') ? url : @channel.media_url(url)
-    Down.download(full_url, headers: @channel.api_headers)
+    Down.download(full_url)
   rescue StandardError => e
     Rails.logger.warn "[HISTORY_SYNC] Media download failed for #{url}: #{e.message}"
     nil
+  end
+
+  def infer_content_type(media_type, filename, fallback)
+    # Try to infer from filename extension first
+    ext = File.extname(filename).downcase.delete('.')
+    mime_from_ext = Rack::Mime.mime_type(".#{ext}", nil) if ext.present?
+    return mime_from_ext if mime_from_ext.present?
+
+    # Infer from media_type
+    case media_type.to_s.downcase
+    when 'image' then 'image/jpeg'
+    when 'video' then 'video/mp4'
+    when 'audio', 'voice' then 'audio/ogg'
+    when 'sticker' then 'image/webp'
+    else fallback || 'application/octet-stream'
+    end
   end
 
   def file_content_type(media_type)
