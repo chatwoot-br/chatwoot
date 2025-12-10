@@ -88,11 +88,13 @@ class Whatsapp::MessageImportService
                            build_contact_attributes(jid, chat)
                          end
 
-    contact_inbox = ContactInboxWithContactBuilder.new(
-      source_id: jid,
-      inbox: inbox,
-      contact_attributes: contact_attributes
-    ).perform
+    # For individuals, search with both formats to find existing contact_inbox
+    # (digits only from outgoing, full identifier from older imports)
+    contact_inbox = if is_group
+                      find_or_create_group_contact_inbox(jid, contact_attributes)
+                    else
+                      find_or_create_individual_contact_inbox(jid, contact_attributes)
+                    end
 
     # Update existing contacts if they have a fallback name
     update_contact_name_if_needed(contact_inbox.contact, contact_attributes, is_group)
@@ -101,6 +103,31 @@ class Whatsapp::MessageImportService
     fetch_and_attach_avatar(contact_inbox.contact, jid)
 
     contact_inbox
+  end
+
+  def find_or_create_individual_contact_inbox(jid, contact_attributes)
+    raw_phone = jid.to_s.gsub(/\D/, '')
+
+    # Check if contact_inbox already exists with either format
+    existing = inbox.contact_inboxes.find_by(source_id: raw_phone)
+    existing ||= inbox.contact_inboxes.find_by(source_id: jid)
+    return existing if existing
+
+    # Use digits-only format for new contact_inboxes (matches outgoing message format)
+    ContactInboxWithContactBuilder.new(
+      source_id: raw_phone,
+      inbox: inbox,
+      contact_attributes: contact_attributes
+    ).perform
+  end
+
+  def find_or_create_group_contact_inbox(jid, contact_attributes)
+    # Groups use full identifier as source_id
+    ContactInboxWithContactBuilder.new(
+      source_id: jid,
+      inbox: inbox,
+      contact_attributes: contact_attributes
+    ).perform
   end
 
   def update_contact_name_if_needed(contact, attributes, is_group)
