@@ -155,7 +155,7 @@ const showSyncButton = computed(() => {
 
 const syncStatusText = computed(() => {
   if (isSyncing.value) return 'IN_PROGRESS';
-  if (!syncStatus.value) return 'NEVER';
+  if (!syncStatus.value || syncStatus.value === 'not_started') return 'NEVER';
   return syncStatus.value.toUpperCase();
 });
 
@@ -334,10 +334,16 @@ const handleSubmit = async () => {
   }
 
   // Build provider_config, omitting optional Basic Auth if left blank
+  // Preserve existing sync status fields that shouldn't be overwritten by form submission
+  const existingConfig = props.inbox?.provider_config || {};
   const providerConfig = {
     gateway_base_url: gatewayBaseUrl.value,
     include_signature: includeSignature.value,
     ignore_group_messages: ignoreGroupMessages.value,
+    // Preserve sync-related fields
+    history_sync_status: existingConfig.history_sync_status,
+    history_sync_at: existingConfig.history_sync_at,
+    history_sync_stats: existingConfig.history_sync_stats,
   };
 
   if (basicAuthUser.value && basicAuthPassword.value) {
