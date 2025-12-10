@@ -104,15 +104,20 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def group_avatar_url(group_jid)
+    # Try to get group avatar - some gateways may not support this endpoint
     response = HTTParty.get(
       "#{api_path}/group/avatar",
       headers: api_headers,
-      query: { group_id: group_jid, is_preview: true }
+      query: { group_id: group_jid, is_preview: true },
+      timeout: 10
     )
 
-    raise StandardError, "Gateway group avatar failed: #{response.message}" unless response.success?
+    return nil unless response.success?
 
     response.dig('results', 'url')
+  rescue StandardError => e
+    Rails.logger.debug { "WhatsApp Web: Group avatar not available for #{group_jid}: #{e.message}" }
+    nil
   end
 
   def contact_info(identifier)
