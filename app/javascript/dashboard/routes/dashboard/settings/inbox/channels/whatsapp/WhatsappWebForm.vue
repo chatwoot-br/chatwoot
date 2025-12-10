@@ -234,7 +234,8 @@ const setDefaults = inbox => {
     ignoreGroupMessages.value =
       inbox.provider_config.ignore_group_messages === true;
 
-    // Load sync status from provider config
+    // Load sync status from provider config as initial values
+    // The actual current status will be fetched via checkSyncStatus()
     syncStatus.value = inbox.provider_config.history_sync_status || null;
     lastSyncAt.value = inbox.provider_config.history_sync_at || null;
     syncStats.value = inbox.provider_config.history_sync_stats || null;
@@ -265,22 +266,6 @@ const checkConnectionStatus = async () => {
     connectionStatus.value = { code: 'ERROR', error: error.message };
   } finally {
     isLoadingStatus.value = false;
-  }
-};
-
-const handleWhatsAppConnected = async () => {
-  closeQRModal();
-  // Refresh the connection status after successful connection
-  await checkConnectionStatus();
-
-  // Trigger history sync when WhatsApp connects
-  if (props.inbox?.id) {
-    try {
-      await WhatsappWebGatewayApi.syncHistory(props.inbox.id);
-      useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
-    } catch {
-      // History sync is non-critical, silently fail
-    }
   }
 };
 
@@ -452,6 +437,47 @@ const pollSyncStatus = async () => {
   }
 };
 
+const checkSyncStatus = async () => {
+  if (props.mode !== 'edit' || !props.inbox?.id) return;
+
+  try {
+    const { data } = await WhatsappWebGatewayApi.getSyncStatus(props.inbox.id);
+    syncStatus.value = data.status;
+    lastSyncAt.value = data.synced_at;
+    syncStats.value = data.stats;
+
+    // Only start polling if sync is genuinely in progress
+    if (data.status === 'in_progress') {
+      isSyncing.value = true;
+      setTimeout(pollSyncStatus, 2000);
+    }
+  } catch {
+    // Sync status check failed, use values from inbox prop
+  }
+};
+
+const handleWhatsAppConnected = async () => {
+  closeQRModal();
+  // Refresh the connection status after successful connection
+  await checkConnectionStatus();
+
+  // Trigger history sync when WhatsApp connects
+  if (props.inbox?.id) {
+    try {
+      isSyncing.value = true;
+      syncStatus.value = 'in_progress';
+      await WhatsappWebGatewayApi.syncHistory(props.inbox.id);
+      useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
+      // Start polling for sync completion
+      setTimeout(pollSyncStatus, 2000);
+    } catch {
+      // History sync is non-critical, silently fail
+      isSyncing.value = false;
+      syncStatus.value = null;
+    }
+  }
+};
+
 const syncHistory = async () => {
   if (!props.inbox?.id) return;
 
@@ -477,6 +503,7 @@ watch(
     if (newInbox && props.mode === 'edit') {
       setDefaults(newInbox);
       checkConnectionStatus();
+      checkSyncStatus();
     }
   },
   { immediate: true }

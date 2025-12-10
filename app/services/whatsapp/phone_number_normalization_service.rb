@@ -24,9 +24,15 @@ class Whatsapp::PhoneNumberNormalizationService
 
     # Format for provider and check for existing contact
     provider_format = format_for_provider(normalized_clean_number, provider)
+
+    # Try normalized format first
     existing_contact_inbox = find_existing_contact_inbox(provider_format)
 
-    existing_contact_inbox&.source_id || raw_number
+    # Fallback: try raw format if normalized not found (handles legacy data)
+    existing_contact_inbox ||= find_existing_contact_inbox(raw_number) if raw_number != provider_format
+
+    # Always return normalized format for new contacts to ensure consistent storage
+    existing_contact_inbox&.source_id || provider_format
   end
 
   private
