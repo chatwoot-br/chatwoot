@@ -51,6 +51,10 @@ const isProvisioning = ref(false);
 const provisionedPort = ref(null);
 const provisionedWebhookSecret = ref(null);
 const isProvisionedInstance = ref(false);
+const isSyncing = ref(false);
+const syncStatus = ref(null);
+const syncStats = ref(null);
+const lastSyncAt = ref(null);
 
 const gatewayConfig = computed(() => ({
   gatewayBaseUrl: gatewayBaseUrl.value,
@@ -145,6 +149,34 @@ const showReconnectButton = computed(() => {
   );
 });
 
+const showSyncButton = computed(() => {
+  return connectionStatusText.value === 'CONNECTED';
+});
+
+const syncStatusText = computed(() => {
+  if (isSyncing.value) return 'IN_PROGRESS';
+  if (!syncStatus.value) return 'NEVER';
+  return syncStatus.value.toUpperCase();
+});
+
+const syncStatusColor = computed(() => {
+  switch (syncStatusText.value) {
+    case 'COMPLETED':
+      return 'text-violet-600 bg-violet-50 border-violet-200 dark:text-violet-400 dark:bg-violet-900/20 dark:border-violet-800';
+    case 'IN_PROGRESS':
+      return 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/20 dark:border-blue-800';
+    case 'FAILED':
+      return 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/20 dark:border-red-800';
+    default:
+      return 'text-slate-500 bg-slate-50 border-slate-200 dark:text-slate-400 dark:bg-slate-800/50 dark:border-slate-700';
+  }
+});
+
+const syncStatusLabel = computed(() => {
+  const statusKey = syncStatusText.value;
+  return t(`INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STATUS.${statusKey}`);
+});
+
 const showConnectionModeToggle = computed(() => {
   return props.mode === 'create' && adminApiConfigured.value;
 });
@@ -200,6 +232,11 @@ const setDefaults = inbox => {
     includeSignature.value = inbox.provider_config.include_signature !== false;
     ignoreGroupMessages.value =
       inbox.provider_config.ignore_group_messages === true;
+
+    // Load sync status from provider config
+    syncStatus.value = inbox.provider_config.history_sync_status || null;
+    lastSyncAt.value = inbox.provider_config.history_sync_at || null;
+    syncStats.value = inbox.provider_config.history_sync_stats || null;
   }
 };
 
@@ -383,6 +420,22 @@ const reconnectWhatsApp = async () => {
     useAlert(error.message || t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.ERROR'));
   } finally {
     isReconnecting.value = false;
+  }
+};
+
+const syncHistory = async () => {
+  if (!props.inbox?.id) return;
+
+  isSyncing.value = true;
+  syncStatus.value = 'in_progress';
+  try {
+    await WhatsappWebGatewayApi.syncHistory(props.inbox.id);
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
+  } catch {
+    syncStatus.value = 'failed';
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.ERROR'));
+  } finally {
+    isSyncing.value = false;
   }
 };
 
@@ -641,6 +694,45 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Message Sync Status (only in edit mode when connected) -->
+    <div
+      v-if="mode === 'edit' && showSyncButton"
+      class="flex-shrink-0 flex-grow-0 mb-4"
+    >
+      <div class="flex items-center mb-2">
+        <span class="text-sm font-medium text-slate-12">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STATUS.LABEL') }}
+        </span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div
+          class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border"
+          :class="syncStatusColor"
+        >
+          <span
+            v-if="isSyncing"
+            class="inline-block w-3 h-3 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"
+          />
+          <span v-else class="w-2 h-2 mr-2 rounded-full bg-current" />
+          {{ syncStatusLabel }}
+        </div>
+        <span
+          v-if="syncStats?.messages_imported"
+          class="text-xs text-slate-500 dark:text-slate-400"
+        >
+          {{ syncStats.messages_imported }}
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STATS.MESSAGES') }}
+        </span>
+      </div>
+      <p
+        v-if="lastSyncAt"
+        class="text-xs text-slate-500 dark:text-slate-400 mt-1"
+      >
+        {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.LAST_SYNC') }}
+        {{ new Date(lastSyncAt).toLocaleString() }}
+      </p>
+    </div>
+
     <div class="flex gap-2 mt-4">
       <!-- Connect Button (QR Code) -->
       <NextButton
@@ -679,6 +771,19 @@ onMounted(() => {
         :label="$t('INBOX_MGMT.ADD.WHATSAPP_WEB.RECONNECT.TITLE')"
         :is-loading="isReconnecting"
         @click="reconnectWhatsApp"
+      />
+
+      <!-- Sync History Button -->
+      <NextButton
+        v-if="mode === 'edit' && showSyncButton"
+        type="button"
+        color="slate"
+        variant="outline"
+        size="md"
+        icon="i-lucide-download"
+        :label="$t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.BUTTON')"
+        :is-loading="isSyncing"
+        @click="syncHistory"
       />
 
       <!-- Submit Button -->

@@ -435,8 +435,20 @@
           "ERROR_MESSAGE": "We were not able to save the WhatsApp Web channel"
         },
         "HISTORY_SYNC": {
+          "BUTTON": "Sync Messages",
           "STARTED": "Message history sync started in the background",
-          "ERROR": "Failed to start history sync"
+          "ERROR": "Failed to start history sync",
+          "STATUS": {
+            "LABEL": "Message Sync",
+            "NEVER": "Not synced yet",
+            "IN_PROGRESS": "Syncing messages...",
+            "COMPLETED": "Synced successfully",
+            "FAILED": "Sync failed"
+          },
+          "STATS": {
+            "MESSAGES": "messages imported"
+          },
+          "LAST_SYNC": "Last synced:"
         }
       },
       "VOICE": {
