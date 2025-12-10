@@ -12,11 +12,13 @@ class Whatsapp::MessageImportService
     @channel = inbox.channel
     @gateway_service = Whatsapp::Providers::WhatsappWebService.new(whatsapp_channel: @channel)
     @stats = { chats_processed: 0, messages_imported: 0, messages_skipped: 0, errors: [] }
+    @company_contact = nil
   end
 
   def perform
     Rails.logger.info "[HISTORY_SYNC] Starting message import for inbox #{inbox.id} (#{inbox.name})"
 
+    setup_company_contact
     import_all_chats
     log_completion
 
@@ -161,7 +163,7 @@ class Whatsapp::MessageImportService
     # Determine message type and sender
     is_from_me = message_data['is_from_me'] || message_data['fromMe']
     message_type = is_from_me ? :outgoing : :incoming
-    sender = is_from_me ? nil : contact
+    sender = is_from_me ? @company_contact : contact
 
     # Parse timestamp
     timestamp = parse_timestamp(message_data['timestamp'])
@@ -304,6 +306,37 @@ class Whatsapp::MessageImportService
   def extract_group_name(jid)
     group_number = jid.split('@').first
     "Group #{group_number}"
+  end
+
+  def setup_company_contact
+    phone_number = channel.phone_number
+    return if phone_number.blank?
+
+    # Build JID for the company phone
+    clean_phone = phone_number.gsub(/\D/, '')
+    source_id = "#{clean_phone}@s.whatsapp.net"
+
+    # Check if company contact already exists
+    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    if existing_contact_inbox
+      @company_contact = existing_contact_inbox.contact
+      Rails.logger.info "[HISTORY_SYNC] Using existing company contact: #{@company_contact.name}"
+      return
+    end
+
+    # Create company contact
+    contact_inbox = ContactInboxWithContactBuilder.new(
+      source_id: source_id,
+      inbox: inbox,
+      contact_attributes: {
+        identifier: source_id,
+        name: phone_number,
+        phone_number: phone_number
+      }
+    ).perform
+
+    @company_contact = contact_inbox.contact
+    Rails.logger.info "[HISTORY_SYNC] Created company contact: #{@company_contact.name}"
   end
 
   def log_completion
