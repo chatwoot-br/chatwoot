@@ -36,6 +36,10 @@ class WhatsappWebGatewayApi extends ApiClient {
     return axios.post(`${this.url}/${inboxId}/sync_history`);
   }
 
+  getSyncStatus(inboxId) {
+    return axios.get(`${this.url}/${inboxId}/sync_status`);
+  }
+
   // Test endpoints for gateway configuration validation
   testConnection(gatewayConfig) {
     return axios.post(`${this.url}/test_connection`, {

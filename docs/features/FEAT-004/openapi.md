@@ -1,6 +1,6 @@
 # WhatsApp API Guide for AI Agents
 
-This guide helps AI agents understand and interact with the WhatsApp Web API MultiDevice (v6.12.0).
+This guide helps AI agents understand and interact with the WhatsApp Web API MultiDevice (v7.10.1).
 
 ## Table of Contents
 - [Authentication](#authentication)
@@ -22,8 +22,7 @@ Authorization: Basic base64(username:password)
 ```
 
 Configure credentials via environment variables:
-- `BASIC_AUTH_USERNAME`
-- `BASIC_AUTH_PASSWORD`
+- `APP_BASIC_AUTH` - Format: `username:password` or `user1:pass1,user2:pass2` for multiple users
 
 ## Phone Number Format
 
@@ -391,6 +390,7 @@ After sending a message, save the `message_id` to:
 
 ---
 
-**Version**: 6.12.0
+**Version**: v7.10.1
 **Protocol**: OpenAPI 3.0.0
 **Base URL**: http://localhost:3000 (configurable via `APP_PORT` env var)
+**Last Updated**: 2025-12-05

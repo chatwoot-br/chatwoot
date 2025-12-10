@@ -286,6 +286,7 @@ Rails.application.routes.draw do
                 get :reconnect
                 get :qr_code
                 post :sync_history
+                get :sync_status
               end
             end
           end

@@ -50,8 +50,12 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
       user_token = @user.access_token&.token
       raise CustomExceptions::Evolution::InvalidConfiguration.new(details: 'User access token not found') if user_token.blank?
 
-      Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], evolution_api_url,
-                                           evolution_api_key, user_token)
+      evolution_response = Evolution::ManagerService.new.create(@inbox.account_id, permitted_params[:name], evolution_api_url,
+                                                                evolution_api_key, user_token)
+
+      # Update channel with webhook URL from Evolution API response
+      webhook_url = evolution_response.dig('chatwoot', 'webhookUrl')
+      channel.update!(webhook_url: webhook_url) if webhook_url.present?
     end
 
     Rails.logger.info("Evolution channel created successfully: #{@inbox.id}")
@@ -118,9 +122,8 @@ class Api::V1::Accounts::Channels::EvolutionChannelsController < Api::V1::Accoun
     channel_type = channel_type_from_params
     return unless channel_type
 
+    # Exclude webhook_url from params - it will be set from Evolution API response
     params = permitted_params(channel_type::EDITABLE_ATTRS)[:channel].except(:type, :api_key, :webhook_url)
-    # For Evolution API, we don't store webhook_url in the channel model
-    # The webhook URL is managed by the Evolution API service
     account_channels_method.create!(params)
   end
 

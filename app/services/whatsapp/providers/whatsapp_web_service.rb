@@ -120,12 +120,17 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
           timeout: 10
         )
 
-        raise StandardError, "Gateway group info failed: #{response.message}" unless response.success?
+        if response.success? && response['results'].present?
+          group_data = response['results']
+          # Try different field names the gateway might use
+          group_name = group_data['name'] || group_data['Name'] || group_data['subject'] || group_data['Subject']
+          Rails.logger.debug { "WhatsApp Web: Group info for #{identifier}: #{group_data.inspect}" }
+          return { name: group_name, type: 'group' } if group_name.present?
+        end
 
-        # Return group name and info
-        group_data = response['results']
-        group_name = group_data&.dig('name') || group_data&.dig('Name')
-        return { name: group_name, type: 'group' } if group_data.present?
+        # Fallback for groups - gateway didn't return a name
+        Rails.logger.debug { "WhatsApp Web: No group name found for #{identifier}" }
+        return { name: nil, type: 'group' }
       else
         # Use user info endpoint for individual contacts
         response = HTTParty.get(
@@ -145,8 +150,6 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
         phone = identifier.split('@').first
         return { name: "+#{phone}", type: 'contact' }
       end
-
-      nil
     rescue Errno::ECONNREFUSED, Net::OpenTimeout => e
       # Retry on transient connection errors with exponential backoff
       current_retry += 1
@@ -503,6 +506,61 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     result = connect
     convert_qr_to_base64(result)
     result
+  end
+
+  # History sync methods for importing messages from WhatsApp Web API
+  def fetch_chats(limit: 25, offset: 0)
+    response = HTTParty.get(
+      "#{api_path}/chats",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: 30
+    )
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Fetch chats response: #{response.code}" }
+
+    raise StandardError, "Failed to fetch chats: #{response.message}" unless response.success?
+
+    response.parsed_response
+  end
+
+  def fetch_messages(chat_jid:, limit: 50, offset: 0)
+    # JID should NOT be URL encoded - the API expects it as-is
+    response = HTTParty.get(
+      "#{api_path}/chat/#{chat_jid}/messages",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: 30
+    )
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Fetch messages for #{chat_jid} response: #{response.code}" }
+
+    raise StandardError, "Failed to fetch messages: #{response.message}" unless response.success?
+
+    response.parsed_response
+  end
+
+  # Trigger media download on the gateway for historical messages
+  # This downloads and caches the media, returning the local media_path
+  def trigger_media_download(message_id:, chat_jid:)
+    url = "#{api_path}/message/#{message_id}/download"
+    Rails.logger.info { "[WHATSAPP_WEB] Calling media download: #{url}?phone=#{chat_jid}" }
+
+    response = HTTParty.get(
+      url,
+      headers: api_headers,
+      query: { phone: chat_jid },
+      timeout: 60
+    )
+
+    Rails.logger.info { "[WHATSAPP_WEB] Media download response for #{message_id}: #{response.code} - #{response.body&.truncate(200)}" }
+
+    return nil unless response.success?
+
+    response.parsed_response
+  rescue StandardError => e
+    Rails.logger.warn "[WHATSAPP_WEB] Media download trigger failed for #{message_id}: #{e.message}"
+    nil
   end
 
   private
