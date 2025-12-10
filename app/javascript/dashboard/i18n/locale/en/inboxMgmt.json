@@ -437,6 +437,7 @@
         "HISTORY_SYNC": {
           "BUTTON": "Sync Messages",
           "STARTED": "Message history sync started in the background",
+          "COMPLETED": "Sync completed! {count} messages imported",
           "ERROR": "Failed to start history sync",
           "STATUS": {
             "LABEL": "Message Sync",

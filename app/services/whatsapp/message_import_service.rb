@@ -139,7 +139,7 @@ class Whatsapp::MessageImportService
       sorted_messages = messages.sort_by { |m| m['timestamp'] || 0 }
 
       sorted_messages.each do |message_data|
-        import_message(message_data, conversation, contact, is_group: is_group)
+        import_message(message_data, conversation, contact, chat_jid: chat_jid, is_group: is_group)
       end
 
       offset += BATCH_SIZE
@@ -155,13 +155,18 @@ class Whatsapp::MessageImportService
     response.dig('results', 'data') || response['results'] || []
   end
 
-  def import_message(message_data, conversation, contact, is_group: false)
+  def import_message(message_data, conversation, contact, chat_jid: nil, is_group: false)
     source_id = message_data['id']
     return if source_id.blank?
 
-    # Skip if message already exists (duplicate prevention)
+    # Check if message already exists
     existing = Message.find_by(source_id: source_id, inbox: inbox)
     if existing
+      # Retry media attachment for existing messages that should have attachments but don't
+      if media?(message_data) && existing.attachments.empty?
+        Rails.logger.info { "[HISTORY_SYNC] Retrying media for existing message #{source_id}" }
+        attach_media(existing, message_data, chat_jid: chat_jid)
+      end
       @stats[:messages_skipped] += 1
       return
     end
@@ -190,7 +195,7 @@ class Whatsapp::MessageImportService
     )
 
     # Handle media attachments
-    attach_media(message, message_data) if media?(message_data)
+    attach_media(message, message_data, chat_jid: chat_jid) if media?(message_data)
 
     message.save!
 
@@ -205,12 +210,16 @@ class Whatsapp::MessageImportService
   end
 
   def extract_content(message_data)
-    message_data['content'] ||
-      message_data['text'] ||
-      message_data.dig('message', 'text') ||
-      message_data.dig('message', 'conversation') ||
-      message_data['caption'] ||
-      default_content_for_type(message_data)
+    content = message_data['content'] ||
+              message_data['text'] ||
+              message_data.dig('message', 'text') ||
+              message_data.dig('message', 'conversation') ||
+              message_data['caption']
+
+    # Don't use placeholder text like "[Image #1]" for media messages
+    return message_data['caption'] || default_content_for_type(message_data) if content.present? && content.match?(/^\[.+#\d+\]$/)
+
+    content || default_content_for_type(message_data)
   end
 
   def default_content_for_type(message_data)
@@ -218,7 +227,11 @@ class Whatsapp::MessageImportService
     return nil if media_type.blank?
 
     case media_type.to_s.downcase
-    when 'document' then message_data['filename']
+    when 'image' then '[Image - media unavailable in history import]'
+    when 'video' then '[Video - media unavailable in history import]'
+    when 'audio', 'voice' then '[Audio - media unavailable in history import]'
+    when 'sticker' then '[Sticker - media unavailable in history import]'
+    when 'document' then message_data['filename'] || '[Document - media unavailable in history import]'
     when 'location' then 'Location shared'
     when 'contact', 'contacts' then 'Contact shared'
     end
@@ -231,9 +244,29 @@ class Whatsapp::MessageImportService
     %w[image video audio voice document sticker].include?(media_type.to_s.downcase)
   end
 
-  def attach_media(message, message_data)
-    media_url = message_data['url'] || message_data['media_url']
-    return if media_url.blank?
+  def attach_media(message, message_data, chat_jid: nil)
+    # Try to get local gateway path first (statics/media/...)
+    media_url = message_data['media_path']
+
+    # If no media_path, try to trigger on-demand download from gateway
+    media_url = trigger_gateway_media_download(message_data['id'], chat_jid) if media_url.blank? && message_data['id'].present? && chat_jid.present?
+
+    # Fall back to url field (might be WhatsApp CDN URL which won't work)
+    media_url ||= message_data['url'] || message_data['media_url']
+
+    if media_url.blank?
+      Rails.logger.debug { "[HISTORY_SYNC] No media URL found in message #{message_data['id']}" }
+      return
+    end
+
+    # WhatsApp CDN URLs (mmg.whatsapp.net) are encrypted and token-protected - not accessible
+    # Also skip .enc files which are encrypted and can't be displayed
+    if media_url.include?('mmg.whatsapp.net') || media_url.include?('whatsapp.net') || media_url.end_with?('.enc')
+      Rails.logger.debug { "[HISTORY_SYNC] Skipping inaccessible/encrypted media for message #{message_data['id']}" }
+      return
+    end
+
+    Rails.logger.info { "[HISTORY_SYNC] Downloading media from: #{media_url}" }
 
     media_type = message_data['media_type'] || message_data['type'] || 'file'
     filename = message_data['filename'] || generate_filename(media_type)
@@ -261,10 +294,57 @@ class Whatsapp::MessageImportService
   def download_media(url)
     # Build full URL if relative path
     full_url = url.start_with?('http') ? url : @channel.media_url(url)
-    Down.download(full_url)
+    Down.download(full_url, headers: @channel.api_headers)
   rescue StandardError => e
     Rails.logger.warn "[HISTORY_SYNC] Media download failed for #{url}: #{e.message}"
     nil
+  end
+
+  # Trigger gateway to download and cache media for historical messages
+  # Returns the local media_path if successful
+  def trigger_gateway_media_download(message_id, chat_jid)
+    Rails.logger.info { "[HISTORY_SYNC] Triggering media download for message #{message_id}" }
+
+    result = @gateway_service.trigger_media_download(message_id: message_id, chat_jid: chat_jid)
+
+    if result.nil?
+      Rails.logger.warn { "[HISTORY_SYNC] Gateway download returned nil for #{message_id}" }
+      return nil
+    end
+
+    Rails.logger.debug { "[HISTORY_SYNC] Gateway download response: #{result.inspect}" }
+
+    # The gateway returns file_path in results after downloading
+    media_path = result.dig('results', 'file_path') ||
+                 result['media_path'] ||
+                 result.dig('results', 'media_path') ||
+                 result.dig('results', 'path')
+
+    if media_path.present?
+      # Strip phone number prefix from file_path if present
+      # Gateway returns: /5521995539939/statics/media/...
+      # We need: /statics/media/... (media_url adds the phone prefix)
+      media_path = normalize_media_path(media_path)
+      Rails.logger.info { "[HISTORY_SYNC] Gateway cached media at: #{media_path}" }
+    else
+      Rails.logger.warn { "[HISTORY_SYNC] Gateway response has no media_path. Keys: #{result.keys.inspect}" }
+    end
+
+    media_path
+  end
+
+  # Normalize media path by stripping phone number prefix if present
+  # Gateway download endpoint returns: /5521995539939/statics/media/...
+  # Messages API returns: /statics/media/...
+  # media_url() adds the phone prefix, so we need the short form
+  def normalize_media_path(path)
+    return path if path.blank?
+
+    # Match pattern: /PHONE_NUMBER/statics/... or /PHONE_NUMBER/...
+    # Strip the phone number prefix (digits only) from the start
+    normalized = path.sub(%r{^/\d+/}, '/')
+    Rails.logger.debug { "[HISTORY_SYNC] Normalized media path: #{path} -> #{normalized}" }
+    normalized
   end
 
   def infer_content_type(media_type, filename, fallback)

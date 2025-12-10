@@ -28,11 +28,11 @@ class Whatsapp::FetchContactAvatarJob < ApplicationJob
     Rails.logger.info(
       "WhatsApp Web: Avatar fetch job completed successfully for contact #{contact_id}"
     )
-  rescue StandardError => e
-    Rails.logger.error(
-      "WhatsApp Web: Avatar fetch job failed for contact #{contact_id}: #{e.message}"
+  rescue StandardError
+    # Log at warn level without re-raising - avatar fetch is non-essential
+    # and "Bad Request" errors are expected for contacts without avatars
+    Rails.logger.warn(
+      "WhatsApp Web: Avatar fetch skipped for contact #{contact_id}"
     )
-    # Re-raise to trigger retry mechanism
-    raise e
   end
 end

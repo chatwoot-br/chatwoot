@@ -181,6 +181,17 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
     render json: { success: false, error: e.message }, status: :unprocessable_entity
   end
 
+  # GET /api/v1/accounts/:account_id/whatsapp_web/gateway/:id/sync_status
+  def sync_status
+    provider_config = @inbox.channel.provider_config || {}
+
+    render json: {
+      status: provider_config['history_sync_status'] || 'not_started',
+      synced_at: provider_config['history_sync_at'],
+      stats: provider_config['history_sync_stats']
+    }
+  end
+
   # GET /api/v1/accounts/:account_id/whatsapp_web/gateway/:id/qr_code?path=<path>
   def qr_code
     qr_path = params[:path]

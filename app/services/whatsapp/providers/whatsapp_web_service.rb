@@ -537,6 +537,29 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.parsed_response
   end
 
+  # Trigger media download on the gateway for historical messages
+  # This downloads and caches the media, returning the local media_path
+  def trigger_media_download(message_id:, chat_jid:)
+    url = "#{api_path}/message/#{message_id}/download"
+    Rails.logger.info { "[WHATSAPP_WEB] Calling media download: #{url}?phone=#{chat_jid}" }
+
+    response = HTTParty.get(
+      url,
+      headers: api_headers,
+      query: { phone: chat_jid },
+      timeout: 60
+    )
+
+    Rails.logger.info { "[WHATSAPP_WEB] Media download response for #{message_id}: #{response.code} - #{response.body&.truncate(200)}" }
+
+    return nil unless response.success?
+
+    response.parsed_response
+  rescue StandardError => e
+    Rails.logger.warn "[WHATSAPP_WEB] Media download trigger failed for #{message_id}: #{e.message}"
+    nil
+  end
+
   private
 
   def convert_qr_to_base64(result)

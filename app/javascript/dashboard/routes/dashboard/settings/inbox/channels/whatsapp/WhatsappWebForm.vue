@@ -424,6 +424,34 @@ const reconnectWhatsApp = async () => {
   }
 };
 
+const pollSyncStatus = async () => {
+  if (!props.inbox?.id) return;
+
+  try {
+    const { data } = await WhatsappWebGatewayApi.getSyncStatus(props.inbox.id);
+    syncStatus.value = data.status;
+    lastSyncAt.value = data.synced_at;
+    syncStats.value = data.stats;
+
+    // Continue polling if still in progress
+    if (data.status === 'in_progress') {
+      setTimeout(pollSyncStatus, 2000);
+    } else {
+      isSyncing.value = false;
+      if (data.status === 'completed') {
+        const imported = data.stats?.messages_imported || 0;
+        useAlert(
+          t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.COMPLETED', {
+            count: imported,
+          })
+        );
+      }
+    }
+  } catch {
+    isSyncing.value = false;
+  }
+};
+
 const syncHistory = async () => {
   if (!props.inbox?.id) return;
 
@@ -432,11 +460,12 @@ const syncHistory = async () => {
   try {
     await WhatsappWebGatewayApi.syncHistory(props.inbox.id);
     useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
+    // Start polling for completion
+    setTimeout(pollSyncStatus, 2000);
   } catch {
     syncStatus.value = 'failed';
-    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.ERROR'));
-  } finally {
     isSyncing.value = false;
+    useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.ERROR'));
   }
 };
 
