@@ -103,6 +103,18 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.dig('results', 'url')
   end
 
+  def group_avatar_url(group_jid)
+    response = HTTParty.get(
+      "#{api_path}/group/avatar",
+      headers: api_headers,
+      query: { group_id: group_jid, is_preview: true }
+    )
+
+    raise StandardError, "Gateway group avatar failed: #{response.message}" unless response.success?
+
+    response.dig('results', 'url')
+  end
+
   def contact_info(identifier)
     # Retry configuration for transient connection failures
     max_retries = 3

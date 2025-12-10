@@ -83,10 +83,7 @@ class Whatsapp::MessageImportService
     is_group = jid.include?('@g.us')
 
     contact_attributes = if is_group
-                           {
-                             identifier: jid,
-                             name: chat['name'] || extract_group_name(jid)
-                           }
+                           build_group_contact_attributes(jid, chat)
                          else
                            {
                              identifier: jid,
@@ -101,10 +98,51 @@ class Whatsapp::MessageImportService
       contact_attributes: contact_attributes
     ).perform
 
-    # Enqueue avatar fetch for the contact
-    enqueue_avatar_fetch(contact_inbox.contact, jid)
+    # Update existing group contacts if they have a fallback name
+    update_group_contact_if_needed(contact_inbox.contact, contact_attributes, is_group)
+
+    # Fetch and update avatar for the contact
+    fetch_and_attach_avatar(contact_inbox.contact, jid, is_group)
 
     contact_inbox
+  end
+
+  def update_group_contact_if_needed(contact, attributes, is_group)
+    return unless is_group
+
+    # Update name if current name is a fallback (starts with "Group " followed by numbers)
+    current_name = contact.name
+    new_name = attributes[:name]
+
+    return if new_name.blank?
+    return if current_name == new_name
+    return unless current_name&.match?(/^Group \d+$/)
+
+    contact.update!(name: new_name)
+    Rails.logger.info { "[HISTORY_SYNC] Updated group name from '#{current_name}' to '#{new_name}'" }
+  end
+
+  def build_group_contact_attributes(jid, chat)
+    # Try to get group name from chat data first
+    group_name = chat['name']
+
+    # If no name in chat data, fetch from gateway
+    if group_name.blank?
+      group_info = fetch_group_info_with_fallback(jid)
+      group_name = group_info[:name]
+    end
+
+    {
+      identifier: jid,
+      name: group_name || extract_group_name(jid)
+    }
+  end
+
+  def fetch_group_info_with_fallback(jid)
+    @gateway_service.contact_info(jid)
+  rescue Errno::ECONNREFUSED, Net::OpenTimeout, Net::ReadTimeout => e
+    Rails.logger.warn { "[HISTORY_SYNC] Failed to fetch group info for #{jid}: #{e.message}" }
+    { name: extract_group_name(jid), type: 'group' }
   end
 
   def find_or_create_conversation(contact_inbox)
@@ -487,13 +525,36 @@ class Whatsapp::MessageImportService
     Rails.logger.info "[HISTORY_SYNC] Created company contact: #{@company_contact.name}"
   end
 
-  def enqueue_avatar_fetch(contact, identifier)
+  def fetch_and_attach_avatar(contact, identifier, is_group)
     return if contact.blank? || identifier.blank?
 
     # Skip if avatar was recently updated (within last 24 hours)
     return if contact.avatar.attached? && contact.updated_at > 24.hours.ago
 
-    # Skip avatar fetch for groups (they use different avatar endpoint)
+    if is_group
+      fetch_group_avatar(contact, identifier)
+    else
+      Whatsapp::FetchContactAvatarJob.perform_later(contact.id, inbox.id, identifier)
+    end
+  rescue StandardError => e
+    Rails.logger.debug { "[HISTORY_SYNC] Could not fetch avatar: #{e.message}" }
+  end
+
+  def fetch_group_avatar(contact, group_jid)
+    avatar_url = @gateway_service.group_avatar_url(group_jid)
+    return if avatar_url.blank?
+
+    ::Avatar::AvatarFromUrlJob.perform_later(contact, avatar_url)
+    Rails.logger.debug { "[HISTORY_SYNC] Enqueued group avatar fetch for #{group_jid}" }
+  rescue StandardError => e
+    # Non-critical - log and continue without avatar
+    Rails.logger.debug { "[HISTORY_SYNC] Could not fetch group avatar for #{group_jid}: #{e.message}" }
+  end
+
+  # Keep for backward compatibility with find_or_create_sender_contact
+  def enqueue_avatar_fetch(contact, identifier)
+    return if contact.blank? || identifier.blank?
+    return if contact.avatar.attached? && contact.updated_at > 24.hours.ago
     return if identifier.include?('@g.us')
 
     Whatsapp::FetchContactAvatarJob.perform_later(contact.id, inbox.id, identifier)
