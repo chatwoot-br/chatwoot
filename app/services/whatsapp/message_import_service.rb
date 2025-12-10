@@ -122,6 +122,7 @@ class Whatsapp::MessageImportService
 
   def import_messages_for_chat(chat_jid, conversation, contact)
     offset = 0
+    is_group = chat_jid.include?('@g.us')
 
     loop do
       response = @gateway_service.fetch_messages(chat_jid: chat_jid, limit: BATCH_SIZE, offset: offset)
@@ -133,7 +134,7 @@ class Whatsapp::MessageImportService
       sorted_messages = messages.sort_by { |m| m['timestamp'] || 0 }
 
       sorted_messages.each do |message_data|
-        import_message(message_data, conversation, contact)
+        import_message(message_data, conversation, contact, is_group: is_group)
       end
 
       offset += BATCH_SIZE
@@ -149,7 +150,7 @@ class Whatsapp::MessageImportService
     response.dig('results', 'data') || response['results'] || []
   end
 
-  def import_message(message_data, conversation, contact)
+  def import_message(message_data, conversation, contact, is_group: false)
     source_id = message_data['id']
     return if source_id.blank?
 
@@ -163,7 +164,9 @@ class Whatsapp::MessageImportService
     # Determine message type and sender
     is_from_me = message_data['is_from_me'] || message_data['fromMe']
     message_type = is_from_me ? :outgoing : :incoming
-    sender = is_from_me ? @company_contact : contact
+
+    # For group messages, get the actual sender from sender_jid
+    sender = determine_message_sender(message_data, contact, is_from_me: is_from_me, is_group: is_group)
 
     # Parse timestamp
     timestamp = parse_timestamp(message_data['timestamp'])
@@ -289,6 +292,43 @@ class Whatsapp::MessageImportService
     end
   rescue ArgumentError
     nil
+  end
+
+  def determine_message_sender(message_data, default_contact, is_from_me:, is_group:)
+    # For outgoing messages, always use company contact
+    return @company_contact if is_from_me
+
+    # For individual chats, use the chat contact
+    return default_contact unless is_group
+
+    # For group messages, find/create sender from sender_jid
+    sender_jid = message_data['sender_jid']
+    return default_contact if sender_jid.blank?
+
+    find_or_create_sender_contact(sender_jid)
+  end
+
+  def find_or_create_sender_contact(sender_jid)
+    # Clean the sender_jid (remove device suffix like :73)
+    clean_jid = sender_jid.split(':').first
+    clean_jid = "#{clean_jid}@s.whatsapp.net" unless clean_jid.include?('@')
+
+    # Check if contact already exists
+    existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: clean_jid)
+    return existing_contact_inbox.contact if existing_contact_inbox
+
+    # Create sender contact
+    contact_inbox = ContactInboxWithContactBuilder.new(
+      source_id: clean_jid,
+      inbox: inbox,
+      contact_attributes: {
+        identifier: clean_jid,
+        name: extract_phone_display(clean_jid),
+        phone_number: extract_phone_number(clean_jid)
+      }
+    ).perform
+
+    contact_inbox.contact
   end
 
   def extract_phone_number(jid)
