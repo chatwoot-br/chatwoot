@@ -132,12 +132,17 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
           timeout: 10
         )
 
-        raise StandardError, "Gateway group info failed: #{response.message}" unless response.success?
+        if response.success? && response['results'].present?
+          group_data = response['results']
+          # Try different field names the gateway might use
+          group_name = group_data['name'] || group_data['Name'] || group_data['subject'] || group_data['Subject']
+          Rails.logger.debug { "WhatsApp Web: Group info for #{identifier}: #{group_data.inspect}" }
+          return { name: group_name, type: 'group' } if group_name.present?
+        end
 
-        # Return group name and info
-        group_data = response['results']
-        group_name = group_data&.dig('name') || group_data&.dig('Name')
-        return { name: group_name, type: 'group' } if group_data.present?
+        # Fallback for groups - gateway didn't return a name
+        Rails.logger.debug { "WhatsApp Web: No group name found for #{identifier}" }
+        return { name: nil, type: 'group' }
       else
         # Use user info endpoint for individual contacts
         response = HTTParty.get(
@@ -157,8 +162,6 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
         phone = identifier.split('@').first
         return { name: "+#{phone}", type: 'contact' }
       end
-
-      nil
     rescue Errno::ECONNREFUSED, Net::OpenTimeout => e
       # Retry on transient connection errors with exponential backoff
       current_retry += 1

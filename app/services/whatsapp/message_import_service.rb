@@ -123,14 +123,16 @@ class Whatsapp::MessageImportService
   end
 
   def build_group_contact_attributes(jid, chat)
-    # Try to get group name from chat data first
-    group_name = chat['name']
+    # Check if chat['name'] is a real name or just a fallback
+    chat_name = chat['name']
+    is_fallback_name = chat_name.blank? || chat_name.match?(/^Group \d+$/)
 
-    # If no name in chat data, fetch from gateway
-    if group_name.blank?
-      group_info = fetch_group_info_with_fallback(jid)
-      group_name = group_info[:name]
-    end
+    # Always fetch from gateway if we have a fallback name
+    group_name = if is_fallback_name
+                   fetch_group_name_from_gateway(jid)
+                 else
+                   chat_name
+                 end
 
     {
       identifier: jid,
@@ -138,11 +140,14 @@ class Whatsapp::MessageImportService
     }
   end
 
-  def fetch_group_info_with_fallback(jid)
-    @gateway_service.contact_info(jid)
-  rescue Errno::ECONNREFUSED, Net::OpenTimeout, Net::ReadTimeout => e
+  def fetch_group_name_from_gateway(jid)
+    group_info = @gateway_service.contact_info(jid)
+    return nil if group_info.nil?
+
+    group_info[:name]
+  rescue StandardError => e
     Rails.logger.warn { "[HISTORY_SYNC] Failed to fetch group info for #{jid}: #{e.message}" }
-    { name: extract_group_name(jid), type: 'group' }
+    nil
   end
 
   def find_or_create_conversation(contact_inbox)
