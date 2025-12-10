@@ -189,6 +189,24 @@ class Whatsapp::MessageImportService
       # Safety limit to prevent infinite loops
       break if offset >= 1000
     end
+
+    # Update conversation timestamps to match imported messages
+    update_conversation_timestamps(conversation)
+  end
+
+  def update_conversation_timestamps(conversation)
+    messages = conversation.messages.order(:created_at)
+    first_message = messages.first
+    last_message = messages.last
+
+    return if first_message.blank?
+
+    # rubocop:disable Rails/SkipsModelValidations
+    conversation.update_columns(
+      created_at: first_message.created_at,
+      last_activity_at: last_message&.created_at || first_message.created_at
+    )
+    # rubocop:enable Rails/SkipsModelValidations
   end
 
   def extract_messages(response)
