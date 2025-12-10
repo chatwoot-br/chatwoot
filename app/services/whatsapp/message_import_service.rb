@@ -102,7 +102,7 @@ class Whatsapp::MessageImportService
     update_group_contact_if_needed(contact_inbox.contact, contact_attributes, is_group)
 
     # Fetch and update avatar for the contact
-    fetch_and_attach_avatar(contact_inbox.contact, jid, is_group)
+    fetch_and_attach_avatar(contact_inbox.contact, jid)
 
     contact_inbox
   end
@@ -145,8 +145,7 @@ class Whatsapp::MessageImportService
     return nil if group_info.nil?
 
     group_info[:name]
-  rescue StandardError => e
-    Rails.logger.warn { "[HISTORY_SYNC] Failed to fetch group info for #{jid}: #{e.message}" }
+  rescue StandardError
     nil
   end
 
@@ -530,41 +529,18 @@ class Whatsapp::MessageImportService
     Rails.logger.info "[HISTORY_SYNC] Created company contact: #{@company_contact.name}"
   end
 
-  def fetch_and_attach_avatar(contact, identifier, is_group)
-    return if contact.blank? || identifier.blank?
-
-    # Skip if avatar was recently updated (within last 24 hours)
-    return if contact.avatar.attached? && contact.updated_at > 24.hours.ago
-
-    if is_group
-      fetch_group_avatar(contact, identifier)
-    else
-      Whatsapp::FetchContactAvatarJob.perform_later(contact.id, inbox.id, identifier)
-    end
-  rescue StandardError => e
-    Rails.logger.debug { "[HISTORY_SYNC] Could not fetch avatar: #{e.message}" }
-  end
-
-  def fetch_group_avatar(contact, group_jid)
-    avatar_url = @gateway_service.group_avatar_url(group_jid)
-    return if avatar_url.blank?
-
-    ::Avatar::AvatarFromUrlJob.perform_later(contact, avatar_url)
-    Rails.logger.debug { "[HISTORY_SYNC] Enqueued group avatar fetch for #{group_jid}" }
-  rescue StandardError => e
-    # Non-critical - log and continue without avatar
-    Rails.logger.debug { "[HISTORY_SYNC] Could not fetch group avatar for #{group_jid}: #{e.message}" }
-  end
-
-  # Keep for backward compatibility with find_or_create_sender_contact
-  def enqueue_avatar_fetch(contact, identifier)
+  def fetch_and_attach_avatar(contact, identifier)
     return if contact.blank? || identifier.blank?
     return if contact.avatar.attached? && contact.updated_at > 24.hours.ago
-    return if identifier.include?('@g.us')
 
+    # Use same job for both contacts and groups - gateway handles both
     Whatsapp::FetchContactAvatarJob.perform_later(contact.id, inbox.id, identifier)
-  rescue StandardError => e
-    Rails.logger.debug { "[HISTORY_SYNC] Could not enqueue avatar fetch: #{e.message}" }
+  rescue StandardError
+    nil
+  end
+
+  def enqueue_avatar_fetch(contact, identifier)
+    fetch_and_attach_avatar(contact, identifier)
   end
 
   def log_completion
