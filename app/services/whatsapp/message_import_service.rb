@@ -63,6 +63,13 @@ class Whatsapp::MessageImportService
     chat_jid = chat['jid'] || chat['id']
     return if chat_jid.blank?
 
+    # Skip group chats if ignore_group_messages is enabled
+    is_group = chat_jid.include?('@g.us')
+    if is_group && ignore_group_messages?
+      Rails.logger.debug { "[HISTORY_SYNC] Skipping group chat (ignore_group_messages enabled): #{chat_jid}" }
+      return
+    end
+
     Rails.logger.debug { "[HISTORY_SYNC] Processing chat: #{chat_jid}" }
 
     # Create or find contact and contact_inbox
@@ -623,6 +630,10 @@ class Whatsapp::MessageImportService
 
   def enqueue_avatar_fetch(contact, identifier)
     fetch_and_attach_avatar(contact, identifier)
+  end
+
+  def ignore_group_messages?
+    channel.provider_config&.dig('ignore_group_messages') == true
   end
 
   def log_completion
