@@ -186,7 +186,8 @@ const isProvisioningMode = computed(() => {
   if (props.mode === 'edit') {
     return false;
   }
-  return connectionMode.value === 'provision';
+  // Only use provisioning mode if admin API is available and user selected provision
+  return adminApiConfigured.value && connectionMode.value === 'provision';
 });
 
 const validationRules = computed(() => {
