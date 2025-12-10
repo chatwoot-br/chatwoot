@@ -306,8 +306,13 @@ class Api::V1::Accounts::WhatsappWeb::GatewayController < Api::V1::Accounts::Bas
   end
 
   # Test connection using the AdminApiClient
+  # Tests both health check AND bearer token authentication
   def test_admin_api_connection(client)
-    client.health_check
+    return false unless client.health_check
+
+    # Also verify bearer token by calling an authenticated endpoint
+    client.list_instances
+    true
   rescue StandardError
     false
   end
