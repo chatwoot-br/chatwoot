@@ -31,6 +31,15 @@ class Whatsapp::PhoneNumberNormalizationService
     # Fallback: try raw format if normalized not found (handles legacy data)
     existing_contact_inbox ||= find_existing_contact_inbox(raw_number) if raw_number != provider_format
 
+    # Fallback for Brazil: try alternate format (with/without 9 digit)
+    if existing_contact_inbox.nil? && normalizer.is_a?(Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer)
+      alternate = brazil_alternate_format(clean_number)
+      if alternate != clean_number
+        alternate_format = format_for_provider(alternate, provider)
+        existing_contact_inbox = find_existing_contact_inbox(alternate_format)
+      end
+    end
+
     # Always return normalized format for new contacts to ensure consistent storage
     existing_contact_inbox&.source_id || provider_format
   end
@@ -38,6 +47,26 @@ class Whatsapp::PhoneNumberNormalizationService
   private
 
   attr_reader :inbox
+
+  # Returns the alternate Brazil phone format (with 9 if missing, without 9 if present)
+  # Brazil numbers can be stored with or without the 9 digit after DDD
+  # This allows finding contacts regardless of which format was originally stored
+  def brazil_alternate_format(number)
+    return number unless number.start_with?('55') && number.length >= 12
+
+    ddd = number[2, 2]
+    rest = number[4..]
+
+    if number.length == 13 && rest.start_with?('9')
+      # Has 9 (13 digits), return without 9 (12 digits)
+      "55#{ddd}#{rest[1..]}"
+    elsif number.length == 12
+      # No 9 (12 digits), return with 9 (13 digits)
+      "55#{ddd}9#{rest}"
+    else
+      number
+    end
+  end
 
   def find_normalizer_for_country(waid)
     NORMALIZERS.map(&:new)
