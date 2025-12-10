@@ -85,11 +85,7 @@ class Whatsapp::MessageImportService
     contact_attributes = if is_group
                            build_group_contact_attributes(jid, chat)
                          else
-                           {
-                             identifier: jid,
-                             name: chat['name'] || chat['pushname'] || extract_phone_display(jid),
-                             phone_number: extract_phone_number(jid)
-                           }
+                           build_contact_attributes(jid, chat)
                          end
 
     contact_inbox = ContactInboxWithContactBuilder.new(
@@ -98,8 +94,8 @@ class Whatsapp::MessageImportService
       contact_attributes: contact_attributes
     ).perform
 
-    # Update existing group contacts if they have a fallback name
-    update_group_contact_if_needed(contact_inbox.contact, contact_attributes, is_group)
+    # Update existing contacts if they have a fallback name
+    update_contact_name_if_needed(contact_inbox.contact, contact_attributes, is_group)
 
     # Fetch and update avatar for the contact
     fetch_and_attach_avatar(contact_inbox.contact, jid)
@@ -107,19 +103,49 @@ class Whatsapp::MessageImportService
     contact_inbox
   end
 
-  def update_group_contact_if_needed(contact, attributes, is_group)
-    return unless is_group
-
-    # Update name if current name is a fallback (starts with "Group " followed by numbers)
+  def update_contact_name_if_needed(contact, attributes, is_group)
     current_name = contact.name
     new_name = attributes[:name]
 
     return if new_name.blank?
     return if current_name == new_name
-    return unless current_name&.match?(/^Group \d+$/)
+
+    # Check if current name is a fallback
+    is_fallback = if is_group
+                    current_name&.match?(/^Group \d+$/)
+                  else
+                    current_name&.match?(/^\+?\d+$/)
+                  end
+
+    return unless is_fallback
 
     contact.update!(name: new_name)
-    Rails.logger.info { "[HISTORY_SYNC] Updated group name from '#{current_name}' to '#{new_name}'" }
+  end
+
+  def build_contact_attributes(jid, chat)
+    chat_name = chat['name'] || chat['pushname']
+    is_fallback_name = chat_name.blank? || chat_name.match?(/^\+?\d+$/)
+
+    contact_name = if is_fallback_name
+                     fetch_contact_name_from_gateway(jid) || chat_name
+                   else
+                     chat_name
+                   end
+
+    {
+      identifier: jid,
+      name: contact_name || extract_phone_display(jid),
+      phone_number: extract_phone_number(jid)
+    }
+  end
+
+  def fetch_contact_name_from_gateway(jid)
+    contact_info = @gateway_service.contact_info(jid)
+    return nil if contact_info.nil?
+
+    contact_info[:name]
+  rescue StandardError
+    nil
   end
 
   def build_group_contact_attributes(jid, chat)
