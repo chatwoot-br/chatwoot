@@ -505,6 +505,38 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     result
   end
 
+  # History sync methods for importing messages from WhatsApp Web API
+  def fetch_chats(limit: 25, offset: 0)
+    response = HTTParty.get(
+      "#{api_path}/chats",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: 30
+    )
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Fetch chats response: #{response.code}" }
+
+    raise StandardError, "Failed to fetch chats: #{response.message}" unless response.success?
+
+    response.parsed_response
+  end
+
+  def fetch_messages(chat_jid:, limit: 50, offset: 0)
+    encoded_jid = URI.encode_www_form_component(chat_jid)
+    response = HTTParty.get(
+      "#{api_path}/chat/#{encoded_jid}/messages",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: 30
+    )
+
+    Rails.logger.debug { "[WHATSAPP_WEB] Fetch messages for #{chat_jid} response: #{response.code}" }
+
+    raise StandardError, "Failed to fetch messages: #{response.message}" unless response.success?
+
+    response.parsed_response
+  end
+
   private
 
   def convert_qr_to_base64(result)

@@ -234,6 +234,16 @@ const handleWhatsAppConnected = async () => {
   closeQRModal();
   // Refresh the connection status after successful connection
   await checkConnectionStatus();
+
+  // Trigger history sync when WhatsApp connects
+  if (props.inbox?.id) {
+    try {
+      await WhatsappWebGatewayApi.syncHistory(props.inbox.id);
+      useAlert(t('INBOX_MGMT.ADD.WHATSAPP_WEB.HISTORY_SYNC.STARTED'));
+    } catch {
+      // History sync is non-critical, silently fail
+    }
+  }
 };
 
 const checkAdminApiStatus = async () => {

@@ -433,6 +433,10 @@
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to save the WhatsApp Web channel"
+        },
+        "HISTORY_SYNC": {
+          "STARTED": "Message history sync started in the background",
+          "ERROR": "Failed to start history sync"
         }
       },
       "VOICE": {
