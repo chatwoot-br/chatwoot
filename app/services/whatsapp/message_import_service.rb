@@ -95,11 +95,16 @@ class Whatsapp::MessageImportService
                            }
                          end
 
-    ContactInboxWithContactBuilder.new(
+    contact_inbox = ContactInboxWithContactBuilder.new(
       source_id: jid,
       inbox: inbox,
       contact_attributes: contact_attributes
     ).perform
+
+    # Enqueue avatar fetch for the contact
+    enqueue_avatar_fetch(contact_inbox.contact, jid)
+
+    contact_inbox
   end
 
   def find_or_create_conversation(contact_inbox)
@@ -315,7 +320,10 @@ class Whatsapp::MessageImportService
 
     # Check if contact already exists
     existing_contact_inbox = inbox.contact_inboxes.find_by(source_id: clean_jid)
-    return existing_contact_inbox.contact if existing_contact_inbox
+    if existing_contact_inbox
+      enqueue_avatar_fetch(existing_contact_inbox.contact, clean_jid)
+      return existing_contact_inbox.contact
+    end
 
     # Create sender contact
     contact_inbox = ContactInboxWithContactBuilder.new(
@@ -328,6 +336,7 @@ class Whatsapp::MessageImportService
       }
     ).perform
 
+    enqueue_avatar_fetch(contact_inbox.contact, clean_jid)
     contact_inbox.contact
   end
 
@@ -377,6 +386,20 @@ class Whatsapp::MessageImportService
 
     @company_contact = contact_inbox.contact
     Rails.logger.info "[HISTORY_SYNC] Created company contact: #{@company_contact.name}"
+  end
+
+  def enqueue_avatar_fetch(contact, identifier)
+    return if contact.blank? || identifier.blank?
+
+    # Skip if avatar was recently updated (within last 24 hours)
+    return if contact.avatar.attached? && contact.updated_at > 24.hours.ago
+
+    # Skip avatar fetch for groups (they use different avatar endpoint)
+    return if identifier.include?('@g.us')
+
+    Whatsapp::FetchContactAvatarJob.perform_later(contact.id, inbox.id, identifier)
+  rescue StandardError => e
+    Rails.logger.debug { "[HISTORY_SYNC] Could not enqueue avatar fetch: #{e.message}" }
   end
 
   def log_completion
