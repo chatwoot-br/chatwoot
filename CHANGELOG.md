@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v4.8.0+4] - 2025-12-11
+
+### Fork Changes
+- feat(whatsapp): add message history import for WhatsApp Web (#10)
+- fix(whatsapp): preserve sync status when updating inbox settings
+- fix(whatsapp): search both Brazil phone variants to prevent duplicate conversations
+- fix(whatsapp): skip group chats during history import when ignore_group_messages is enabled
+- fix(whatsapp): fix sync status indicator getting stuck after connection
+- fix(whatsapp): validate bearer token in connection test
+
 ## [v4.8.0+3] - 2025-12-09
 
 ### Fork Changes
