@@ -100,9 +100,14 @@ spec:
             {{- toYaml .Values.web.livenessProbe | nindent 12 }}
           readinessProbe:
             {{- toYaml .Values.web.readinessProbe | nindent 12 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
       serviceAccountName: {{ include "chatwoot.serviceAccountName" . }}
-      {{- if .Values.securityContext }}
-      securityContext: {{ .Values.securityContext | toYaml | nindent 8 }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
         - name: cache

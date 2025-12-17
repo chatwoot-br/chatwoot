@@ -116,15 +116,15 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
   # fsGroup: 2000
 
 securityContext:
   capabilities:
     drop:
     - ALL
-  runAsNonRoot: true
-  runAsUser: 1000
 
 ingress:
   enabled: false
