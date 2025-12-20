@@ -141,12 +141,16 @@ RUN if [ "$RAILS_ENV" != "production" ]; then \
   && pnpm --version; \
   fi
 
-COPY --from=pre-builder /gems/ /gems/
-COPY --from=pre-builder /app /app
+RUN addgroup -g 1000 chatwoot \
+  && adduser -u 1000 -G chatwoot -h /app -s /bin/sh -D chatwoot
 
-# Copy .git_sha file from pre-builder stage
-COPY --from=pre-builder /app/.git_sha /app/.git_sha
+COPY --from=pre-builder --chown=chatwoot:chatwoot /gems/ /gems/
+COPY --from=pre-builder --chown=chatwoot:chatwoot /app /app
 
 WORKDIR /app
+
+RUN chown -R chatwoot:chatwoot /app /gems
+
+USER chatwoot
 
 EXPOSE 3000
