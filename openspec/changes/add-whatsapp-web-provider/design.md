@@ -59,8 +59,9 @@ This design adds `whatsapp_web` provider that bridges to go-whatsapp-web-multide
 **Decision**: Skip template functionality entirely for whatsapp_web provider.
 
 **Rationale**:
-- WhatsApp Web doesn't have official template support
-- Session-only messaging (within 24h window)
+- WhatsApp Web doesn't use the official template system
+- Messages can be sent anytime without restrictions (no 24h window like Business API)
+- Templates are unnecessary since proactive messaging is unrestricted
 - Keeps implementation simple
 - `sync_templates` returns no-op
 

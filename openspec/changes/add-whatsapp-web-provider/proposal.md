@@ -13,7 +13,7 @@ The `go-whatsapp-web-multidevice` project provides a reliable REST API bridge to
 - Implement QR code-based device authentication flow in the inbox creation wizard
 - Use phone number (without +) as the `device_id` for simplicity
 - Support text and media message sending/receiving
-- **No template support** (WhatsApp Web limitation - session-only messaging within 24h window)
+- **No template support** (not applicable for WhatsApp Web - messages can be sent anytime)
 
 ## Impact
 
@@ -33,5 +33,5 @@ The `go-whatsapp-web-multidevice` project provides a reliable REST API bridge to
 
 - WhatsApp Web connections may be less stable than official Business API
 - WhatsApp may block numbers that appear to be automated
-- No official template support limits proactive outreach
+- No template support (but not needed since messages can be sent anytime)
 - Requires self-hosting go-whatsapp-web-multidevice server

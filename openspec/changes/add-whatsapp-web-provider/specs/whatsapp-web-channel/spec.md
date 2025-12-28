@@ -61,11 +61,11 @@ The system SHALL send messages through go-whatsapp-web-multidevice API.
 - **WHEN** the message is processed
 - **THEN** the system calls `POST /send/file` with the file URL
 
-#### Scenario: Template messages are not supported
+#### Scenario: Unrestricted message sending
 - **GIVEN** a WhatsApp Web inbox
-- **WHEN** a template message is attempted
-- **THEN** the message is marked as failed
-- **AND** an error indicates templates are not supported
+- **WHEN** an agent sends a message to any contact
+- **THEN** the message is sent without restrictions
+- **AND** no 24h session window applies (unlike official Business API)
 
 ### Requirement: Dedicated Webhook Endpoint
 
@@ -126,15 +126,17 @@ The system SHALL use a global environment variable for the WhatsApp Web API URL.
 
 ### Requirement: No Template Synchronization
 
-The system SHALL skip template synchronization for WhatsApp Web inboxes.
+The system SHALL skip template synchronization for WhatsApp Web inboxes since templates are not needed (messages can be sent anytime without restrictions).
 
 #### Scenario: Skip template sync on inbox creation
 - **GIVEN** a WhatsApp Web inbox is created
 - **WHEN** the `after_create` callbacks run
 - **THEN** `sync_templates` is NOT called
+- **AND** this is acceptable because messages can be sent anytime
 
 #### Scenario: Template sync returns empty
 - **GIVEN** a WhatsApp Web inbox
 - **WHEN** `sync_templates` is explicitly called
 - **THEN** no API call is made
 - **AND** `message_templates` remains empty
+- **AND** messaging functionality is unaffected
