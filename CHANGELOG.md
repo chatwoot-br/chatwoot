@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Chatwoot Helm chart with initial templates and configurations (env-secret, ingress, migrations-job, web/worker deployments, HPA, service account)
+- Development Docker setup with docker-compose.dev.yaml for local development
+- Docker and Helm release CI workflows with multi-arch builds using Hetzner Cloud runners
+
+### Changed
+
+- Update configuration for ChatWoot Brazil deployment (PostgreSQL schema support, branding updates, disabled inbound_emails and campaigns by default)
+
 ## [v4.9.1] - 2025-12-22
 
 ### Fixed
