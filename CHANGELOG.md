@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [v4.9.1] - 2025-12-22
+
+### Fixed
+
+- Improve handling of empty custom attributes list in settings (#13127)
+- Prevent invalid attachments from blocking text paste (#13135)
+- Add Linear integration for the Startup plan (#13136)
+
 ## [4.9.0] - 2025-12-19
 
 ### Added
@@ -952,6 +962,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial v4 release with major UI redesign and new features.
 
+[v4.9.1]: https://github.com/chatwoot-br/chatwoot/compare/v4.9.0...v4.9.1
 [4.9.0]: https://github.com/chatwoot/chatwoot/compare/v4.8.0...v4.9.0
 [4.8.0]: https://github.com/chatwoot/chatwoot/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/chatwoot/chatwoot/compare/v4.6.0...v4.7.0

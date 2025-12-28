@@ -25,6 +25,7 @@ Follow these steps:
 3. **Update version in these files** (use the new version number):
    - `VERSION_CW` line 1: `X.Y.Z+N` (e.g., `4.8.0+1`)
    - `VERSION_CWCTL` line 1: `X.Y.Z+N` (e.g., `4.8.0+1`)
+   - `config/app.yml` line 2: `version: 'X.Y.Z'` (base version only, no +N)
    - `package.json` line 3: `"version": "X.Y.Z"` (base version only, no +N)
    - `charts/chatwoot/Chart.yaml` line 32: `version: X.Y.Z` (chart version - bump if chart files changed)
    - `charts/chatwoot/Chart.yaml` line 35: `appVersion: "vX.Y.Z-N"` (use `-` not `+` for Docker)
@@ -53,7 +54,7 @@ Follow these steps:
 
 5. **Commit and tag**:
    ```bash
-   git add VERSION_CW VERSION_CWCTL package.json charts/chatwoot/Chart.yaml charts/chatwoot/values.yaml CHANGELOG.md
+   git add VERSION_CW VERSION_CWCTL config/app.yml package.json charts/chatwoot/Chart.yaml charts/chatwoot/values.yaml CHANGELOG.md
    # For fork-only:
    git commit -m "chore: bump version to vX.Y.Z+N"
    # For upstream sync:
