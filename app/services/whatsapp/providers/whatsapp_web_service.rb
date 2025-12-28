@@ -1,0 +1,154 @@
+class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
+  def send_message(phone_number, message)
+    @message = message
+
+    if message.attachments.present?
+      send_attachment_message(phone_number, message)
+    else
+      send_text_message(phone_number, message)
+    end
+  end
+
+  def send_template(_phone_number, _template_info, _message)
+    # WhatsApp Web doesn't support template messages
+    nil
+  end
+
+  def sync_templates
+    # WhatsApp Web doesn't support template messages
+    # No-op to avoid errors
+  end
+
+  def validate_provider_config?
+    return false if ENV['WHATSAPP_WEB_API_URL'].blank?
+    return false if whatsapp_channel.provider_config['device_id'].blank?
+
+    # Verify the device exists and is accessible
+    response = HTTParty.get(
+      "#{api_base_path}/devices/#{device_id}/status",
+      headers: api_headers
+    )
+
+    response.success?
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Validation failed: #{e.message}"
+    false
+  end
+
+  def api_headers
+    { 'X-Device-Id' => device_id, 'Content-Type' => 'application/json' }
+  end
+
+  def media_url(media_id)
+    "#{api_base_path}/media/#{media_id}"
+  end
+
+  # Device management methods
+  def qr_code
+    response = HTTParty.get(
+      "#{api_base_path}/devices/#{device_id}/login",
+      headers: api_headers
+    )
+
+    return nil unless response.success?
+
+    response.parsed_response
+  end
+
+  def device_status
+    response = HTTParty.get(
+      "#{api_base_path}/devices/#{device_id}/status",
+      headers: api_headers
+    )
+
+    return nil unless response.success?
+
+    response.parsed_response
+  end
+
+  def reconnect_device
+    response = HTTParty.post(
+      "#{api_base_path}/devices/#{device_id}/reconnect",
+      headers: api_headers
+    )
+
+    response.success?
+  end
+
+  def logout_device
+    response = HTTParty.post(
+      "#{api_base_path}/devices/#{device_id}/logout",
+      headers: api_headers
+    )
+
+    response.success?
+  end
+
+  private
+
+  def api_base_path
+    ENV.fetch('WHATSAPP_WEB_API_URL', 'http://localhost:3000')
+  end
+
+  def device_id
+    whatsapp_channel.provider_config['device_id']
+  end
+
+  def send_text_message(phone_number, message)
+    response = HTTParty.post(
+      "#{api_base_path}/send/message",
+      headers: api_headers,
+      body: {
+        phone: phone_number,
+        message: message.outgoing_content
+      }.to_json
+    )
+
+    process_response(response, message)
+  end
+
+  def send_attachment_message(phone_number, message)
+    attachment = message.attachments.first
+    endpoint = attachment_endpoint(attachment.file_type)
+
+    body = build_attachment_body(phone_number, message, attachment)
+
+    response = HTTParty.post(
+      "#{api_base_path}#{endpoint}",
+      headers: api_headers,
+      body: body.to_json
+    )
+
+    process_response(response, message)
+  end
+
+  def attachment_endpoint(file_type)
+    case file_type
+    when 'image' then '/send/image'
+    when 'video' then '/send/video'
+    when 'audio' then '/send/audio'
+    else '/send/file'
+    end
+  end
+
+  def build_attachment_body(phone_number, message, attachment)
+    body = {
+      'phone' => phone_number,
+      attachment.file_type => attachment.download_url
+    }
+
+    # Add caption for supported types
+    body['caption'] = message.outgoing_content if %w[image video].include?(attachment.file_type) && message.outgoing_content.present?
+
+    body
+  end
+
+  def error_message(response)
+    # Extract error message from go-whatsapp-web-multidevice API response
+    parsed = response.parsed_response
+    return parsed['error'] if parsed.is_a?(Hash) && parsed['error'].present?
+    return parsed['message'] if parsed.is_a?(Hash) && parsed['message'].present?
+
+    'Unknown error occurred'
+  end
+end

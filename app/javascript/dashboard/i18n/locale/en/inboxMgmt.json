@@ -235,6 +235,8 @@
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
           "WHATSAPP_CLOUD_DESC": "Quick setup through Meta",
+          "WHATSAPP_WEB": "WhatsApp Web",
+          "WHATSAPP_WEB_DESC": "Scan QR code to connect directly",
           "TWILIO_DESC": "Connect via Twilio credentials",
           "360_DIALOG": "360Dialog"
         },
@@ -310,6 +312,41 @@
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to save the WhatsApp channel"
+        }
+      },
+      "WHATSAPP_WEB": {
+        "TITLE": "Connect via WhatsApp Web",
+        "DESCRIPTION": "Scan a QR code to connect your WhatsApp account directly without requiring Meta Business credentials.",
+        "INBOX_NAME": {
+          "LABEL": "Inbox Name",
+          "PLACEHOLDER": "Please enter an inbox name",
+          "ERROR": "This field is required"
+        },
+        "PHONE_NUMBER": {
+          "LABEL": "Phone Number",
+          "PLACEHOLDER": "Please enter the phone number in E.164 format (e.g., +1234567890)",
+          "ERROR": "Please provide a valid phone number that starts with a `+` sign and does not contain any spaces.",
+          "HELP": "Enter your WhatsApp number in international format (e.g., +1234567890)"
+        },
+        "PHONE_INPUT": {
+          "SUBMIT": "Generate QR Code"
+        },
+        "QR_CODE": {
+          "TITLE": "Scan QR Code",
+          "DESCRIPTION": "Open WhatsApp on your phone and scan this QR code to connect your account.",
+          "INSTRUCTIONS": {
+            "TITLE": "How to scan:",
+            "STEP_1": "Open WhatsApp on your phone",
+            "STEP_2": "Tap Menu or Settings and select Linked Devices",
+            "STEP_3": "Point your phone at this screen to capture the QR code"
+          },
+          "WAITING": "Waiting for you to scan the QR code...",
+          "REFRESH": "Refresh QR Code",
+          "ERROR": "Failed to load QR code. Please try again.",
+          "REFRESH_ERROR": "Failed to refresh QR code. Please try again."
+        },
+        "API": {
+          "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"
         }
       },
       "VOICE": {
