@@ -178,26 +178,21 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def download_from_local_path(file_path)
-    # Read media from local filesystem
-    # This is used when WHATSAPP_AUTO_DOWNLOAD_MEDIA is true
-    file = File.open(file_path, 'rb')
-    filename = File.basename(file_path)
-    content_type = Marcel::MimeType.for(file)
-
-    # Create a Down::ChunkedIO compatible object
+    # Read media from local filesystem (used when WHATSAPP_AUTO_DOWNLOAD_MEDIA is true)
     Down::ChunkedIO.new(
-      chunks: [file.read],
+      chunks: [File.binread(file_path)],
       size: File.size(file_path),
-      data: {
-        filename: filename,
-        content_type: content_type
-      }
+      data: { filename: File.basename(file_path), content_type: Marcel::MimeType.for(Pathname.new(file_path)) }
     )
+  rescue Errno::ENOENT => e
+    Rails.logger.error "WhatsApp Web: Media file not found: #{file_path} - #{e.message}"
+    nil
+  rescue Errno::EACCES => e
+    Rails.logger.error "WhatsApp Web: Permission denied for media file: #{file_path} - #{e.message}"
+    nil
   rescue StandardError => e
     Rails.logger.error "WhatsApp Web: Failed to read local media file: #{e.message}"
     nil
-  ensure
-    file&.close
   end
 
   def process_statuses

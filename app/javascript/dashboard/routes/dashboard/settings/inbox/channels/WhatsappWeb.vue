@@ -15,16 +15,20 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
+// Constants
+const POLL_INTERVAL_MS = 3000; // 3 seconds
+const MAX_POLL_COUNT = 60; // 3 minutes max (60 * 3s)
+
 // Form state
 const currentStep = ref('phone_input');
 const phoneNumber = ref('');
 const inboxName = ref('');
 const deviceId = ref('');
 const qrCodeUrl = ref('');
-const connectionStatus = ref('disconnected');
 const isLoading = ref(false);
 const errorMessage = ref('');
 const pollInterval = ref(null);
+const pollCount = ref(0);
 
 // Validation
 const rules = {
@@ -64,6 +68,7 @@ const stopStatusPolling = () => {
     clearInterval(pollInterval.value);
     pollInterval.value = null;
   }
+  pollCount.value = 0;
 };
 
 const createInbox = async () => {
@@ -103,9 +108,18 @@ const createInbox = async () => {
 };
 
 const checkDeviceStatus = async () => {
+  pollCount.value += 1;
+
+  // Check for timeout
+  if (pollCount.value > MAX_POLL_COUNT) {
+    stopStatusPolling();
+    errorMessage.value = t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.TIMEOUT');
+    useAlert(errorMessage.value);
+    return;
+  }
+
   try {
     const response = await whatsappWebAPI.getDeviceStatus(deviceId.value);
-    connectionStatus.value = response.data.state;
 
     if (response.data.state === 'logged_in') {
       stopStatusPolling();
@@ -118,8 +132,8 @@ const checkDeviceStatus = async () => {
 };
 
 const startStatusPolling = () => {
-  // Poll every 3 seconds
-  pollInterval.value = setInterval(checkDeviceStatus, 3000);
+  pollCount.value = 0;
+  pollInterval.value = setInterval(checkDeviceStatus, POLL_INTERVAL_MS);
 };
 
 const createDevice = async () => {
@@ -133,7 +147,8 @@ const createDevice = async () => {
 
   try {
     const response = await whatsappWebAPI.createDevice(phoneNumber.value);
-    deviceId.value = response.data.inbox_id;
+    // Use device_id from response (phone number normalized by backend)
+    deviceId.value = response.data.device_id;
     currentStep.value = 'scan_qr';
     await fetchQRCode();
     startStatusPolling();
@@ -154,6 +169,8 @@ const refreshQRCode = async () => {
   try {
     await whatsappWebAPI.reconnect(deviceId.value);
     await fetchQRCode();
+    // Reset poll count on refresh
+    pollCount.value = 0;
   } catch (error) {
     errorMessage.value =
       error.response?.data?.message ||

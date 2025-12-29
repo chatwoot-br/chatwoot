@@ -343,7 +343,8 @@
           "WAITING": "Waiting for you to scan the QR code...",
           "REFRESH": "Refresh QR Code",
           "ERROR": "Failed to load QR code. Please try again.",
-          "REFRESH_ERROR": "Failed to refresh QR code. Please try again."
+          "REFRESH_ERROR": "Failed to refresh QR code. Please try again.",
+          "TIMEOUT": "QR code scan timed out. Please refresh and try again."
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"

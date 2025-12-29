@@ -1,4 +1,6 @@
 class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
+  HTTP_TIMEOUT = 30 # seconds
+
   def send_message(phone_number, message)
     @message = message
 
@@ -26,7 +28,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     # Verify the device exists and is accessible
     response = HTTParty.get(
       "#{api_base_path}/devices/#{device_id}/status",
-      headers: api_headers
+      headers: api_headers,
+      timeout: HTTP_TIMEOUT
     )
 
     response.success?
@@ -47,7 +50,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   def qr_code
     response = HTTParty.get(
       "#{api_base_path}/devices/#{device_id}/login",
-      headers: api_headers
+      headers: api_headers,
+      timeout: HTTP_TIMEOUT
     )
 
     return nil unless response.success?
@@ -58,7 +62,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   def device_status
     response = HTTParty.get(
       "#{api_base_path}/devices/#{device_id}/status",
-      headers: api_headers
+      headers: api_headers,
+      timeout: HTTP_TIMEOUT
     )
 
     return nil unless response.success?
@@ -69,7 +74,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   def reconnect_device
     response = HTTParty.post(
       "#{api_base_path}/devices/#{device_id}/reconnect",
-      headers: api_headers
+      headers: api_headers,
+      timeout: HTTP_TIMEOUT
     )
 
     response.success?
@@ -78,7 +84,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   def logout_device
     response = HTTParty.post(
       "#{api_base_path}/devices/#{device_id}/logout",
-      headers: api_headers
+      headers: api_headers,
+      timeout: HTTP_TIMEOUT
     )
 
     response.success?
@@ -101,7 +108,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
       body: {
         phone: phone_number,
         message: message.outgoing_content
-      }.to_json
+      }.to_json,
+      timeout: HTTP_TIMEOUT
     )
 
     process_response(response, message)
@@ -116,7 +124,8 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response = HTTParty.post(
       "#{api_base_path}#{endpoint}",
       headers: api_headers,
-      body: body.to_json
+      body: body.to_json,
+      timeout: HTTP_TIMEOUT
     )
 
     process_response(response, message)

@@ -1,5 +1,8 @@
 class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::BaseController
+  HTTP_TIMEOUT = 30 # seconds
+
   before_action :check_whatsapp_web_api_url
+  before_action :authorize_account_access, only: [:create]
   before_action :fetch_inbox, only: [:qr_code, :status, :reconnect, :logout]
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/devices
@@ -88,13 +91,18 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     }, status: :service_unavailable
   end
 
+  def authorize_account_access
+    authorize Current.account, :update?
+  end
+
   def fetch_inbox
     @inbox = Current.account.inboxes.find(params[:id])
     validate_whatsapp_web_inbox
   end
 
   def validate_whatsapp_web_inbox
-    return if @inbox.channel.is_a?(Channel::Whatsapp) && @inbox.channel.provider == 'whatsapp_web'
+    channel = @inbox.channel
+    return if channel.is_a?(Channel::Whatsapp) && channel.provider == Channel::Whatsapp::WHATSAPP_WEB_PROVIDER
 
     render json: {
       success: false,
@@ -124,19 +132,28 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     }
   end
 
+  def http_options(extra_headers = {})
+    {
+      headers: api_headers.merge(extra_headers),
+      timeout: HTTP_TIMEOUT
+    }
+  end
+
   def create_device_in_api(phone_number)
     url = "#{whatsapp_web_api_url}/devices"
-    body = { device_id: phone_number }.to_json
 
-    response = HTTParty.post(url, headers: api_headers, body: body)
+    response = HTTParty.post(
+      url,
+      **http_options,
+      body: { device_id: phone_number }.to_json
+    )
     handle_api_response(response, 'create device')
   end
 
   def fetch_qr_code_from_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/login"
-    headers = api_headers.merge('X-Device-Id' => device_id)
 
-    response = HTTParty.get(url, headers: headers)
+    response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
 
     raise "Failed to fetch QR code: #{response.code} - #{response.body}" unless response.success?
 
@@ -145,9 +162,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
   def fetch_device_status_from_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/status"
-    headers = api_headers.merge('X-Device-Id' => device_id)
 
-    response = HTTParty.get(url, headers: headers)
+    response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
     parsed_response = handle_api_response(response, 'fetch device status')
 
     # Transform response to expected format
@@ -160,17 +176,15 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
   def reconnect_device_in_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/reconnect"
-    headers = api_headers.merge('X-Device-Id' => device_id)
 
-    response = HTTParty.post(url, headers: headers)
+    response = HTTParty.post(url, **http_options('X-Device-Id' => device_id))
     handle_api_response(response, 'reconnect device')
   end
 
   def logout_device_in_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/logout"
-    headers = api_headers.merge('X-Device-Id' => device_id)
 
-    response = HTTParty.post(url, headers: headers)
+    response = HTTParty.post(url, **http_options('X-Device-Id' => device_id))
     handle_api_response(response, 'logout device')
   end
 

@@ -1,4 +1,8 @@
 class Webhooks::WhatsappWebController < ActionController::API
+  include WhatsappWebChannelFinder
+
+  before_action :verify_webhook_secret
+
   def process_payload
     device_id = params[:device_id]
 
@@ -8,7 +12,7 @@ class Webhooks::WhatsappWebController < ActionController::API
       return
     end
 
-    channel = find_channel_by_device_id(device_id)
+    channel = find_whatsapp_web_channel(device_id)
 
     if channel.blank?
       Rails.logger.warn("WhatsApp Web webhook received for unknown device_id: #{device_id}")
@@ -16,7 +20,7 @@ class Webhooks::WhatsappWebController < ActionController::API
       return
     end
 
-    if channel_is_inactive?(channel)
+    if whatsapp_web_channel_inactive?(channel)
       Rails.logger.warn("WhatsApp Web webhook received for inactive channel: #{device_id}")
       render json: { error: 'Inactive channel' }, status: :unprocessable_entity
       return
@@ -28,15 +32,15 @@ class Webhooks::WhatsappWebController < ActionController::API
 
   private
 
-  def find_channel_by_device_id(device_id)
-    Channel::Whatsapp.find_by("provider = 'whatsapp_web' AND provider_config->>'device_id' = ?", device_id)
-  end
+  def verify_webhook_secret
+    secret = ENV.fetch('WHATSAPP_WEB_WEBHOOK_SECRET', nil)
+    return if secret.blank? # Skip verification if secret not configured
 
-  def channel_is_inactive?(channel)
-    return true if channel.blank?
-    return true if channel.reauthorization_required?
-    return true unless channel.account.active?
+    provided_secret = request.headers['X-Webhook-Secret'] || params[:webhook_secret]
 
-    false
+    return if ActiveSupport::SecurityUtils.secure_compare(secret, provided_secret.to_s)
+
+    Rails.logger.warn('WhatsApp Web webhook received with invalid secret')
+    render json: { error: 'Invalid webhook secret' }, status: :unauthorized
   end
 end
