@@ -91,6 +91,19 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.success?
   end
 
+  # Override base service to handle go-whatsapp response format
+  # go-whatsapp returns: { "code": "SUCCESS", "results": { "message_id": "..." } }
+  # WhatsApp Cloud returns: { "messages": [{ "id": "..." }] }
+  def process_response(response, message)
+    parsed_response = response.parsed_response
+    if response.success? && parsed_response['code'] == 'SUCCESS'
+      parsed_response.dig('results', 'message_id')
+    else
+      handle_error(response, message)
+      nil
+    end
+  end
+
   private
 
   def api_base_path

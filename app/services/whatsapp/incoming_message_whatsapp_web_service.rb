@@ -1,5 +1,6 @@
 # Service to handle incoming messages from go-whatsapp-web-multidevice webhook
 # Transforms webhook payload to Chatwoot format compatible with IncomingMessageBaseService
+# rubocop:disable Metrics/ClassLength
 class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBaseService
   private
 
@@ -7,16 +8,23 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     @processed_params ||= transform_webhook_payload
   end
 
-  def transform_webhook_payload
-    return {} if params[:payload].blank?
+  # Ensure params are accessible with symbol keys (webhook sends string keys)
+  def webhook_params
+    @webhook_params ||= params.with_indifferent_access
+  end
 
-    payload = params[:payload]
-    event_type = params[:event]
+  def transform_webhook_payload
+    return {} if webhook_params[:payload].blank?
+
+    payload = webhook_params[:payload].with_indifferent_access
+    event_type = webhook_params[:event]
 
     # Handle different event types
     case event_type
     when 'message'
       transform_message_event(payload)
+    when 'message.ack'
+      transform_status_event(payload)
     when 'message.reaction', 'message.revoked', 'message.edited'
       # Skip these for now - can be implemented later
       {}
@@ -35,6 +43,27 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       contacts: [build_contact(payload)],
       messages: [build_message(payload, message_id, from, timestamp)]
     }
+  end
+
+  # Transform message.ack event to status update format
+  # go-whatsapp sends: { ids: [...], receipt_type: "delivered"|"read" }
+  # Base service expects: { statuses: [{ id: "...", status: "delivered"|"read" }] }
+  def transform_status_event(payload)
+    message_ids = payload[:ids] || []
+    receipt_type = payload[:receipt_type]
+
+    # Map go-whatsapp receipt types to Chatwoot statuses
+    status = case receipt_type
+             when 'delivered' then 'delivered'
+             when 'read' then 'read'
+             else return {} # Unknown receipt type
+             end
+
+    statuses = message_ids.map do |message_id|
+      { id: message_id, status: status }
+    end
+
+    { statuses: statuses }
   end
 
   def build_contact(payload)
@@ -195,10 +224,34 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     nil
   end
 
+  # Override to prevent status regression (delivered should not overwrite read)
+  # go-whatsapp can send duplicate/out-of-order receipts
   def process_statuses
-    # Status updates (delivered, read) are not supported in the same way
-    # as WhatsApp Cloud API for now. This could be implemented later
-    # if go-whatsapp-web-multidevice adds receipt webhooks.
-    Rails.logger.debug 'WhatsApp Web: Status updates not yet implemented'
+    processed_params[:statuses]&.each do |status_update|
+      message = Message.find_by(source_id: status_update[:id])
+      next unless message
+
+      new_status = status_update[:status]
+      current_status = message.status
+
+      # Status progression: sent(0) → delivered(1) → read(2)
+      # Only update if new status is higher priority (don't regress from read to delivered)
+      next if status_should_not_progress?(current_status, new_status)
+
+      message.update!(status: new_status)
+    end
+  rescue StandardError => e
+    Rails.logger.error "WhatsApp Web: Error processing status update: #{e.message}"
+  end
+
+  def status_should_not_progress?(current_status, new_status)
+    status_priority = { 'sent' => 0, 'delivered' => 1, 'read' => 2, 'failed' => -1 }
+    current_priority = status_priority[current_status] || 0
+    new_priority = status_priority[new_status] || 0
+
+    # Don't regress (e.g., don't go from read back to delivered)
+    # But always allow failed status
+    new_status != 'failed' && new_priority <= current_priority
   end
 end
+# rubocop:enable Metrics/ClassLength
