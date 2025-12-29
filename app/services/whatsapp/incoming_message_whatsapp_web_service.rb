@@ -66,6 +66,12 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     { statuses: statuses }
   end
 
+  # Override to sync avatar after contact is set
+  def set_contact
+    super
+    sync_contact_avatar if @contact
+  end
+
   def build_contact(payload)
     from = extract_phone_number(payload[:from])
     profile_name = payload[:from_name]
@@ -252,6 +258,33 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Don't regress (e.g., don't go from read back to delivered)
     # But always allow failed status
     new_status != 'failed' && new_priority <= current_priority
+  end
+
+  AVATAR_SYNC_INTERVAL = 1.hour
+
+  # Fetch avatar from go-whatsapp and schedule sync job
+  # Rate limited to once per hour to avoid excessive API calls
+  def sync_contact_avatar
+    return if avatar_recently_synced?
+
+    phone_number = @contact.phone_number&.delete_prefix('+')
+    return if phone_number.blank?
+
+    avatar_url = inbox.channel.provider_service.fetch_avatar_url(phone_number)
+    return if avatar_url.blank?
+
+    Avatar::AvatarFromUrlJob.perform_later(@contact, avatar_url)
+  rescue StandardError => e
+    Rails.logger.error "WhatsApp Web: Failed to sync avatar for contact #{@contact.id}: #{e.message}"
+  end
+
+  def avatar_recently_synced?
+    last_sync = @contact.additional_attributes&.dig('last_avatar_sync_at')
+    return false if last_sync.blank?
+
+    Time.zone.parse(last_sync) > AVATAR_SYNC_INTERVAL.ago
+  rescue ArgumentError
+    false
   end
 end
 # rubocop:enable Metrics/ClassLength

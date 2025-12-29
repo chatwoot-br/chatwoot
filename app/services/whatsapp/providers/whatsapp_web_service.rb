@@ -91,6 +91,27 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.success?
   end
 
+  # Fetch avatar URL for a phone number from go-whatsapp API
+  # Returns the avatar URL or nil if not available
+  def fetch_avatar_url(phone_number)
+    response = HTTParty.get(
+      "#{api_base_path}/user/avatar",
+      headers: api_headers,
+      query: { phone: phone_number },
+      timeout: HTTP_TIMEOUT
+    )
+
+    return nil unless response.success?
+
+    parsed = response.parsed_response
+    return nil unless parsed['code'] == 'SUCCESS'
+
+    parsed.dig('results', 'url')
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to fetch avatar: #{e.message}"
+    nil
+  end
+
   # Override base service to handle go-whatsapp response format
   # go-whatsapp returns: { "code": "SUCCESS", "results": { "message_id": "..." } }
   # WhatsApp Cloud returns: { "messages": [{ "id": "..." }] }
