@@ -167,10 +167,13 @@ const refreshQRCode = async () => {
   errorMessage.value = '';
 
   try {
-    await whatsappWebAPI.reconnect(deviceId.value);
+    // Just fetch a new QR code - the /login endpoint handles initialization
     await fetchQRCode();
-    // Reset poll count on refresh
+    // Reset poll count and restart polling on refresh
     pollCount.value = 0;
+    if (!pollInterval.value) {
+      startStatusPolling();
+    }
   } catch (error) {
     errorMessage.value =
       error.response?.data?.message ||

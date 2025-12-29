@@ -3,7 +3,7 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
   before_action :check_whatsapp_web_api_url
   before_action :authorize_account_access, only: [:create]
-  before_action :fetch_inbox, only: [:qr_code, :status, :reconnect, :logout]
+  before_action :resolve_device_id, only: [:qr_code, :status, :reconnect, :logout]
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/devices
   # Creates a new device in go-whatsapp-web-multidevice
@@ -25,10 +25,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   # GET /api/v1/accounts/:account_id/whatsapp_web/devices/:id/qr_code
   # Returns QR code image for device login
   def qr_code
-    authorize @inbox, :update?
-
-    device_id = @inbox.channel.provider_config['device_id']
-    qr_image = fetch_qr_code_from_api(device_id)
+    authorize_device_action(:update?)
+    qr_image = fetch_qr_code_from_api(@device_id)
 
     send_data qr_image, type: 'image/png', disposition: 'inline'
   rescue StandardError => e
@@ -38,10 +36,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   # GET /api/v1/accounts/:account_id/whatsapp_web/devices/:id/status
   # Returns device connection status
   def status
-    authorize @inbox, :show?
-
-    device_id = @inbox.channel.provider_config['device_id']
-    status_data = fetch_device_status_from_api(device_id)
+    authorize_device_action(:show?)
+    status_data = fetch_device_status_from_api(@device_id)
 
     render json: status_data
   rescue StandardError => e
@@ -51,10 +47,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   # POST /api/v1/accounts/:account_id/whatsapp_web/devices/:id/reconnect
   # Triggers device reconnection
   def reconnect
-    authorize @inbox, :update?
-
-    device_id = @inbox.channel.provider_config['device_id']
-    reconnect_device_in_api(device_id)
+    authorize_device_action(:update?)
+    reconnect_device_in_api(@device_id)
 
     render json: {
       success: true,
@@ -67,10 +61,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   # POST /api/v1/accounts/:account_id/whatsapp_web/devices/:id/logout
   # Logs out device from WhatsApp Web
   def logout
-    authorize @inbox, :update?
-
-    device_id = @inbox.channel.provider_config['device_id']
-    logout_device_in_api(device_id)
+    authorize_device_action(:update?)
+    logout_device_in_api(@device_id)
 
     render json: {
       success: true,
@@ -95,9 +87,19 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     authorize Current.account, :update?
   end
 
-  def fetch_inbox
-    @inbox = Current.account.inboxes.find(params[:id])
-    validate_whatsapp_web_inbox
+  # Resolves device_id from either:
+  # 1. An existing inbox ID (for post-setup operations)
+  # 2. A direct device_id (for pre-inbox setup flow)
+  def resolve_device_id
+    @inbox = Current.account.inboxes.find_by(id: params[:id])
+
+    if @inbox
+      validate_whatsapp_web_inbox
+      @device_id = @inbox.channel.provider_config['device_id']
+    else
+      # Pre-inbox setup: params[:id] is the device_id directly
+      @device_id = params[:id]
+    end
   end
 
   def validate_whatsapp_web_inbox
@@ -108,6 +110,16 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
       success: false,
       error: 'Inbox is not a WhatsApp Web channel'
     }, status: :bad_request
+  end
+
+  # Authorizes based on whether we're in setup mode or have an inbox
+  def authorize_device_action(policy_action)
+    if @inbox
+      authorize @inbox, policy_action
+    else
+      # Pre-inbox setup: authorize account access
+      authorize Current.account, :update?
+    end
   end
 
   def validate_create_params!
@@ -147,17 +159,31 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
       **http_options,
       body: { device_id: phone_number }.to_json
     )
+
+    # Handle "device already exists" as success
+    return { 'device_id' => phone_number } if !response.success? && response.body.to_s.include?('already exists')
+
     handle_api_response(response, 'create device')
   end
 
   def fetch_qr_code_from_api(device_id)
-    url = "#{whatsapp_web_api_url}/devices/#{device_id}/login"
+    # Use legacy /app/login endpoint with X-Device-Id header
+    # as /devices/{id}/login is not implemented yet
+    url = "#{whatsapp_web_api_url}/app/login"
 
     response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
-
     raise "Failed to fetch QR code: #{response.code} - #{response.body}" unless response.success?
 
-    response.body
+    # Parse JSON response to get QR code image URL
+    parsed = JSON.parse(response.body)
+    qr_link = parsed.dig('results', 'qr_link')
+    raise 'QR code link not found in response' if qr_link.blank?
+
+    # Download the actual QR code image
+    image_response = HTTParty.get(qr_link, timeout: HTTP_TIMEOUT)
+    raise "Failed to download QR image: #{image_response.code}" unless image_response.success?
+
+    image_response.body
   end
 
   def fetch_device_status_from_api(device_id)
