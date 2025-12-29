@@ -188,16 +188,11 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
   def fetch_device_status_from_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/status"
-
     response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
-    parsed_response = handle_api_response(response, 'fetch device status')
-
-    # Transform response to expected format
-    {
-      state: parsed_response['state'] || 'disconnected',
-      jid: parsed_response['jid'],
-      display_name: parsed_response['display_name']
-    }
+    results = handle_api_response(response, 'fetch device status')['results'] || {}
+    state = results['is_logged_in'] ? 'logged_in' : 'disconnected'
+    state = 'connected' if !results['is_logged_in'] && results['is_connected']
+    { state: state, jid: results['jid'], display_name: results['display_name'] || results['pushname'] }
   end
 
   def reconnect_device_in_api(device_id)
