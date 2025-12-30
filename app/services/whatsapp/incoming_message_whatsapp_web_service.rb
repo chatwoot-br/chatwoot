@@ -416,34 +416,35 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     media_id = attachment_payload[:id]
     return nil if media_id.blank?
 
-    # Check if media_id is a URL (not auto-downloaded)
+    # Check if media_id is a full URL
     if media_id.start_with?('http://', 'https://')
-      # Download from WhatsApp Web API media endpoint
-      download_from_whatsapp_web_api(media_id)
-    elsif File.exist?(media_id)
-      # Media was auto-downloaded, read from local path
+      download_from_url(media_id)
+    elsif media_id.start_with?('/')
+      # Absolute local path
       download_from_local_path(media_id)
     else
-      Rails.logger.error "WhatsApp Web: Cannot download attachment - invalid media_id: #{media_id}"
-      nil
+      # Relative path from go-whatsapp (e.g., "statics/media/...")
+      # Construct full URL to go-whatsapp server
+      download_from_go_whatsapp_path(media_id)
     end
   end
 
-  def download_from_whatsapp_web_api(media_url)
-    # Download media from go-whatsapp-web-multidevice API
-    # This would be used when WHATSAPP_AUTO_DOWNLOAD_MEDIA is false
+  def download_from_go_whatsapp_path(relative_path)
     api_url = ENV.fetch('WHATSAPP_WEB_API_URL', nil)
-    return nil if api_url.blank?
+    if api_url.blank?
+      Rails.logger.error 'WhatsApp Web: WHATSAPP_WEB_API_URL not configured for media download'
+      return nil
+    end
 
-    device_id = inbox.channel.provider_config['device_id']
-    headers = {
-      'X-Device-Id' => device_id,
-      'Accept' => '*/*'
-    }
+    full_url = "#{api_url}/#{relative_path}"
+    Rails.logger.info "WhatsApp Web: Downloading media from #{full_url}"
+    download_from_url(full_url)
+  end
 
-    Down.download(media_url, headers: headers)
+  def download_from_url(url)
+    Down.download(url, max_size: 100.megabytes)
   rescue Down::Error => e
-    Rails.logger.error "WhatsApp Web: Failed to download media from API: #{e.message}"
+    Rails.logger.error "WhatsApp Web: Failed to download media from URL: #{e.message}"
     nil
   end
 
