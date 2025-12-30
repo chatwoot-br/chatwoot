@@ -119,10 +119,84 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     reactions[emoji] << sender unless reactions[emoji].include?(sender)
   end
 
-  # Override to sync avatar after contact is set
+  # Override to handle group messages differently
   def set_contact
-    super
-    sync_contact_avatar if @contact
+    if group_message?
+      set_group_contact
+    else
+      super
+      sync_contact_avatar if @contact
+    end
+  end
+
+  def group_message?
+    webhook_params.dig(:payload, :chat_id).to_s.end_with?('@g.us')
+  end
+
+  def group_id
+    webhook_params.dig(:payload, :chat_id)
+  end
+
+  def set_group_contact
+    group_jid = group_id
+    group_name = fetch_group_name(group_jid) || "Group #{group_jid.split('@').first}"
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: group_jid,
+      inbox: inbox,
+      contact_attributes: {
+        name: group_name,
+        additional_attributes: { is_group: true }
+      }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+
+    # Sync group avatar (uses same endpoint as user avatar)
+    sync_group_avatar(group_jid)
+  end
+
+  def sync_group_avatar(group_jid)
+    return if avatar_recently_synced?
+
+    avatar_url = inbox.channel.provider_service.fetch_avatar_url(group_jid)
+    return if avatar_url.blank?
+
+    Avatar::AvatarFromUrlJob.perform_later(@contact, avatar_url)
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to sync group avatar: #{e.message}"
+  end
+
+  def fetch_group_name(group_jid)
+    group_info = inbox.channel.provider_service.fetch_group_info(group_jid)
+    # go-whatsapp returns 'Name' (capital N) for group name
+    group_info&.dig('Name') || group_info&.dig('name')
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to fetch group name: #{e.message}"
+    nil
+  end
+
+  # Override to store sender info for group messages
+  def create_message(message)
+    @message = @conversation.messages.build(
+      content: message_content(message),
+      account_id: @inbox.account_id,
+      inbox_id: @inbox.id,
+      message_type: :incoming,
+      sender: @contact,
+      source_id: message[:id].to_s,
+      in_reply_to_external_id: @in_reply_to_external_id,
+      additional_attributes: group_message? ? group_sender_attributes : {}
+    )
+  end
+
+  def group_sender_attributes
+    payload = webhook_params[:payload]
+    {
+      sender_phone: extract_phone_number(payload[:from]),
+      sender_name: payload[:from_name]
+    }
   end
 
   def build_contact(payload)

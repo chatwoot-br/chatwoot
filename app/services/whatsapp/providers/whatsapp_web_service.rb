@@ -91,6 +91,27 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     response.success?
   end
 
+  # Fetch group info from go-whatsapp API
+  # Returns the group info hash or nil if not available
+  def fetch_group_info(group_id)
+    response = HTTParty.get(
+      "#{api_base_path}/group/info",
+      headers: api_headers,
+      query: { group_id: group_id },
+      timeout: HTTP_TIMEOUT
+    )
+
+    return nil unless response.success?
+
+    parsed = response.parsed_response
+    return nil unless parsed['code'] == 'SUCCESS'
+
+    parsed['results']
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to fetch group info: #{e.message}"
+    nil
+  end
+
   # Fetch avatar URL for a phone number from go-whatsapp API
   # Returns the avatar URL or nil if not available
   def fetch_avatar_url(phone_number)

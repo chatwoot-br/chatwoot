@@ -2,22 +2,22 @@
 
 ## 1. Backend Service Layer
 
-- [ ] 1.1 Add `group_message?` method to detect group messages (`chat_id` ends with `@g.us`)
-- [ ] 1.2 Add `group_id` method to extract group ID from webhook payload
-- [ ] 1.3 Override `set_contact` to route group messages to group contact
-- [ ] 1.4 Add `set_group_contact` method to create/find group contact by group ID
-- [ ] 1.5 Add `fetch_group_name` method to get group name from go-whatsapp API
-- [ ] 1.6 Store sender info in message `additional_attributes` for group messages
+- [x] 1.1 Add `group_message?` method to detect group messages (`chat_id` ends with `@g.us`)
+- [x] 1.2 Add `group_id` method to extract group ID from webhook payload
+- [x] 1.3 Override `set_contact` to route group messages to group contact
+- [x] 1.4 Add `set_group_contact` method to create/find group contact by group ID
+- [x] 1.5 Add `fetch_group_name` method to get group name from go-whatsapp API
+- [x] 1.6 Store sender info in message `additional_attributes` for group messages
 
 ## 2. Provider Service
 
-- [ ] 2.1 Add `fetch_group_info(group_id)` method to `WhatsappWebService`
-- [ ] 2.2 Parse group info response and extract group name
+- [x] 2.1 Add `fetch_group_info(group_id)` method to `WhatsappWebService`
+- [x] 2.2 Parse group info response and extract group name
 
 ## 3. Model Validation
 
-- [ ] 3.1 Update `WHATSAPP_CHANNEL_REGEX` in `RegexHelper` to accept group IDs
-- [ ] 3.2 New regex pattern: `^\d{1,15}(@g\.us)?$` (allows phone numbers and group IDs)
+- [x] 3.1 Update `WHATSAPP_CHANNEL_REGEX` in `RegexHelper` to accept group IDs
+- [x] 3.2 New regex pattern: `^(\d{1,15}|\d+@g\.us)$` (allows phone numbers and group IDs with any length)
 
 ## 4. Validation
 
