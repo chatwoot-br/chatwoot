@@ -179,16 +179,71 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Override to store sender info for group messages
   def create_message(message)
+    sender = group_message? ? find_or_create_sender_contact : @contact
+
     @message = @conversation.messages.build(
       content: message_content(message),
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       message_type: :incoming,
-      sender: @contact,
+      sender: sender,
       source_id: message[:id].to_s,
       in_reply_to_external_id: @in_reply_to_external_id,
       additional_attributes: group_message? ? group_sender_attributes : {}
     )
+  end
+
+  # Find or create a Contact record for the actual message sender in a group
+  # This allows proper avatar sync and contact management for group participants
+  def find_or_create_sender_contact
+    payload = webhook_params[:payload]
+    sender_phone = extract_phone_number(payload[:from])
+    sender_name = payload[:from_name]
+
+    contact = inbox.account.contacts.find_or_initialize_by(
+      phone_number: "+#{sender_phone}"
+    )
+
+    if contact.new_record?
+      contact.name = sender_name.presence || sender_phone
+      contact.save!
+    elsif contact.name.blank? && sender_name.present?
+      contact.update(name: sender_name)
+    end
+
+    # Sync avatar for this sender
+    sync_sender_avatar(contact, sender_phone)
+
+    contact
+  end
+
+  def sync_sender_avatar(contact, phone_number)
+    return if sender_avatar_recently_synced?(contact)
+
+    avatar_url = inbox.channel.provider_service.fetch_avatar_url(phone_number)
+    if avatar_url.blank?
+      Rails.logger.info "[WhatsApp Web] No avatar URL for sender #{phone_number}"
+      return
+    end
+
+    Rails.logger.info "[WhatsApp Web] Syncing avatar for contact #{contact.id} from #{avatar_url}"
+    # Use perform_now for new contacts to ensure avatar is available immediately
+    if contact.avatar.blank?
+      Avatar::AvatarFromUrlJob.perform_now(contact, avatar_url)
+    else
+      Avatar::AvatarFromUrlJob.perform_later(contact, avatar_url)
+    end
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to sync sender avatar: #{e.message}"
+  end
+
+  def sender_avatar_recently_synced?(contact)
+    last_sync = contact.additional_attributes&.dig('last_avatar_sync_at')
+    return false if last_sync.blank?
+
+    Time.zone.parse(last_sync) > AVATAR_SYNC_INTERVAL.ago
+  rescue ArgumentError
+    false
   end
 
   def group_sender_attributes

@@ -443,14 +443,6 @@ function handleReplyTo() {
 }
 
 const avatarInfo = computed(() => {
-  // For group messages, use sender info from additionalAttributes
-  if (isGroupMessage.value && orientation.value === ORIENTATION.LEFT) {
-    return {
-      name: props.additionalAttributes?.senderName ?? '',
-      src: '', // Avatar URL not available for individual group members
-    };
-  }
-
   // If no sender, return bot info
   if (!props.sender) {
     return {
