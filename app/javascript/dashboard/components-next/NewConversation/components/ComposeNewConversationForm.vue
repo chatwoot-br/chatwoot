@@ -65,10 +65,21 @@ const state = reactive({
   attachedFiles: [],
 });
 
+const isWhatsappWebInbox = computed(() => {
+  return (
+    props.targetInbox?.channelType === INBOX_TYPES.WHATSAPP &&
+    props.targetInbox?.provider === 'whatsapp_web'
+  );
+});
+
 const inboxTypes = computed(() => ({
   isEmail: props.targetInbox?.channelType === INBOX_TYPES.EMAIL,
   isTwilio: props.targetInbox?.channelType === INBOX_TYPES.TWILIO,
-  isWhatsapp: props.targetInbox?.channelType === INBOX_TYPES.WHATSAPP,
+  // whatsapp_web provider doesn't require templates, so treat it like a regular inbox
+  isWhatsapp:
+    props.targetInbox?.channelType === INBOX_TYPES.WHATSAPP &&
+    !isWhatsappWebInbox.value,
+  isWhatsappWeb: isWhatsappWebInbox.value,
   isWebWidget: props.targetInbox?.channelType === INBOX_TYPES.WEB,
   isApi: props.targetInbox?.channelType === INBOX_TYPES.API,
   isEmailOrWebWidget:
@@ -331,8 +342,10 @@ const handleSendTwilioMessage = async ({ message, templateParams }) => {
 };
 
 const shouldShowMessageEditor = computed(() => {
+  // Show message editor for whatsapp_web (no template requirement)
+  // Hide for whatsapp_cloud/default providers (require templates)
   return (
-    !inboxTypes.value.isWhatsapp &&
+    (!inboxTypes.value.isWhatsapp || inboxTypes.value.isWhatsappWeb) &&
     !showNoInboxAlert.value &&
     !inboxTypes.value.isTwilioWhatsapp
   );
@@ -407,6 +420,7 @@ const shouldShowMessageEditor = computed(() => {
     <ActionButtons
       :attached-files="state.attachedFiles"
       :is-whatsapp-inbox="inboxTypes.isWhatsapp"
+      :is-whatsapp-web-inbox="inboxTypes.isWhatsappWeb"
       :is-email-or-web-widget-inbox="inboxTypes.isEmailOrWebWidget"
       :is-twilio-sms-inbox="inboxTypes.isTwilioSMS"
       :is-twilio-whats-app-inbox="inboxTypes.isTwilioWhatsapp"

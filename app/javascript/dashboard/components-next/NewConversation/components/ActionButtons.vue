@@ -17,6 +17,7 @@ import ContentTemplateSelector from './ContentTemplateSelector.vue';
 const props = defineProps({
   attachedFiles: { type: Array, default: () => [] },
   isWhatsappInbox: { type: Boolean, default: false },
+  isWhatsappWebInbox: { type: Boolean, default: false },
   isEmailOrWebWidgetInbox: { type: Boolean, default: false },
   isTwilioSmsInbox: { type: Boolean, default: false },
   isTwilioWhatsAppInbox: { type: Boolean, default: false },
@@ -72,13 +73,20 @@ const showTwilioContentTemplates = computed(() => {
 });
 
 const shouldShowEmojiButton = computed(() => {
+  // whatsapp_web allows direct messaging, so show emoji button
   return (
-    !props.isWhatsappInbox && !props.isTwilioWhatsAppInbox && !props.hasNoInbox
+    (!props.isWhatsappInbox || props.isWhatsappWebInbox) &&
+    !props.isTwilioWhatsAppInbox &&
+    !props.hasNoInbox
   );
 });
 
 const isRegularMessageMode = computed(() => {
-  return !props.isWhatsappInbox && !props.isTwilioWhatsAppInbox;
+  // whatsapp_web doesn't require templates, treat it like a regular inbox
+  return (
+    (!props.isWhatsappInbox || props.isWhatsappWebInbox) &&
+    !props.isTwilioWhatsAppInbox
+  );
 });
 
 const isVoiceInbox = computed(() => props.channelType === INBOX_TYPES.VOICE);
