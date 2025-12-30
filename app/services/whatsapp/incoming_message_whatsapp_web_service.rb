@@ -2,6 +2,16 @@
 # Transforms webhook payload to Chatwoot format compatible with IncomingMessageBaseService
 # rubocop:disable Metrics/ClassLength
 class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBaseService
+  def perform
+    processed_params
+
+    if processed_params.try(:[], :reaction).present?
+      process_reaction
+    else
+      super
+    end
+  end
+
   private
 
   def processed_params
@@ -25,7 +35,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       transform_message_event(payload)
     when 'message.ack'
       transform_status_event(payload)
-    when 'message.reaction', 'message.revoked', 'message.edited'
+    when 'message.reaction'
+      transform_reaction_event(payload)
+    when 'message.revoked', 'message.edited'
       # Skip these for now - can be implemented later
       {}
     else
@@ -64,6 +76,47 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     end
 
     { statuses: statuses }
+  end
+
+  # Transform message.reaction event to reaction update format
+  # go-whatsapp sends: { reacted_message_id: "...", reaction: "👍", from: "..." }
+  def transform_reaction_event(payload)
+    {
+      reaction: {
+        message_id: payload[:reacted_message_id],
+        emoji: payload[:reaction],
+        sender: extract_phone_number(payload[:from])
+      }
+    }
+  end
+
+  def process_reaction
+    reaction_data = processed_params[:reaction]
+    message = inbox.messages.find_by(source_id: reaction_data[:message_id])
+    return unless message
+
+    updated_reactions = update_reactions(message.reactions || {}, reaction_data[:emoji], reaction_data[:sender])
+    message.update!(reactions: updated_reactions)
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Error processing reaction: #{e.message}"
+  end
+
+  def update_reactions(reactions, emoji, sender)
+    # Remove any existing reaction from this sender
+    remove_sender_from_reactions(reactions, sender)
+    # Add new reaction if emoji is present (empty means un-react)
+    add_reaction(reactions, emoji, sender) if emoji.present?
+    reactions
+  end
+
+  def remove_sender_from_reactions(reactions, sender)
+    reactions.each_value { |senders| senders.delete(sender) }
+    reactions.delete_if { |_, senders| senders.empty? }
+  end
+
+  def add_reaction(reactions, emoji, sender)
+    reactions[emoji] ||= []
+    reactions[emoji] << sender unless reactions[emoji].include?(sender)
   end
 
   # Override to sync avatar after contact is set
