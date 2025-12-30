@@ -177,20 +177,70 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     nil
   end
 
-  # Override to store sender info for group messages
+  # Override to handle outgoing messages and group sender info
   def create_message(message)
-    sender = group_message? ? find_or_create_sender_contact : @contact
+    @message = @conversation.messages.build(message_attributes(message))
+  end
 
-    @message = @conversation.messages.build(
+  def message_attributes(message)
+    base_attrs = {
       content: message_content(message),
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
-      message_type: :incoming,
-      sender: sender,
       source_id: message[:id].to_s,
-      in_reply_to_external_id: @in_reply_to_external_id,
-      additional_attributes: group_message? ? group_sender_attributes : {}
+      in_reply_to_external_id: @in_reply_to_external_id
+    }
+
+    # Messages from the connected device are outgoing with device contact as sender
+    if message_from_me?
+      base_attrs.merge(outgoing_message_attributes)
+    else
+      base_attrs.merge(incoming_message_attributes)
+    end
+  end
+
+  # Messages from connected device are outgoing (right side, blue bubble)
+  # with device contact as sender for proper name/avatar display
+  def outgoing_message_attributes
+    {
+      message_type: :outgoing,
+      sender: find_or_create_device_contact
+    }
+  end
+
+  # Find or create a Contact for the connected WhatsApp device
+  def find_or_create_device_contact
+    device_phone = extract_phone_number(webhook_params[:device_id])
+    sender_name = webhook_params.dig(:payload, :from_name)
+
+    contact = inbox.account.contacts.find_or_initialize_by(
+      phone_number: "+#{device_phone}"
     )
+
+    if contact.new_record?
+      contact.name = sender_name.presence || device_phone
+      contact.save!
+    elsif contact.name.blank? && sender_name.present?
+      contact.update(name: sender_name)
+    end
+
+    # Sync avatar for this device contact
+    sync_sender_avatar(contact, device_phone)
+
+    contact
+  end
+
+  def incoming_message_attributes
+    attrs = {
+      message_type: :incoming,
+      sender: group_message? ? find_or_create_sender_contact : @contact
+    }
+    attrs[:additional_attributes] = group_sender_attributes if group_message?
+    attrs
+  end
+
+  def message_from_me?
+    webhook_params.dig(:payload, :is_from_me) == true
   end
 
   # Find or create a Contact record for the actual message sender in a group
