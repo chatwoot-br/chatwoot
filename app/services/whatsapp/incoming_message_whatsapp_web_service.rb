@@ -356,10 +356,13 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def build_media_object(media_data, caption = nil)
     media_obj = if media_data.is_a?(Hash)
-                  # Media not auto-downloaded, has URL
-                  { id: media_data[:url] }
+                  # go-whatsapp sends either:
+                  # - { media_path: "...", mime_type: "...", caption: "..." } when auto-downloaded
+                  # - { url: "..." } when not auto-downloaded
+                  path = media_data[:media_path] || media_data[:url]
+                  { id: path }
                 else
-                  # Media auto-downloaded, has local path
+                  # Direct string path (legacy format)
                   { id: media_data }
                 end
 
