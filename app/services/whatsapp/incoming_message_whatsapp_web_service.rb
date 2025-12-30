@@ -48,12 +48,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def transform_message_event(payload)
     message_id = payload[:id]
-    from = extract_phone_number(payload[:from])
     timestamp = parse_timestamp(payload[:timestamp])
+
+    # For is_from_me messages, use chat_id as the contact identifier (the recipient)
+    # For incoming messages, use from as the contact identifier (the sender)
+    contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
+    contact_phone = extract_phone_number(contact_jid)
 
     {
       contacts: [build_contact(payload)],
-      messages: [build_message(payload, message_id, from, timestamp)]
+      messages: [build_message(payload, message_id, contact_phone, timestamp)]
     }
   end
 
@@ -305,11 +309,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def build_contact(payload)
-    from = extract_phone_number(payload[:from])
-    profile_name = payload[:from_name]
+    # For is_from_me messages, use chat_id as the contact (the recipient)
+    # For incoming messages, use from as the contact (the sender)
+    contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
+    contact_phone = extract_phone_number(contact_jid)
+
+    # Profile name is only available for incoming messages
+    profile_name = payload[:is_from_me] ? nil : payload[:from_name]
 
     {
-      wa_id: from,
+      wa_id: contact_phone,
       profile: {
         name: profile_name
       }
