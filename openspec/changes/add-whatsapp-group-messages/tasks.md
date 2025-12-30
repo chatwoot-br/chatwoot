@@ -19,10 +19,19 @@
 - [x] 3.1 Update `WHATSAPP_CHANNEL_REGEX` in `RegexHelper` to accept group IDs
 - [x] 3.2 New regex pattern: `^(\d{1,15}|\d+@g\.us)$` (allows phone numbers and group IDs with any length)
 
-## 4. Validation
+## 4. Frontend Changes
 
-- [ ] 4.1 Test individual message routing (unchanged behavior)
-- [ ] 4.2 Test group message creates group conversation
-- [ ] 4.3 Test multiple senders in same group use same conversation
-- [ ] 4.4 Test group name fetched from API
-- [ ] 4.5 Test sender info stored in message additional_attributes
+- [x] 4.1 Add `additionalAttributes` prop to Message.vue
+- [x] 4.2 Detect group messages via `additionalAttributes.sender_name`
+- [x] 4.3 Show avatar for incoming group messages (left side)
+- [x] 4.4 Display "Sent by: {sender_name}" tooltip on avatar hover
+- [x] 4.5 Adjust grid layout for left-side avatar
+
+## 5. Validation
+
+- [ ] 5.1 Test individual message routing (unchanged behavior)
+- [ ] 5.2 Test group message creates group conversation
+- [ ] 5.3 Test multiple senders in same group use same conversation
+- [ ] 5.4 Test group name fetched from API
+- [ ] 5.5 Test sender info stored in message additional_attributes
+- [ ] 5.6 Test sender avatar and tooltip display in group conversations
