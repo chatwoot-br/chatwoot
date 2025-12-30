@@ -182,6 +182,7 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     endpoint = attachment_endpoint(attachment.file_type)
 
     body = build_attachment_body(phone_number, message, attachment)
+    Rails.logger.info "[WhatsApp Web] Sending attachment: #{body.to_json}"
 
     response = HTTParty.post(
       "#{api_base_path}#{endpoint}",
@@ -203,18 +204,51 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def build_attachment_body(phone_number, message, attachment)
+    # go-whatsapp expects *_url suffix for URL parameters (e.g., audio_url, image_url)
+    # The non-suffixed fields (audio, image) are for multipart file uploads
+    url_field = attachment_url_field(attachment.file_type)
+
     body = {
       'phone' => phone_number,
-      attachment.file_type => attachment.download_url
+      url_field => accessible_download_url(attachment)
     }
 
     # Add caption for supported types
     body['caption'] = message.outgoing_content if %w[image video].include?(attachment.file_type) && message.outgoing_content.present?
 
+    # Send audio as voice note (PTT = Push-to-Talk)
+    body['ptt'] = true if attachment.file_type == 'audio'
+
     # Add reply context if replying to a message
     body['reply_message_id'] = reply_message_id(message) if reply_message_id(message).present?
 
     body
+  end
+
+  # Transform download URL to be accessible by go-whatsapp service
+  # 0.0.0.0 is a bind address, not a valid hostname for external access
+  def accessible_download_url(attachment)
+    url = attachment.download_url
+    return url if url.blank?
+
+    # Use INTERNAL_API_URL if available (for Docker/service communication)
+    internal_url = ENV.fetch('INTERNAL_API_URL', nil)
+    if internal_url.present?
+      frontend_url = ENV.fetch('FRONTEND_URL', 'http://0.0.0.0:3000')
+      return url.sub(frontend_url, internal_url)
+    end
+
+    # Fallback: replace 0.0.0.0 with localhost
+    url.gsub('://0.0.0.0:', '://localhost:')
+  end
+
+  def attachment_url_field(file_type)
+    case file_type
+    when 'image' then 'image_url'
+    when 'video' then 'video_url'
+    when 'audio' then 'audio_url'
+    else 'file_url'
+    end
   end
 
   def error_message(response)
