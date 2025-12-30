@@ -119,7 +119,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
   def add_reply_context(message, payload)
-    message[:context] = { id: payload[:replied_to_id] } if payload[:replied_to_id].present?
+    message['context'] = { 'id' => payload[:replied_to_id] } if payload[:replied_to_id].present?
   end
 
   def build_media_object(media_data, caption = nil)

@@ -127,6 +127,10 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
 
   private
 
+  def reply_message_id(message)
+    message.content_attributes[:in_reply_to_external_id]
+  end
+
   def api_base_path
     ENV.fetch('WHATSAPP_WEB_API_URL', 'http://localhost:3000')
   end
@@ -136,13 +140,16 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def send_text_message(phone_number, message)
+    body = {
+      phone: phone_number,
+      message: message.outgoing_content
+    }
+    body[:reply_message_id] = reply_message_id(message) if reply_message_id(message).present?
+
     response = HTTParty.post(
       "#{api_base_path}/send/message",
       headers: api_headers,
-      body: {
-        phone: phone_number,
-        message: message.outgoing_content
-      }.to_json,
+      body: body.to_json,
       timeout: HTTP_TIMEOUT
     )
 
@@ -182,6 +189,9 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
 
     # Add caption for supported types
     body['caption'] = message.outgoing_content if %w[image video].include?(attachment.file_type) && message.outgoing_content.present?
+
+    # Add reply context if replying to a message
+    body['reply_message_id'] = reply_message_id(message) if reply_message_id(message).present?
 
     body
   end
