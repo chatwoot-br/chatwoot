@@ -9,6 +9,7 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 - **No templates**: Session-only messaging (WhatsApp Web limitation)
 - **Dedicated webhook**: Single global endpoint `/webhooks/whatsapp_web` for all devices
 - **Phone as device_id**: Use phone number (without +) as `device_id`
+- **Inbox deletion cleanup**: When inbox is deleted, logout and remove device from go-whatsapp
 
 ---
 
@@ -95,6 +96,19 @@ end
 
 # Line 35: Skip template sync for whatsapp_web
 after_create :sync_templates, unless: :whatsapp_web?
+
+# Cleanup device on destroy
+before_destroy :cleanup_whatsapp_web_device, if: :whatsapp_web?
+
+private
+
+def cleanup_whatsapp_web_device
+  return unless whatsapp_web? && provider_config['device_id'].present?
+
+  provider_service.logout_device
+rescue StandardError => e
+  Rails.logger.error "WhatsApp Web: Failed to cleanup device on inbox deletion: #{e.message}"
+end
 ```
 
 ### 2. Routes
@@ -160,6 +174,7 @@ WHATSAPP_WEB: 'whatsapp_web',
 11. **Parent Component** - Add provider option to `Whatsapp.vue`
 12. **Translations** - Add i18n strings
 13. **Config** - Expose env var to frontend
+14. **Inbox Deletion Cleanup** - Add `before_destroy` callback to cleanup device from go-whatsapp
 
 ---
 
