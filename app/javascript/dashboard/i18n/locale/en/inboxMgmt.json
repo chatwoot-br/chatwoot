@@ -663,6 +663,7 @@
       "WIDGET_BUILDER": "Widget Builder",
       "BOT_CONFIGURATION": "Bot Configuration",
       "ACCOUNT_HEALTH": "Account Health",
+      "CONNECTION": "Connection",
       "CSAT": "CSAT"
     },
     "ACCOUNT_HEALTH": {
@@ -718,6 +719,48 @@
           "SANDBOX": "Sandbox",
           "LIVE": "Live"
         }
+      }
+    },
+    "WHATSAPP_WEB_CONNECTION": {
+      "TITLE": "WhatsApp Web Connection",
+      "DESCRIPTION": "Manage your WhatsApp Web connection status",
+      "PHONE_NUMBER": "Phone Number",
+      "STATUS": {
+        "CONNECTED": "Connected",
+        "DISCONNECTED": "Disconnected",
+        "CONNECTING": "Connecting...",
+        "LABEL": "Connection Status"
+      },
+      "ACTIONS": {
+        "CONNECT": "Connect with QR Code",
+        "RECONNECT": "Reconnect",
+        "DISCONNECT": "Disconnect",
+        "REFRESH_QR": "Refresh QR Code",
+        "CLOSE": "Close"
+      },
+      "QR_MODAL": {
+        "TITLE": "Scan QR Code to Connect",
+        "DESCRIPTION": "Open WhatsApp on your phone and scan this QR code",
+        "INSTRUCTIONS": {
+          "TITLE": "How to scan:",
+          "STEP_1": "Open WhatsApp on your phone",
+          "STEP_2": "Tap Menu or Settings and select Linked Devices",
+          "STEP_3": "Point your phone at this screen to capture the QR code"
+        },
+        "WAITING": "Waiting for connection..."
+      },
+      "DISCONNECT_CONFIRM": {
+        "TITLE": "Disconnect WhatsApp?",
+        "MESSAGE": "This will disconnect your WhatsApp account. You'll need to scan the QR code again to reconnect.",
+        "CONFIRM": "Yes, Disconnect",
+        "CANCEL": "Cancel"
+      },
+      "ALERTS": {
+        "RECONNECT_SUCCESS": "WhatsApp reconnected successfully",
+        "RECONNECT_ERROR": "Failed to reconnect. Please try again.",
+        "DISCONNECT_SUCCESS": "WhatsApp disconnected successfully",
+        "DISCONNECT_ERROR": "Failed to disconnect. Please try again.",
+        "STATUS_ERROR": "Failed to fetch connection status"
       }
     },
     "SETTINGS": "Settings",
