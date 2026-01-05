@@ -342,6 +342,8 @@
           },
           "WAITING": "Waiting for you to scan the QR code...",
           "REFRESH": "Refresh QR Code",
+          "SKIP": "Skip & Create Inbox",
+          "SKIP_NOTE": "You can connect to WhatsApp later from the inbox settings page.",
           "ERROR": "Failed to load QR code. Please try again.",
           "REFRESH_ERROR": "Failed to refresh QR code. Please try again.",
           "TIMEOUT": "QR code scan timed out. Please refresh and try again."

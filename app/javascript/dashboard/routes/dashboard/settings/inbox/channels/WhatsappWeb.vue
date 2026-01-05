@@ -184,6 +184,11 @@ const refreshQRCode = async () => {
   }
 };
 
+const skipQRScan = async () => {
+  stopStatusPolling();
+  await createInbox();
+};
+
 // Cleanup
 onBeforeUnmount(() => {
   stopStatusPolling();
@@ -349,7 +354,20 @@ onBeforeUnmount(() => {
             <Icon icon="i-lucide-refresh-cw" size="16" />
             {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.REFRESH') }}
           </NextButton>
+          <NextButton
+            variant="primary"
+            :is-loading="isLoading"
+            :is-disabled="isLoading"
+            @click="skipQRScan"
+          >
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.SKIP') }}
+          </NextButton>
         </div>
+
+        <!-- Skip note -->
+        <p class="text-xs text-center text-n-slate-10 max-w-md">
+          {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.SKIP_NOTE') }}
+        </p>
       </div>
     </div>
 

@@ -22,20 +22,12 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   end
 
   def validate_provider_config?
+    # Only check that required config is present, NOT connection status
+    # This allows inbox creation before WhatsApp is connected
     return false if ENV['WHATSAPP_WEB_API_URL'].blank?
     return false if whatsapp_channel.provider_config['device_id'].blank?
 
-    # Verify the device exists and is accessible
-    response = HTTParty.get(
-      "#{api_base_path}/devices/#{device_id}/status",
-      headers: api_headers,
-      timeout: HTTP_TIMEOUT
-    )
-
-    response.success?
-  rescue StandardError => e
-    Rails.logger.error "[WhatsApp Web] Validation failed: #{e.message}"
-    false
+    true
   end
 
   def api_headers

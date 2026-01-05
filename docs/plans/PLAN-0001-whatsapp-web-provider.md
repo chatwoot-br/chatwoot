@@ -10,6 +10,7 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 - **Dedicated webhook**: Single global endpoint `/webhooks/whatsapp_web` for all devices
 - **Phone as device_id**: Use phone number (without +) as `device_id`
 - **Inbox deletion cleanup**: When inbox is deleted, logout and remove device from go-whatsapp
+- **Deferred connection**: Inbox creation must NOT require WhatsApp connection; user can skip QR scan and connect later from inbox settings
 
 ---
 
@@ -19,6 +20,7 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 **`app/services/whatsapp/providers/whatsapp_web_service.rb`**
 - Inherit from `BaseService`
 - Implement: `send_message`, `send_template` (no-op), `sync_templates` (no-op), `validate_provider_config?`
+- `validate_provider_config?` should only check that `WHATSAPP_WEB_API_URL` env var and `device_id` are present (NOT connection status)
 - API calls to go-whatsapp-web-multidevice: `/send/message`, `/send/image`, `/send/file`, etc.
 - Device management: `get_qr_code`, `get_device_status`, `reconnect_device`, `logout_device`
 - Use `X-Device-Id` header with `device_id` from `provider_config`
@@ -59,9 +61,11 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 
 ### 7. Frontend Component
 **`app/javascript/dashboard/routes/dashboard/settings/inbox/channels/WhatsappWeb.vue`**
-- 3-step flow: Create Device → Scan QR → Create Inbox
-- Poll status every 3 seconds during QR scan step
+- 2-step flow: Enter Phone Number → Create Inbox (QR scan is optional)
+- Show QR code after device creation with "Skip" button to proceed without connecting
+- Poll status every 3 seconds during QR scan step (if user chooses to scan)
 - Display connection status, handle refresh QR
+- User can connect later from inbox settings page
 
 ### 8. API Client
 **`app/javascript/dashboard/api/channel/whatsappWebChannel.js`**
