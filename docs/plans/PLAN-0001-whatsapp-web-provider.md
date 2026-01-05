@@ -59,7 +59,7 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 - `POST /:inbox_id/reconnect` - Trigger reconnection
 - `POST /:inbox_id/logout` - Logout device
 
-### 7. Frontend Component
+### 7. Frontend Component - Inbox Creation
 **`app/javascript/dashboard/routes/dashboard/settings/inbox/channels/WhatsappWeb.vue`**
 - 2-step flow: Enter Phone Number → Create Inbox (QR scan is optional)
 - Show QR code after device creation with "Skip" button to proceed without connecting
@@ -67,7 +67,15 @@ Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with 
 - Display connection status, handle refresh QR
 - User can connect later from inbox settings page
 
-### 8. API Client
+### 8. Frontend Component - Connection Management (Implemented)
+**`app/javascript/dashboard/routes/dashboard/settings/inbox/components/WhatsAppWebConnection.vue`**
+- New "Connection" tab in inbox settings (only for whatsapp_web provider)
+- Displays connection status with color-coded badge
+- Actions: Connect with QR Code, Reconnect, Disconnect
+- QR code modal with polling for connection status
+- Disconnect confirmation dialog
+
+### 9. API Client
 **`app/javascript/dashboard/api/channel/whatsappWebChannel.js`**
 - `createDevice(phoneNumber)`, `getQRCode(inboxId)`, `getDeviceStatus(inboxId)`, `reconnect(inboxId)`, `logout(inboxId)`
 
