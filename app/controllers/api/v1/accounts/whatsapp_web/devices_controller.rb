@@ -172,6 +172,13 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     url = "#{whatsapp_web_api_url}/app/login"
 
     response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
+
+    # If device not found (deleted after disconnect), recreate it and retry
+    if !response.success? && (response.code == 404 || response.body.to_s.include?('not found'))
+      create_device_in_api(device_id)
+      response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
+    end
+
     raise "Failed to fetch QR code: #{response.code} - #{response.body}" unless response.success?
 
     # Parse JSON response to get QR code image URL
@@ -189,6 +196,10 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   def fetch_device_status_from_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/status"
     response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
+
+    # Handle "device not found" gracefully as disconnected state
+    return { state: 'disconnected' } if !response.success? && response.body.to_s.include?('not found')
+
     results = handle_api_response(response, 'fetch device status')['results'] || {}
     state = results['is_logged_in'] ? 'logged_in' : 'disconnected'
     state = 'connected' if !results['is_logged_in'] && results['is_connected']

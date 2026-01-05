@@ -98,7 +98,27 @@ Added conditional render in template:
 />
 ```
 
-### 2. Translations
+### 2. Devices Controller - Graceful Disconnect Handling
+**`app/controllers/api/v1/accounts/whatsapp_web/devices_controller.rb`**
+
+Added graceful handling for device not found scenarios:
+
+```ruby
+# In fetch_device_status_from_api - return disconnected state instead of error
+return { state: 'disconnected' } if !response.success? && response.body.to_s.include?('not found')
+
+# In fetch_qr_code_from_api - recreate device if not found and retry
+if !response.success? && (response.code == 404 || response.body.to_s.include?('not found'))
+  create_device_in_api(device_id)
+  response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
+end
+```
+
+This ensures:
+- After disconnect, status check returns "disconnected" instead of error
+- After disconnect, "Connect with QR Code" recreates the device automatically
+
+### 3. Translations
 **`app/javascript/dashboard/i18n/locale/en/inboxMgmt.json`**
 
 Added to TABS:
