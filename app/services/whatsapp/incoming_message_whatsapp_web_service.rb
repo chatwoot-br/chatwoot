@@ -477,19 +477,25 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Override to prevent status regression (delivered should not overwrite read)
   # go-whatsapp can send duplicate/out-of-order receipts
+  # Uses database locking to prevent race conditions when multiple status updates arrive simultaneously
   def process_statuses
     processed_params[:statuses]&.each do |status_update|
       message = Message.find_by(source_id: status_update[:id])
       next unless message
 
       new_status = status_update[:status]
-      current_status = message.status
 
-      # Status progression: sent(0) → delivered(1) → read(2)
-      # Only update if new status is higher priority (don't regress from read to delivered)
-      next if status_should_not_progress?(current_status, new_status)
+      # Use pessimistic locking to prevent race conditions
+      # This ensures we read the latest status before deciding to update
+      message.with_lock do
+        current_status = message.status
 
-      message.update!(status: new_status)
+        # Status progression: sent(0) → delivered(1) → read(2)
+        # Only update if new status is higher priority (don't regress from read to delivered)
+        next if status_should_not_progress?(current_status, new_status)
+
+        message.update!(status: new_status)
+      end
     end
   rescue StandardError => e
     Rails.logger.error "WhatsApp Web: Error processing status update: #{e.message}"
