@@ -382,6 +382,52 @@ end
 
 **File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
 
+### 6. Missing Contact Names
+**Problem**: Contacts imported without names because PUSH_NAME sync comes after RECENT messages.
+
+**Cause**: WhatsApp sends multiple sync events in sequence (RECENT, PUSH_NAME, etc.). Webhook was firing after EACH event, so RECENT messages were imported before PUSH_NAME (containing names) arrived.
+
+**Fix**: Added debounce mechanism in go-whatsapp to wait 5 seconds after the last sync event:
+```go
+var (
+    historySyncDebounceTimer *time.Timer
+    historySyncDebounceMu    sync.Mutex
+    historySyncDebounceDelay = 5 * time.Second
+)
+
+func scheduleHistorySyncWebhook(client *whatsmeow.Client, syncType string) {
+    historySyncDebounceMu.Lock()
+    defer historySyncDebounceMu.Unlock()
+
+    if historySyncDebounceTimer != nil {
+        historySyncDebounceTimer.Stop()
+    }
+
+    historySyncDebounceTimer = time.AfterFunc(historySyncDebounceDelay, func() {
+        forwardHistorySyncCompleteToWebhook(context.Background(), client, syncType)
+    })
+}
+```
+
+**File:** `src/infrastructure/whatsapp/history_sync.go`
+
+### 7. Chat Info Enrichment
+**Problem**: Chat data from `/chats` API might lack complete name/jid info.
+
+**Fix**: Merge `chat_info` from messages API response into chat data:
+```ruby
+def sync_history_chat_messages(chat)
+  enriched_chat = chat.dup
+  # ...
+  response = inbox.channel.provider_service.fetch_chat_messages(...)
+  chat_info = response['chat_info']
+  enriched_chat = enriched_chat.merge(chat_info) if chat_info.present?
+  process_history_messages(batch, enriched_chat)
+end
+```
+
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
 ---
 
 ## Known Issues (Pending Fix)
