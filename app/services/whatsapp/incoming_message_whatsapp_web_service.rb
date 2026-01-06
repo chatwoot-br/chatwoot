@@ -568,6 +568,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     chat_jid = chat['jid']
     return if chat_jid.blank?
 
+    # Will be enriched with chat_info from first messages response
+    enriched_chat = chat.dup
     offset = 0
 
     loop do
@@ -578,10 +580,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       )
       break if response.blank?
 
+      # Merge chat_info from response into chat data (has name and jid)
+      chat_info = response['chat_info']
+      enriched_chat = enriched_chat.merge(chat_info) if chat_info.present?
+
       batch = response['data']
       break if batch.blank? || !batch.is_a?(Array)
 
-      process_history_messages(batch, chat)
+      process_history_messages(batch, enriched_chat)
       break unless more_history_pages?(response, offset, HISTORY_MESSAGE_BATCH_SIZE)
 
       offset += HISTORY_MESSAGE_BATCH_SIZE
