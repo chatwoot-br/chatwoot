@@ -329,19 +329,21 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
     contact_phone = extract_phone_number(contact_jid)
 
-    # Profile name: for incoming messages use from_name, for outgoing use contact_name (from history sync)
-    # Real-time webhooks don't have contact_name, so it falls back to nil for outgoing (correct behavior)
+    # Profile name resolution:
+    # - Incoming messages: use from_name (sender's push name)
+    # - Outgoing messages: use contact_name (history sync) or chat_name (real-time webhook)
     profile_name = if payload[:is_from_me]
-                     payload[:contact_name] # Set by history sync, nil for real-time webhooks
+                     # contact_name is set by history sync, chat_name is set by real-time webhook
+                     payload[:contact_name] || payload[:chat_name]
                    else
                      payload[:from_name]
                    end
 
     # Debug: Log contact name resolution
-    Rails.logger.info "[WhatsApp History Sync] build_contact: is_from_me=#{payload[:is_from_me]}, " \
+    Rails.logger.info "[WhatsApp] build_contact: is_from_me=#{payload[:is_from_me]}, " \
                       "contact_jid=#{contact_jid}, contact_phone=#{contact_phone}, " \
                       "from_name=#{payload[:from_name].inspect}, contact_name=#{payload[:contact_name].inspect}, " \
-                      "profile_name=#{profile_name.inspect}"
+                      "chat_name=#{payload[:chat_name].inspect}, profile_name=#{profile_name.inspect}"
 
     {
       wa_id: contact_phone,
