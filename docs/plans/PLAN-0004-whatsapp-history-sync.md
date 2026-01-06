@@ -553,6 +553,8 @@ after_create :enable_lock_to_single_conversation_for_whatsapp_web
 
 def enable_lock_to_single_conversation_for_whatsapp_web
   return unless channel.is_a?(Channel::Whatsapp) && channel.whatsapp_web?
-  self.lock_to_single_conversation = true
+  update_column(:lock_to_single_conversation, true)
 end
 ```
+
+**Note**: Must use `update_column` because `after_create` runs after the INSERT.
