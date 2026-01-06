@@ -1,5 +1,7 @@
 # Plan: Add WhatsApp Group Message Support
 
+## Status: Implemented
+
 ## Overview
 Add support for WhatsApp group messages in the WhatsApp Web provider. Currently, group messages are incorrectly routed to individual contact conversations. They should create/use a separate "group contact" conversation.
 

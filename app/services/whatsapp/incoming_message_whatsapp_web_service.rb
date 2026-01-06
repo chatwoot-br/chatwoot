@@ -329,8 +329,19 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
     contact_phone = extract_phone_number(contact_jid)
 
-    # Profile name is only available for incoming messages
-    profile_name = payload[:is_from_me] ? nil : payload[:from_name]
+    # Profile name: for incoming messages use from_name, for outgoing use contact_name (from history sync)
+    # Real-time webhooks don't have contact_name, so it falls back to nil for outgoing (correct behavior)
+    profile_name = if payload[:is_from_me]
+                     payload[:contact_name] # Set by history sync, nil for real-time webhooks
+                   else
+                     payload[:from_name]
+                   end
+
+    # Debug: Log contact name resolution
+    Rails.logger.info "[WhatsApp History Sync] build_contact: is_from_me=#{payload[:is_from_me]}, " \
+                      "contact_jid=#{contact_jid}, contact_phone=#{contact_phone}, " \
+                      "from_name=#{payload[:from_name].inspect}, contact_name=#{payload[:contact_name].inspect}, " \
+                      "profile_name=#{profile_name.inspect}"
 
     {
       wa_id: contact_phone,
@@ -426,6 +437,50 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     return '' if jid.blank?
 
     jid.split('@').first
+  end
+
+  def group_chat?(jid)
+    # Group chats have JIDs ending in @g.us
+    return false if jid.blank?
+
+    jid.end_with?('@g.us')
+  end
+
+  # Look up sender name for group messages
+  # Priority: message['sender_name'] > individual chat lookup > nil (placeholder)
+  # NEVER return group name - that causes contacts to be named with group names
+  def lookup_sender_name_for_group(message, sender_jid)
+    # First try sender_name from message API (populated by go-whatsapp)
+    name = message['sender_name']
+    return name if name.present?
+
+    # Fall back to looking up sender's individual chat
+    return nil unless @history_chats_by_jid && sender_jid.present?
+
+    # Try direct lookup first
+    sender_chat = @history_chats_by_jid[sender_jid]
+
+    # Try with @s.whatsapp.net suffix if not found
+    sender_chat = @history_chats_by_jid["#{sender_jid}@s.whatsapp.net"] if sender_chat.nil? && !sender_jid.include?('@')
+
+    sender_chat&.dig('name')
+  end
+
+  # Merge chat_info into enriched_chat, but preserve non-blank name from original
+  # This prevents empty name from messages API overwriting good name from chats list
+  def merge_chat_info_preserving_name(enriched_chat, chat_info)
+    return enriched_chat if chat_info.blank?
+
+    original_name = enriched_chat['name']
+    merged = enriched_chat.merge(chat_info)
+
+    # Restore original name if new one is blank but original was present
+    if merged['name'].blank? && original_name.present?
+      Rails.logger.info "[WhatsApp History Sync] Preserving name: chat_info had blank name, keeping #{original_name.inspect}"
+      merged['name'] = original_name
+    end
+
+    merged
   end
 
   def parse_timestamp(timestamp_str)
@@ -535,13 +590,25 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def process_history_sync
     Rails.logger.info "[WhatsApp History Sync] Starting for inbox #{inbox.id}"
 
-    fetch_all_history_chats.each do |chat|
+    # Fetch all chats and store for name lookups during message processing
+    @history_chats = fetch_all_history_chats
+    @history_chats_by_jid = @history_chats.index_by { |c| c['jid'] }
+
+    # Debug: Log all fetched chats with names
+    @history_chats.each do |chat|
+      Rails.logger.info "[WhatsApp History Sync] Chat: jid=#{chat['jid']}, name=#{chat['name'].inspect}"
+    end
+
+    @history_chats.each do |chat|
       sync_history_chat_messages(chat)
     end
 
     Rails.logger.info "[WhatsApp History Sync] Completed for inbox #{inbox.id}"
   rescue StandardError => e
     Rails.logger.error "[WhatsApp History Sync] Failed: #{e.message}"
+  ensure
+    @history_chats = nil
+    @history_chats_by_jid = nil
   end
 
   def fetch_all_history_chats
@@ -580,9 +647,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       )
       break if response.blank?
 
-      # Merge chat_info from response into chat data (has name and jid)
+      # Merge chat_info from response, but only non-blank values (preserve original name if new one is blank)
       chat_info = response['chat_info']
-      enriched_chat = enriched_chat.merge(chat_info) if chat_info.present?
+      enriched_chat = merge_chat_info_preserving_name(enriched_chat, chat_info) if chat_info.present?
 
       batch = response['data']
       break if batch.blank? || !batch.is_a?(Array)
@@ -623,11 +690,25 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     sender_jid = message['sender_jid'] || chat_jid
     is_from_me = message['is_from_me'] == true
 
+    # For group chats (@g.us), use sender_name from message (individual's name)
+    # For individual chats (@s.whatsapp.net), use chat name
+    # NEVER use group chat name for sender - that causes contacts to get group names
+    sender_name = if group_chat?(chat_jid)
+                    lookup_sender_name_for_group(message, sender_jid)
+                  else
+                    chat['name']
+                  end
+
+    # Debug: Log sender name resolution
+    Rails.logger.info "[WhatsApp History Sync] build_params: chat_jid=#{chat_jid}, sender_jid=#{sender_jid}, " \
+                      "is_from_me=#{is_from_me}, chat_name=#{chat['name'].inspect}, sender_name=#{sender_name.inspect}"
+
     payload = {
       id: message['id'],
       chat_id: chat_jid,
       from: is_from_me ? webhook_params[:device_id] : sender_jid,
-      from_name: chat['name'],
+      from_name: sender_name,
+      contact_name: chat['name'], # Used by build_contact for outgoing messages to get recipient name
       timestamp: message['timestamp'],
       is_from_me: is_from_me
     }

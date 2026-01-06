@@ -1,5 +1,7 @@
 # Plan: Add WhatsApp Web Provider
 
+## Status: Implemented
+
 ## Overview
 Add a `whatsapp_web` provider to Chatwoot's WhatsApp inbox that integrates with go-whatsapp-web-multidevice for QR code-based WhatsApp connection.
 
@@ -120,6 +122,19 @@ def cleanup_whatsapp_web_device
   provider_service.logout_device
 rescue StandardError => e
   Rails.logger.error "WhatsApp Web: Failed to cleanup device on inbox deletion: #{e.message}"
+end
+```
+
+### 1b. Inbox Model - Auto-Lock Single Conversation
+**`app/models/inbox.rb`**
+
+WhatsApp Web inboxes automatically enable `lock_to_single_conversation` to prevent duplicate conversations during history sync:
+```ruby
+after_create :enable_lock_to_single_conversation_for_whatsapp_web
+
+def enable_lock_to_single_conversation_for_whatsapp_web
+  return unless channel.is_a?(Channel::Whatsapp) && channel.whatsapp_web?
+  self.lock_to_single_conversation = true
 end
 ```
 

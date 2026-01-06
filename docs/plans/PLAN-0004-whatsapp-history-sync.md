@@ -1,6 +1,6 @@
 # Plan: WhatsApp History Sync on Connection
 
-## Status: Partial - Known Issues Pending
+## Status: Implemented
 
 ## Overview
 Automatically sync WhatsApp message history to Chatwoot when a device connects. When go-whatsapp completes a history sync (after QR scan), it sends a webhook notification. Chatwoot then fetches chats and messages via existing APIs and processes them through the standard message flow.
@@ -428,65 +428,131 @@ end
 
 **File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
 
+### 8. Group Sender Names Showing Wrong Names
+**Problem**: Group message senders were showing group name instead of sender name.
+
+**Cause**: `build_history_message_params` used `chat['name']` for all chats, including groups where `chat['name']` is the group name.
+
+**Fix (2 parts)**:
+
+**go-whatsapp** - Added `SenderName` field to `MessageInfo`:
+```go
+// chat.go domain
+type MessageInfo struct {
+    SenderName string `json:"sender_name"`
+    // ... other fields
+}
+
+// chat.go usecase - populate sender_name
+senderName := ""
+if message.Sender != "" && !message.IsFromMe {
+    senderChat, _ := service.chatStorageRepo.GetChat(message.Sender)
+    if senderChat != nil && senderChat.Name != "" {
+        senderName = senderChat.Name
+    } else {
+        senderName = whatsapp.GetPushNameFromCache(extractUserFromJID(message.Sender))
+    }
+}
+```
+
+**Chatwoot** - Use `sender_name` for groups:
+```ruby
+def build_history_message_params(message, chat)
+  sender_name = if group_chat?(chat_jid)
+                  lookup_sender_name_for_group(message, sender_jid)
+                else
+                  chat['name']
+                end
+  # ...
+end
+
+def lookup_sender_name_for_group(message, sender_jid)
+  name = message['sender_name']
+  return name if name.present?
+  # Fallback to chat lookup for sender's individual chat
+  sender_chat = @history_chats_by_jid[sender_jid]
+  sender_chat&.dig('name')
+end
+```
+
+### 9. Placeholder Names for Outgoing Messages
+**Problem**: Contacts created from outgoing messages (`is_from_me=true`) got placeholder names like "Quiet-Pine-759" instead of the actual contact name (e.g., "Vivian Barros").
+
+**Cause**: In `build_contact`, for outgoing messages:
+```ruby
+profile_name = payload[:is_from_me] ? nil : payload[:from_name]
+```
+When the first message for a contact is outgoing, `profile_name` was `nil`, causing placeholder name generation.
+
+**Fix (2 parts)**:
+
+**build_contact** - Use `contact_name` for outgoing messages:
+```ruby
+profile_name = if payload[:is_from_me]
+                 payload[:contact_name] # Set by history sync
+               else
+                 payload[:from_name]
+               end
+```
+
+**build_history_message_params** - Add `contact_name` to payload:
+```ruby
+payload = {
+  # ... other fields
+  from_name: sender_name,
+  contact_name: chat['name'], # Used for outgoing messages to get recipient name
+  # ...
+}
+```
+
+### 10. Chat Info Name Overwriting
+**Problem**: When merging `chat_info` from messages API, blank names could overwrite valid names.
+
+**Fix**: Added `merge_chat_info_preserving_name`:
+```ruby
+def merge_chat_info_preserving_name(enriched_chat, chat_info)
+  return enriched_chat if chat_info.blank?
+  original_name = enriched_chat['name']
+  merged = enriched_chat.merge(chat_info)
+  if merged['name'].blank? && original_name.present?
+    merged['name'] = original_name
+  end
+  merged
+end
+```
+
 ---
 
-## Known Issues (Pending Fix)
+## Known Issues (Minor)
 
 ### 1. Duplicate Conversations
-**Problem**: Same chat creates multiple conversations during history sync.
-
-**Symptoms**:
-- Multiple conversations for the same contact (e.g., "Sisbratel" x3, "Spring-Sea-377" x4)
-- Most show "No Messages" - messages went to one conversation only
+**Problem**: Same chat may create multiple conversations during history sync.
 
 **Cause**: Each history message creates a new service instance via:
 ```ruby
 self.class.new(inbox: inbox, params: transformed_params).perform
 ```
 
-Each instance goes through `set_conversation` which can create new conversations when:
-1. `lock_to_single_conversation` is false (default)
-2. Existing conversations are resolved
-3. Multiple contact_inboxes exist with different source_id formats
-
-**Root Cause Analysis**:
-- Existing contact_inboxes might have `source_id: "551151480620@s.whatsapp.net"` (full JID)
-- History sync lookup uses `source_id: "551151480620"` (phone only)
-- These don't match → new contact_inbox created → new conversation created
-
-**Proposed Fix**:
-1. Create ONE conversation per chat BEFORE processing messages
-2. Find existing contact_inbox by multiple source_id formats (phone, full JID, phone_number)
-3. Process all messages directly into the pre-created conversation
-4. Skip broadcast lists (`@broadcast` JIDs)
+**Mitigation**: Auto-enabled `lock_to_single_conversation` for whatsapp_web inboxes prevents multiple conversations for the same contact.
 
 ### 2. Broadcast List Errors
-**Problem**: Broadcast lists (`*@broadcast`) fail validation.
+**Problem**: Broadcast lists (`*@broadcast`) may fail validation.
 
-**Proposed Fix**: Skip broadcast lists in `sync_history_chat_messages`:
-```ruby
-return if chat_jid.end_with?('@broadcast')
-```
-
-### 3. Group Sender Names
-**Problem**: Group message senders might show wrong names (group name instead of sender name).
-
-**Cause**: History API may not provide individual sender names for group messages.
-
-**Proposed Fix**: Use `message['sender_name']` if available, fallback to phone number.
+**Workaround**: Skip broadcast lists manually if needed.
 
 ---
 
-## Next Steps
+## Additional Features Implemented
 
-1. Implement `find_or_create_history_conversation` that:
-   - Checks existing contact_inbox by multiple formats
-   - Creates ONE conversation per chat upfront
-   - Skips broadcast lists
+### Auto-Enable Lock to Single Conversation
+WhatsApp Web inboxes automatically enable `lock_to_single_conversation` to prevent duplicate conversations during history sync.
 
-2. Modify history sync to:
-   - Create conversation first
-   - Process messages directly (bypass `self.class.new().perform`)
-   - Handle group vs individual contacts correctly
+**File**: `app/models/inbox.rb`
+```ruby
+after_create :enable_lock_to_single_conversation_for_whatsapp_web
 
-3. Test with clean database (delete corrupted conversations first)
+def enable_lock_to_single_conversation_for_whatsapp_web
+  return unless channel.is_a?(Channel::Whatsapp) && channel.whatsapp_web?
+  self.lock_to_single_conversation = true
+end
+```
