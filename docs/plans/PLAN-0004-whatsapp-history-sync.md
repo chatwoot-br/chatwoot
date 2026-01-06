@@ -521,6 +521,57 @@ def merge_chat_info_preserving_name(enriched_chat, chat_info)
 end
 ```
 
+### 11. Real-Time Outgoing Messages Missing Contact Names
+**Problem**: Real-time outgoing messages (sent from WhatsApp device, not history sync) created contacts with placeholder names like "Delicate-Feather-260".
+
+**Cause**: The webhook for real-time messages didn't include `chat_name`. The fix in #9 only worked for history sync (which has `contact_name`). For real-time messages:
+1. `chatStorageRepo.GetChat()` failed because the chat wasn't in storage yet (only populated during history sync)
+2. No fallback existed for contacts not in history sync
+
+**Fix (go-whatsapp)**: Added fallback to WhatsApp's contact store in `buildEventPayload`:
+```go
+// For outgoing messages, look up chat name for contact creation
+// Try multiple sources: chat storage (history sync) → contact store (WhatsApp contacts)
+if evt.Info.IsFromMe {
+    chatJID := evt.Info.Chat
+    var chatName string
+
+    // First try: chat storage (populated during history sync)
+    if chatStorageRepo != nil {
+        if chat, err := chatStorageRepo.GetChat(chatJIDStr); err == nil && chat != nil && chat.Name != "" {
+            chatName = chat.Name
+        }
+    }
+
+    // Second try: WhatsApp contact store (for contacts not in history sync)
+    if chatName == "" && client != nil && client.Store.Contacts != nil {
+        if contact, err := client.Store.Contacts.GetContact(ctx, chatJID.ToNonAD()); err == nil {
+            if contact.FullName != "" {
+                chatName = contact.FullName
+            } else if contact.PushName != "" {
+                chatName = contact.PushName
+            }
+        }
+    }
+
+    if chatName != "" {
+        payload["chat_name"] = chatName
+    }
+}
+```
+
+**Fix (Chatwoot)**: Updated `build_contact` to use `chat_name` as fallback:
+```ruby
+profile_name = if payload[:is_from_me]
+                 payload[:contact_name] || payload[:chat_name]  # history sync OR real-time
+               else
+                 payload[:from_name]
+               end
+```
+
+**File:** `src/infrastructure/whatsapp/event_message.go`
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
 ---
 
 ## Known Issues (Minor)
