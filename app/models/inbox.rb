@@ -77,6 +77,7 @@ class Inbox < ApplicationRecord
 
   enum sender_name_type: { friendly: 0, professional: 1 }
 
+  after_create :enable_lock_to_single_conversation_for_whatsapp_web
   after_destroy :delete_round_robin_agents
 
   after_create_commit :dispatch_create_event
@@ -239,6 +240,12 @@ class Inbox < ApplicationRecord
 
   def delete_round_robin_agents
     ::AutoAssignment::InboxRoundRobinService.new(inbox: self).clear_queue
+  end
+
+  def enable_lock_to_single_conversation_for_whatsapp_web
+    return unless channel.is_a?(Channel::Whatsapp) && channel.whatsapp_web?
+
+    self.lock_to_single_conversation = true
   end
 
   def check_channel_type?
