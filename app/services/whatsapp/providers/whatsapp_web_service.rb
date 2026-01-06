@@ -125,6 +125,63 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     nil
   end
 
+  # Fetch list of chats from go-whatsapp API for history sync
+  def fetch_chats(limit: 100, offset: 0)
+    response = HTTParty.get(
+      "#{api_base_path}/chats",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: HTTP_TIMEOUT
+    )
+
+    return nil unless response.success?
+
+    response.parsed_response['results']
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to fetch chats: #{e.message}"
+    nil
+  end
+
+  # Fetch messages from a specific chat for history sync
+  def fetch_chat_messages(chat_jid:, limit: 100, offset: 0)
+    response = HTTParty.get(
+      "#{api_base_path}/chat/#{CGI.escape(chat_jid)}/messages",
+      headers: api_headers,
+      query: { limit: limit, offset: offset },
+      timeout: HTTP_TIMEOUT
+    )
+
+    return nil unless response.success?
+
+    response.parsed_response['results']
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to fetch messages for #{chat_jid}: #{e.message}"
+    nil
+  end
+
+  # Download and decrypt media for a history sync message
+  # Returns the accessible URL to the downloaded file, or nil if download fails
+  def download_message_media(message_id:, chat_jid:)
+    phone = chat_jid.split('@').first
+    response = HTTParty.get(
+      "#{api_base_path}/message/#{CGI.escape(message_id)}/download",
+      headers: api_headers,
+      query: { phone: phone },
+      timeout: 60 # Longer timeout for media download
+    )
+
+    return nil unless response.success?
+
+    results = response.parsed_response['results']
+    return nil if results.blank? || results['file_path'].blank?
+
+    # Return the full URL to access the downloaded file
+    "#{api_base_path}/#{results['file_path']}"
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp Web] Failed to download media for message #{message_id}: #{e.message}"
+    nil
+  end
+
   # Override base service to handle go-whatsapp response format
   # go-whatsapp returns: { "code": "SUCCESS", "results": { "message_id": "..." } }
   # WhatsApp Cloud returns: { "messages": [{ "id": "..." }] }

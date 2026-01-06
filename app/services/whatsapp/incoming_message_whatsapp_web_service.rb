@@ -37,6 +37,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       transform_status_event(payload)
     when 'message.reaction'
       transform_reaction_event(payload)
+    when 'history_sync_complete'
+      process_history_sync
+      {} # Return empty - messages processed inline
     when 'message.revoked', 'message.edited'
       # Skip these for now - can be implemented later
       {}
@@ -192,7 +195,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       account_id: @inbox.account_id,
       inbox_id: @inbox.id,
       source_id: message[:id].to_s,
-      in_reply_to_external_id: @in_reply_to_external_id
+      in_reply_to_external_id: @in_reply_to_external_id,
+      created_at: message_created_at(message)
     }
 
     # Messages from the connected device are outgoing with device contact as sender
@@ -201,6 +205,17 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     else
       base_attrs.merge(incoming_message_attributes)
     end
+  end
+
+  # Extract created_at from message timestamp
+  # Timestamp is stored as Unix timestamp string (seconds since epoch)
+  def message_created_at(message)
+    timestamp = message[:timestamp]
+    return Time.current if timestamp.blank?
+
+    Time.zone.at(timestamp.to_i)
+  rescue ArgumentError
+    Time.current
   end
 
   # Messages from connected device are outgoing (right side, blue bubble)
@@ -511,7 +526,199 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     new_status != 'failed' && new_priority <= current_priority
   end
 
+  # History sync configuration
+  HISTORY_CHAT_BATCH_SIZE = 100
+  HISTORY_MESSAGE_BATCH_SIZE = 100
   AVATAR_SYNC_INTERVAL = 1.hour
+
+  # Process history sync complete event by fetching and importing messages
+  def process_history_sync
+    Rails.logger.info "[WhatsApp History Sync] Starting for inbox #{inbox.id}"
+
+    fetch_all_history_chats.each do |chat|
+      sync_history_chat_messages(chat)
+    end
+
+    Rails.logger.info "[WhatsApp History Sync] Completed for inbox #{inbox.id}"
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp History Sync] Failed: #{e.message}"
+  end
+
+  def fetch_all_history_chats
+    chats = []
+    offset = 0
+
+    loop do
+      response = inbox.channel.provider_service.fetch_chats(limit: HISTORY_CHAT_BATCH_SIZE, offset: offset)
+      break if response.blank?
+
+      batch = response['data']
+      break if batch.blank? || !batch.is_a?(Array)
+
+      chats.concat(batch)
+      break unless more_history_pages?(response, offset, HISTORY_CHAT_BATCH_SIZE)
+
+      offset += HISTORY_CHAT_BATCH_SIZE
+    end
+
+    chats
+  end
+
+  def sync_history_chat_messages(chat)
+    chat_jid = chat['jid']
+    return if chat_jid.blank?
+
+    offset = 0
+
+    loop do
+      response = inbox.channel.provider_service.fetch_chat_messages(
+        chat_jid: chat_jid,
+        limit: HISTORY_MESSAGE_BATCH_SIZE,
+        offset: offset
+      )
+      break if response.blank?
+
+      batch = response['data']
+      break if batch.blank? || !batch.is_a?(Array)
+
+      process_history_messages(batch, chat)
+      break unless more_history_pages?(response, offset, HISTORY_MESSAGE_BATCH_SIZE)
+
+      offset += HISTORY_MESSAGE_BATCH_SIZE
+    end
+
+    # After all messages are synced, update conversation timestamps
+    update_conversation_timestamps_for_chat(chat_jid)
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp History Sync] Error syncing chat #{chat_jid}: #{e.message}"
+  end
+
+  def process_history_messages(messages, chat)
+    messages.each do |msg|
+      process_single_history_message(msg, chat)
+    rescue StandardError => e
+      Rails.logger.error "[WhatsApp History Sync] Error processing message #{msg['id']}: #{e.message}"
+    end
+  end
+
+  def process_single_history_message(message, chat)
+    # Skip if message already exists
+    message_id = message['id']
+    return if message_id.blank?
+    return if inbox.messages.exists?(source_id: message_id)
+
+    # Transform to webhook format and process
+    transformed_params = build_history_message_params(message, chat)
+    self.class.new(inbox: inbox, params: transformed_params).perform
+  end
+
+  def build_history_message_params(message, chat)
+    chat_jid = chat['jid']
+    sender_jid = message['sender_jid'] || chat_jid
+    is_from_me = message['is_from_me'] == true
+
+    payload = {
+      id: message['id'],
+      chat_id: chat_jid,
+      from: is_from_me ? webhook_params[:device_id] : sender_jid,
+      from_name: chat['name'],
+      timestamp: message['timestamp'],
+      is_from_me: is_from_me
+    }
+
+    content = message['content']
+    payload[:body] = content if content.present?
+
+    add_history_media_to_payload(payload, message, chat)
+
+    {
+      'event' => 'message',
+      'device_id' => webhook_params[:device_id],
+      'payload' => payload
+    }
+  end
+
+  def add_history_media_to_payload(payload, message, chat)
+    media_type = message['media_type']
+    return if media_type.blank?
+
+    message_id = message['id']
+    chat_jid = chat['jid']
+    return if message_id.blank? || chat_jid.blank?
+
+    # Download and decrypt media via go-whatsapp API
+    # WhatsApp CDN URLs require decryption with MediaKey, so we use the download endpoint
+    downloaded_url = inbox.channel.provider_service.download_message_media(
+      message_id: message_id,
+      chat_jid: chat_jid
+    )
+
+    return if downloaded_url.blank?
+
+    filename = message['filename']
+    media_obj = { url: downloaded_url }
+    media_obj[:filename] = filename if filename.present?
+
+    case media_type.downcase
+    when 'image' then payload[:image] = media_obj
+    when 'video' then payload[:video] = media_obj
+    when 'audio' then payload[:audio] = media_obj
+    when 'document' then payload[:document] = media_obj
+    when 'sticker' then payload[:sticker] = media_obj
+    when 'video_note' then payload[:video] = media_obj # PTV messages are video
+    end
+  end
+
+  def more_history_pages?(response, current_offset, batch_size)
+    return false unless response.is_a?(Hash)
+
+    pagination = response['pagination']
+    return false unless pagination
+
+    total = pagination['total']
+    return false unless total
+
+    (current_offset + batch_size) < total
+  end
+
+  # Update conversation timestamps based on actual message dates
+  # This ensures created_at reflects the oldest message and last_activity_at reflects the newest
+  def update_conversation_timestamps_for_chat(chat_jid)
+    # Find the contact_inbox for this chat
+    phone = extract_phone_number(chat_jid)
+    contact_inbox = inbox.contact_inboxes.joins(:contact).find_by(
+      source_id: chat_jid
+    ) || inbox.contact_inboxes.joins(:contact).find_by(
+      contacts: { phone_number: "+#{phone}" }
+    )
+    return unless contact_inbox
+
+    # Get the conversation
+    conversation = contact_inbox.conversations.last
+    return unless conversation
+
+    # Get min and max created_at from messages
+    message_timestamps = conversation.messages.pluck(:created_at)
+    return if message_timestamps.empty?
+
+    oldest_message_at = message_timestamps.min
+    newest_message_at = message_timestamps.max
+
+    # Update conversation timestamps using update_columns to skip callbacks
+    # rubocop:disable Rails/SkipsModelValidations
+    updates = { last_activity_at: newest_message_at }
+
+    # Only update created_at if oldest message is older than current created_at
+    updates[:created_at] = oldest_message_at if oldest_message_at < conversation.created_at
+
+    conversation.update_columns(updates)
+    # rubocop:enable Rails/SkipsModelValidations
+
+    Rails.logger.info "[WhatsApp History Sync] Updated conversation #{conversation.id} timestamps: " \
+                      "created_at=#{conversation.created_at}, last_activity_at=#{newest_message_at}"
+  rescue StandardError => e
+    Rails.logger.error "[WhatsApp History Sync] Error updating conversation timestamps: #{e.message}"
+  end
 
   # Fetch avatar from go-whatsapp and schedule sync job
   # Rate limited to once per hour to avoid excessive API calls
