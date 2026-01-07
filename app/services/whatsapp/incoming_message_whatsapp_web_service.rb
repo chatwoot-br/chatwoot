@@ -468,6 +468,28 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     sender_chat&.dig('name')
   end
 
+  # Look up the device owner's name from their own chat entry
+  # For history sync outgoing messages, we need the device owner's actual name,
+  # NOT the chat recipient's name
+  def lookup_device_owner_name
+    return nil unless @history_chats_by_jid
+
+    device_id = webhook_params[:device_id]
+    return nil if device_id.blank?
+
+    # Try to find the device owner's own chat (self-chat/notes)
+    device_jid = "#{device_id}@s.whatsapp.net"
+    device_chat = @history_chats_by_jid[device_jid]
+
+    name = device_chat&.dig('name')
+
+    # If name is just the phone number, return nil to use phone as fallback
+    # This prevents creating a contact with a phone number as the display name
+    return nil if name.blank? || name == device_id
+
+    name
+  end
+
   # Merge chat_info into enriched_chat, but preserve non-blank name from original
   # This prevents empty name from messages API overwriting good name from chats list
   def merge_chat_info_preserving_name(enriched_chat, chat_info)
@@ -692,10 +714,17 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     sender_jid = message['sender_jid'] || chat_jid
     is_from_me = message['is_from_me'] == true
 
-    # For group chats (@g.us), use sender_name from message (individual's name)
-    # For individual chats (@s.whatsapp.net), use chat name
+    # For outgoing messages (is_from_me=true):
+    #   - from_name should be the device owner's name (NOT the chat/recipient name)
+    #   - contact_name is the chat name (recipient) for build_contact
+    # For incoming messages:
+    #   - from_name is the sender's name
+    # For group chats: use sender_name from message (individual's name)
     # NEVER use group chat name for sender - that causes contacts to get group names
-    sender_name = if group_chat?(chat_jid)
+    sender_name = if is_from_me
+                    # For outgoing messages, get device owner's name from their own chat entry
+                    lookup_device_owner_name
+                  elsif group_chat?(chat_jid)
                     lookup_sender_name_for_group(message, sender_jid)
                   else
                     chat['name']

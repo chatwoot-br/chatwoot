@@ -572,6 +572,41 @@ profile_name = if payload[:is_from_me]
 **File:** `src/infrastructure/whatsapp/event_message.go`
 **File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
 
+### 12. Device Contact Getting Wrong Name (Recipient's Name)
+**Problem**: The device contact (sender of outgoing messages) was incorrectly named with the first chat recipient's name instead of the device owner's actual name.
+
+**Example**: If the first outgoing message processed is in a chat with "Antonio Milesi", the device contact gets named "Antonio Milesi" even though the device owner is a different person.
+
+**Cause**: In `build_history_message_params`, for non-group chats, `sender_name` was always set to `chat['name']` regardless of whether the message was outgoing or incoming. This chat name is the **recipient's** name, not the **sender's** (device owner's) name. Then `find_or_create_device_contact` used this `from_name` to name the device contact.
+
+**Fix**: Added `lookup_device_owner_name` method that looks up the device owner's name from their own chat entry (self-chat). For outgoing messages, `sender_name` now uses this method instead of the chat name:
+```ruby
+sender_name = if is_from_me
+                # For outgoing messages, get device owner's name from their own chat entry
+                lookup_device_owner_name
+              elsif group_chat?(chat_jid)
+                lookup_sender_name_for_group(message, sender_jid)
+              else
+                chat['name']
+              end
+
+def lookup_device_owner_name
+  return nil unless @history_chats_by_jid
+  device_id = webhook_params[:device_id]
+  return nil if device_id.blank?
+
+  device_jid = "#{device_id}@s.whatsapp.net"
+  device_chat = @history_chats_by_jid[device_jid]
+  name = device_chat&.dig('name')
+
+  # If name is just the phone number, return nil to use phone as fallback
+  return nil if name.blank? || name == device_id
+  name
+end
+```
+
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
 ---
 
 ## Known Issues (Minor)
