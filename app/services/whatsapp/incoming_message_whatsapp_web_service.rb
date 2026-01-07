@@ -16,13 +16,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Skip messages with no content and no attachments (but allow reactions and status updates)
   def empty_message?
-    return false if processed_params.blank? # Allow empty params (handled elsewhere)
-    return false if processed_params[:reaction].present?
-    return false if processed_params[:attachments].present?
-    return false if processed_params[:statuses].present? # Allow status updates
+    return false if processed_params.blank? || processed_params[:reaction].present? || processed_params[:statuses].present?
 
-    content = message_content(processed_params)
-    content.blank?
+    first_message = processed_params.dig(:messages, 0)
+    return false if first_message.blank? || message_has_media?(first_message)
+
+    message_content(first_message).blank?
+  end
+
+  def message_has_media?(message)
+    %i[image video audio document sticker location contacts].any? { |key| message[key].present? }
   end
 
   private
