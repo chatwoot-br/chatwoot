@@ -644,3 +644,78 @@ end
 ```
 
 **Note**: Must use `update_column` because `after_create` runs after the INSERT.
+
+### 13. Duplicate Message Filtering (Frontend)
+**Problem**: Messages with content not appearing in conversation view, showing empty duplicates instead.
+
+**Cause**: go-whatsapp sends duplicate webhooks for the same message ID - first without body/content, second with content. Due to race conditions and PostgreSQL non-deterministic ordering for same timestamps, the `filterDuplicateSourceMessages` function in the frontend was keeping the FIRST message with a given `source_id`, which could be the empty one.
+
+**Fix (2 parts)**:
+
+**Frontend** - Modified `filterDuplicateSourceMessages` to prefer messages with content:
+```javascript
+// app/javascript/dashboard/helper/conversationHelper.js
+
+const hasContent = message => {
+  return (
+    (message.content && message.content.trim().length > 0) ||
+    (message.attachments && message.attachments.length > 0)
+  );
+};
+
+export const filterDuplicateSourceMessages = (messages = []) => {
+  const messagesWithoutDuplicates = [];
+  messages.forEach(m1 => {
+    if (m1.source_id) {
+      const index = messagesWithoutDuplicates.findIndex(
+        m2 => m1.source_id === m2.source_id
+      );
+      if (index < 0) {
+        messagesWithoutDuplicates.push(m1);
+      } else if (
+        hasContent(m1) &&
+        !hasContent(messagesWithoutDuplicates[index])
+      ) {
+        // Replace empty duplicate with one that has content
+        messagesWithoutDuplicates[index] = m1;
+      }
+    } else {
+      messagesWithoutDuplicates.push(m1);
+    }
+  });
+  return messagesWithoutDuplicates;
+};
+```
+
+**Backend** - Added duplicate detection in `create_message` to prevent race conditions:
+```ruby
+# app/services/whatsapp/incoming_message_whatsapp_web_service.rb
+
+def create_regular_message(message)
+  create_message(message)
+  return if @message_already_exists
+
+  attach_files
+  attach_location if message_type == 'location'
+  @message.save!
+end
+
+def create_message(message)
+  source_id = message[:id].to_s
+  existing_message = inbox.messages.find_by(source_id: source_id)
+
+  if existing_message
+    new_content = message_content(message)
+    existing_message.update!(content: new_content) if new_content.present? && existing_message.content.blank?
+    @message = existing_message
+    @message_already_exists = true
+    return
+  end
+
+  @message = @conversation.messages.build(message_attributes(message))
+end
+```
+
+**Files:**
+- `app/javascript/dashboard/helper/conversationHelper.js`
+- `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
