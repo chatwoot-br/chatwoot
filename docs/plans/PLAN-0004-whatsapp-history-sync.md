@@ -719,3 +719,68 @@ end
 **Files:**
 - `app/javascript/dashboard/helper/conversationHelper.js`
 - `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
+### 14. Empty Message Check Breaking All Messages
+**Problem**: After adding `empty_message?` check to skip empty webhooks, ALL messages were being filtered out.
+
+**Cause**: The `empty_message?` method called `message_content(processed_params)` but `processed_params` has structure `{ contacts: [...], messages: [...] }`. The `message_content` helper expected a message object with `text.body`, not the whole params object, so it always returned `nil`.
+
+**Fix**: Extract the first message from `processed_params[:messages]` before checking content:
+```ruby
+def empty_message?
+  return false if processed_params.blank? || processed_params[:reaction].present? || processed_params[:statuses].present?
+
+  first_message = processed_params.dig(:messages, 0)
+  return false if first_message.blank? || message_has_media?(first_message)
+
+  message_content(first_message).blank?
+end
+
+def message_has_media?(message)
+  %i[image video audio document sticker location contacts].any? { |key| message[key].present? }
+end
+```
+
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
+### 15. Missing Media Type Support
+**Problem**: `video_note` (PTV messages) and `live_location` from go-whatsapp were being ignored.
+
+**Cause**: `determine_message_content` didn't handle these fields from go-whatsapp payload.
+
+**Fix**: Added handlers for `video_note` (treat as video) and `live_location` (treat as location):
+```ruby
+def determine_message_content(payload)
+  # ... existing checks ...
+  return { type: 'video', video: build_media_object(payload[:video], payload[:caption]) } if payload[:video].present?
+  # video_note is PTV (push-to-talk video) - treat as video
+  return { type: 'video', video: build_media_object(payload[:video_note], payload[:caption]) } if payload[:video_note].present?
+  # ... existing checks ...
+  return { type: 'location', location: transform_location(payload[:location]) } if payload[:location].present?
+  # live_location treated as regular location
+  return { type: 'location', location: transform_location(payload[:live_location]) } if payload[:live_location].present?
+  # ...
+end
+```
+
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
+### 16. Incomplete Receipt Type Handling
+**Problem**: go-whatsapp sends receipt types `read_self`, `played`, `played_self` that weren't being processed.
+
+**Cause**: `transform_status_event` only handled `delivered` and `read`.
+
+**Fix**: Map additional receipt types to Chatwoot statuses:
+```ruby
+def transform_status_event(payload)
+  # ...
+  status = case receipt_type
+           when 'delivered' then 'delivered'
+           when 'read', 'read_self', 'played', 'played_self' then 'read'
+           else return {} # Unknown receipt type (e.g., 'sent' from linked devices)
+           end
+  # ...
+end
+```
+
+**File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`

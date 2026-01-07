@@ -218,8 +218,10 @@ const handleIgnoreGroupMessagesChange = async () => {
       ...props.inbox.provider_config,
       ignore_group_messages: ignoreGroupMessages.value,
     };
+    // Use formData: false to properly serialize nested objects like provider_config
     await store.dispatch('inboxes/updateInbox', {
       id: props.inbox.id,
+      formData: false,
       channel: {
         provider_config: updatedProviderConfig,
       },

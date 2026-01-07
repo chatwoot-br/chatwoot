@@ -76,8 +76,10 @@ const whatsappChannel = await store.dispatch('inboxes/createChannel', {
 - Added state: `const ignoreGroupMessages = ref(false);`
 - Initialized from inbox on mount: `props.inbox.provider_config?.ignore_group_messages ?? false`
 - Added watcher to sync with inbox prop
-- Added `handleIgnoreGroupMessagesChange` method to save via Vuex
+- Added `handleIgnoreGroupMessagesChange` method to save via Vuex with `formData: false`
 - Added UI section with checkbox toggle
+
+**Important**: Must use `formData: false` when dispatching `updateInbox` to properly serialize nested objects like `provider_config`. Without this, FormData converts objects to `"[object Object]"` string.
 
 ### 4. Frontend: Translations
 **File:** `app/javascript/dashboard/i18n/locale/en/inboxMgmt.json`

@@ -81,17 +81,20 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   # Transform message.ack event to status update format
-  # go-whatsapp sends: { ids: [...], receipt_type: "delivered"|"read" }
+  # go-whatsapp sends: { ids: [...], receipt_type: "delivered"|"read"|"read_self"|"played"|"played_self" }
   # Base service expects: { statuses: [{ id: "...", status: "delivered"|"read" }] }
   def transform_status_event(payload)
     message_ids = payload[:ids] || []
     receipt_type = payload[:receipt_type]
 
     # Map go-whatsapp receipt types to Chatwoot statuses
+    # - delivered: message delivered to recipient device
+    # - read/read_self: message seen by recipient
+    # - played/played_self: media viewed (treat as read)
     status = case receipt_type
              when 'delivered' then 'delivered'
-             when 'read' then 'read'
-             else return {} # Unknown receipt type
+             when 'read', 'read_self', 'played', 'played_self' then 'read'
+             else return {} # Unknown receipt type (e.g., 'sent' from linked devices)
              end
 
     statuses = message_ids.map do |message_id|
@@ -419,10 +422,14 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     return { type: 'text', text: { body: payload[:body] } } if payload[:body].present?
     return { type: 'image', image: build_media_object(payload[:image], payload[:caption]) } if payload[:image].present?
     return { type: 'video', video: build_media_object(payload[:video], payload[:caption]) } if payload[:video].present?
+    # video_note is PTV (push-to-talk video) - treat as video
+    return { type: 'video', video: build_media_object(payload[:video_note], payload[:caption]) } if payload[:video_note].present?
     return { type: 'audio', audio: build_media_object(payload[:audio]) } if payload[:audio].present?
     return { type: 'document', document: build_media_object(payload[:document]) } if payload[:document].present?
     return { type: 'sticker', sticker: build_media_object(payload[:sticker]) } if payload[:sticker].present?
     return { type: 'location', location: transform_location(payload[:location]) } if payload[:location].present?
+    # live_location treated as regular location
+    return { type: 'location', location: transform_location(payload[:live_location]) } if payload[:live_location].present?
     return { type: 'contacts', contacts: [transform_contact(payload[:contact])] } if payload[:contact].present?
 
     # Default to text with empty body
