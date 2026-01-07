@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v4.9.1+1] - 2025-01-07
+
 ### Added
+
+- **WhatsApp Web Provider**: Full integration with go-whatsapp-web-multidevice for WhatsApp Web connectivity
+  - QR code scanning for device connection
+  - History sync on connection (imports past messages and contacts)
+  - Real-time message send/receive
+  - Support for text, images, videos, audio, documents, stickers, locations, and contacts
+  - Message reactions support
+  - Delivery and read receipts
+  - Group message support with optional ignore setting
+  - Avatar sync for contacts and groups
+  - Outgoing message support (messages sent from WhatsApp device appear in Chatwoot)
 
 - Chatwoot Helm chart with initial templates and configurations (env-secret, ingress, migrations-job, web/worker deployments, HPA, service account)
 - Development Docker setup with docker-compose.dev.yaml for local development
@@ -16,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update configuration for ChatWoot Brazil deployment (PostgreSQL schema support, branding updates, disabled inbound_emails and campaigns by default)
+- Auto-enable `lock_to_single_conversation` for WhatsApp Web inboxes
+- MessageFinder uses `created_at`-based pagination for proper history message ordering
+
+### Fixed
+
+- Duplicate message filtering prefers messages with content over empty ones
+- Frontend and backend duplicate prevention for race conditions
+- Contact name resolution for outgoing messages (uses chat storage and WhatsApp contact store)
+- Group sender names correctly show individual sender instead of group name
+- Device contact naming uses device owner's name from self-chat entry
 
 ## [v4.9.1] - 2025-12-22
 
