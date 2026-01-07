@@ -175,8 +175,7 @@ services:
       # Points to local Chatwoot instance - adjust if Chatwoot runs on different host/port
       # For Docker host network: use host.docker.internal on macOS/Windows
       # For Docker bridge network: use service name if in same compose file
-      - APP_BASE_PATH=/5521995539939
-      - WHATSAPP_WEBHOOK=http://host.docker.internal:3000/webhooks/whatsapp_web/5521995539939
+      - WHATSAPP_WEBHOOK=http://host.docker.internal:3000/webhooks/whatsapp_web
       - WHATSAPP_WEBHOOK_SECRET=dev-secret-key-change-in-production
 
       # Optional WhatsApp Features (uncomment to enable)

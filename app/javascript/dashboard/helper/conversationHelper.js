@@ -17,7 +17,20 @@ const getLastNonActivityMessage = (messageInStore, messageFromAPI) => {
 };
 
 /**
+ * Checks if a message has meaningful content (text or attachments).
+ * @param {Object} message - The message to check.
+ * @returns {boolean} True if the message has content.
+ */
+const hasContent = message => {
+  return (
+    (message.content && message.content.trim().length > 0) ||
+    (message.attachments && message.attachments.length > 0)
+  );
+};
+
+/**
  * Filters out duplicate source messages from an array of messages.
+ * When duplicates exist, prefers the message with content over empty ones.
  * @param {Array} messages - The array of messages to filter.
  * @returns {Array} An array of messages without duplicates.
  */
@@ -25,6 +38,7 @@ export const filterDuplicateSourceMessages = (messages = []) => {
   const messagesWithoutDuplicates = [];
   // We cannot use Map or any short hand method as it returns the last message with the duplicate ID
   // We should return the message with smaller id when there is a duplicate
+  // Additionally, prefer messages with content over empty duplicates
   messages.forEach(m1 => {
     if (m1.source_id) {
       const index = messagesWithoutDuplicates.findIndex(
@@ -33,6 +47,12 @@ export const filterDuplicateSourceMessages = (messages = []) => {
 
       if (index < 0) {
         messagesWithoutDuplicates.push(m1);
+      } else if (
+        hasContent(m1) &&
+        !hasContent(messagesWithoutDuplicates[index])
+      ) {
+        // Replace empty duplicate with one that has content
+        messagesWithoutDuplicates[index] = m1;
       }
     } else {
       messagesWithoutDuplicates.push(m1);

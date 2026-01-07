@@ -24,6 +24,7 @@ import CollaboratorsPage from './settingsPage/CollaboratorsPage.vue';
 import WidgetBuilder from './WidgetBuilder.vue';
 import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
+import WhatsAppWebConnection from './components/WhatsAppWebConnection.vue';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -55,6 +56,7 @@ export default {
     Editor,
     Avatar,
     AccountHealth,
+    WhatsAppWebConnection,
   },
   mixins: [inboxMixin],
   setup() {
@@ -100,6 +102,12 @@ export default {
     shouldShowWhatsAppConfiguration() {
       return this.isAWhatsAppCloudChannel;
     },
+    isAWhatsAppWebChannel() {
+      return (
+        this.channelType === INBOX_TYPES.WHATSAPP &&
+        this.inbox.provider === 'whatsapp_web'
+      );
+    },
     whatsAppAPIProviderName() {
       if (this.isAWhatsAppCloudChannel) {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD');
@@ -110,6 +118,9 @@ export default {
       if (this.isATwilioWhatsAppChannel) {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO');
       }
+      if (this.isAWhatsAppWebChannel) {
+        return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_WEB');
+      }
       return '';
     },
     tabs() {
@@ -118,6 +129,21 @@ export default {
           key: 'inbox-settings',
           name: this.$t('INBOX_MGMT.TABS.SETTINGS'),
         },
+      ];
+
+      // Add Connection tab for WhatsApp Web channels after Settings
+      if (this.isAWhatsAppWebChannel) {
+        visibleToAllChannelTabs = [
+          ...visibleToAllChannelTabs,
+          {
+            key: 'whatsapp-web-connection',
+            name: this.$t('INBOX_MGMT.TABS.CONNECTION'),
+          },
+        ];
+      }
+
+      visibleToAllChannelTabs = [
+        ...visibleToAllChannelTabs,
         {
           key: 'collaborators',
           name: this.$t('INBOX_MGMT.TABS.COLLABORATORS'),
@@ -946,6 +972,9 @@ export default {
       </div>
       <div v-if="selectedTabKey === 'whatsapp-health'">
         <AccountHealth :health-data="healthData" />
+      </div>
+      <div v-if="selectedTabKey === 'whatsapp-web-connection'">
+        <WhatsAppWebConnection :inbox="inbox" />
       </div>
     </section>
   </div>

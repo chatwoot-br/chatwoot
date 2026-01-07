@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 
 import MessageMeta from '../MessageMeta.vue';
+import MessageReactions from '../MessageReactions.vue';
 
 import { emitter } from 'shared/helpers/mitt';
 import { useMessageContext } from '../provider.js';
@@ -112,6 +113,12 @@ const replyToPreview = computed(() => {
       </span>
     </div>
     <slot />
+    <!-- Show reactions even when message is grouped (shouldShowMeta is false) -->
+    <MessageReactions
+      v-if="!shouldShowMeta"
+      class="mt-1"
+      :class="flexOrientationClass"
+    />
     <MessageMeta
       v-if="shouldShowMeta"
       :class="[

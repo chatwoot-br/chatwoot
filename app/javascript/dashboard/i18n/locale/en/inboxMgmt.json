@@ -235,6 +235,8 @@
           "TWILIO": "Twilio",
           "WHATSAPP_CLOUD": "WhatsApp Cloud",
           "WHATSAPP_CLOUD_DESC": "Quick setup through Meta",
+          "WHATSAPP_WEB": "WhatsApp Web",
+          "WHATSAPP_WEB_DESC": "Scan QR code to connect directly",
           "TWILIO_DESC": "Connect via Twilio credentials",
           "360_DIALOG": "360Dialog"
         },
@@ -311,6 +313,46 @@
         "API": {
           "ERROR_MESSAGE": "We were not able to save the WhatsApp channel"
         }
+      },
+      "WHATSAPP_WEB": {
+        "TITLE": "Connect via WhatsApp Web",
+        "DESCRIPTION": "Scan a QR code to connect your WhatsApp account directly without requiring Meta Business credentials.",
+        "INBOX_NAME": {
+          "LABEL": "Inbox Name",
+          "PLACEHOLDER": "Please enter an inbox name",
+          "ERROR": "This field is required"
+        },
+        "PHONE_NUMBER": {
+          "LABEL": "Phone Number",
+          "PLACEHOLDER": "Please enter the phone number in E.164 format (e.g., +1234567890)",
+          "ERROR": "Please provide a valid phone number that starts with a `+` sign and does not contain any spaces.",
+          "HELP": "Enter your WhatsApp number in international format (e.g., +1234567890)"
+        },
+        "PHONE_INPUT": {
+          "SUBMIT": "Generate QR Code"
+        },
+        "QR_CODE": {
+          "TITLE": "Scan QR Code",
+          "DESCRIPTION": "Open WhatsApp on your phone and scan this QR code to connect your account.",
+          "INSTRUCTIONS": {
+            "TITLE": "How to scan:",
+            "STEP_1": "Open WhatsApp on your phone",
+            "STEP_2": "Tap Menu or Settings and select Linked Devices",
+            "STEP_3": "Point your phone at this screen to capture the QR code"
+          },
+          "WAITING": "Waiting for you to scan the QR code...",
+          "REFRESH": "Refresh QR Code",
+          "SKIP": "Skip & Create Inbox",
+          "SKIP_NOTE": "You can connect to WhatsApp later from the inbox settings page.",
+          "ERROR": "Failed to load QR code. Please try again.",
+          "REFRESH_ERROR": "Failed to refresh QR code. Please try again.",
+          "TIMEOUT": "QR code scan timed out. Please refresh and try again."
+        },
+        "API": {
+          "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"
+        },
+        "IGNORE_GROUP_MESSAGES": "Ignore group messages",
+        "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
       },
       "VOICE": {
         "TITLE": "Voice Channel",
@@ -623,6 +665,7 @@
       "WIDGET_BUILDER": "Widget Builder",
       "BOT_CONFIGURATION": "Bot Configuration",
       "ACCOUNT_HEALTH": "Account Health",
+      "CONNECTION": "Connection",
       "CSAT": "CSAT"
     },
     "ACCOUNT_HEALTH": {
@@ -679,6 +722,52 @@
           "LIVE": "Live"
         }
       }
+    },
+    "WHATSAPP_WEB_CONNECTION": {
+      "TITLE": "WhatsApp Web Connection",
+      "DESCRIPTION": "Manage your WhatsApp Web connection status",
+      "PHONE_NUMBER": "Phone Number",
+      "STATUS": {
+        "CONNECTED": "Connected",
+        "DISCONNECTED": "Disconnected",
+        "CONNECTING": "Connecting...",
+        "LABEL": "Connection Status"
+      },
+      "ACTIONS": {
+        "CONNECT": "Connect with QR Code",
+        "RECONNECT": "Reconnect",
+        "DISCONNECT": "Disconnect",
+        "REFRESH_QR": "Refresh QR Code",
+        "CLOSE": "Close"
+      },
+      "QR_MODAL": {
+        "TITLE": "Scan QR Code to Connect",
+        "DESCRIPTION": "Open WhatsApp on your phone and scan this QR code",
+        "INSTRUCTIONS": {
+          "TITLE": "How to scan:",
+          "STEP_1": "Open WhatsApp on your phone",
+          "STEP_2": "Tap Menu or Settings and select Linked Devices",
+          "STEP_3": "Point your phone at this screen to capture the QR code"
+        },
+        "WAITING": "Waiting for connection..."
+      },
+      "DISCONNECT_CONFIRM": {
+        "TITLE": "Disconnect WhatsApp?",
+        "MESSAGE": "This will disconnect your WhatsApp account. You'll need to scan the QR code again to reconnect.",
+        "CONFIRM": "Yes, Disconnect",
+        "CANCEL": "Cancel"
+      },
+      "ALERTS": {
+        "RECONNECT_SUCCESS": "WhatsApp reconnected successfully",
+        "RECONNECT_ERROR": "Failed to reconnect. Please try again.",
+        "DISCONNECT_SUCCESS": "WhatsApp disconnected successfully",
+        "DISCONNECT_ERROR": "Failed to disconnect. Please try again.",
+        "STATUS_ERROR": "Failed to fetch connection status",
+        "SETTINGS_UPDATED": "Settings updated successfully",
+        "SETTINGS_UPDATE_ERROR": "Failed to update settings. Please try again."
+      },
+      "IGNORE_GROUP_MESSAGES": "Ignore group messages",
+      "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
     },
     "SETTINGS": "Settings",
     "FEATURES": {
