@@ -350,7 +350,9 @@
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"
-        }
+        },
+        "IGNORE_GROUP_MESSAGES": "Ignore group messages",
+        "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
       },
       "VOICE": {
         "TITLE": "Voice Channel",
@@ -760,8 +762,12 @@
         "RECONNECT_ERROR": "Failed to reconnect. Please try again.",
         "DISCONNECT_SUCCESS": "WhatsApp disconnected successfully",
         "DISCONNECT_ERROR": "Failed to disconnect. Please try again.",
-        "STATUS_ERROR": "Failed to fetch connection status"
-      }
+        "STATUS_ERROR": "Failed to fetch connection status",
+        "SETTINGS_UPDATED": "Settings updated successfully",
+        "SETTINGS_UPDATE_ERROR": "Failed to update settings. Please try again."
+      },
+      "IGNORE_GROUP_MESSAGES": "Ignore group messages",
+      "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
     },
     "SETTINGS": "Settings",
     "FEATURES": {

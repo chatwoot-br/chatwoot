@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useStore } from 'vuex';
 import { useAlert } from 'dashboard/composables';
 import whatsappWebAPI from 'dashboard/api/channel/whatsappWebChannel';
 import ButtonV4 from 'next/button/Button.vue';
@@ -15,6 +16,7 @@ const props = defineProps({
 });
 
 const { t } = useI18n();
+const store = useStore();
 
 // Constants
 const POLL_INTERVAL_MS = 3000;
@@ -30,6 +32,18 @@ const pollInterval = ref(null);
 const pollCount = ref(0);
 const isReconnecting = ref(false);
 const isDisconnecting = ref(false);
+const isSavingSettings = ref(false);
+const ignoreGroupMessages = ref(
+  props.inbox.provider_config?.ignore_group_messages ?? false
+);
+
+// Watch for inbox prop changes to sync ignoreGroupMessages
+watch(
+  () => props.inbox.provider_config?.ignore_group_messages,
+  newValue => {
+    ignoreGroupMessages.value = newValue ?? false;
+  }
+);
 
 // Computed
 const isConnected = computed(() => deviceStatus.value?.state === 'logged_in');
@@ -197,6 +211,31 @@ const handleDisconnectCancel = () => {
   showDisconnectModal.value = false;
 };
 
+const handleIgnoreGroupMessagesChange = async () => {
+  isSavingSettings.value = true;
+  try {
+    const updatedProviderConfig = {
+      ...props.inbox.provider_config,
+      ignore_group_messages: ignoreGroupMessages.value,
+    };
+    await store.dispatch('inboxes/updateInbox', {
+      id: props.inbox.id,
+      channel: {
+        provider_config: updatedProviderConfig,
+      },
+    });
+    useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SETTINGS_UPDATED'));
+  } catch {
+    // Revert the value on error
+    ignoreGroupMessages.value = !ignoreGroupMessages.value;
+    useAlert(
+      t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SETTINGS_UPDATE_ERROR')
+    );
+  } finally {
+    isSavingSettings.value = false;
+  }
+};
+
 // Lifecycle
 onMounted(() => {
   fetchDeviceStatus();
@@ -326,6 +365,35 @@ onBeforeUnmount(() => {
             }}</span>
           </div>
         </div>
+      </div>
+
+      <!-- Settings Section -->
+      <div
+        class="flex flex-col gap-4 p-4 rounded-lg border border-n-weak bg-n-solid-1"
+      >
+        <label class="flex gap-3 items-start cursor-pointer">
+          <input
+            v-model="ignoreGroupMessages"
+            type="checkbox"
+            class="mt-0.5 w-4 h-4 rounded border-n-weak text-n-brand focus:ring-n-brand"
+            :disabled="isSavingSettings"
+            @change="handleIgnoreGroupMessagesChange"
+          />
+          <div class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{
+                t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.IGNORE_GROUP_MESSAGES')
+              }}
+            </span>
+            <span class="text-xs text-n-slate-11">
+              {{
+                t(
+                  'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.IGNORE_GROUP_MESSAGES_HELP'
+                )
+              }}
+            </span>
+          </div>
+        </label>
       </div>
     </div>
 

@@ -4,6 +4,7 @@
 class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBaseService
   def perform
     processed_params
+    return if ignore_group_messages? && group_message?
 
     if processed_params.try(:[], :reaction).present?
       process_reaction
@@ -140,6 +141,10 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     webhook_params.dig(:payload, :chat_id).to_s.end_with?('@g.us')
   end
 
+  def ignore_group_messages?
+    inbox.channel.provider_config['ignore_group_messages'] == true
+  end
+
   def group_id
     webhook_params.dig(:payload, :chat_id)
   end
@@ -184,8 +189,31 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     nil
   end
 
+  # Override to skip attachment processing and saving for duplicate messages
+  def create_regular_message(message)
+    create_message(message)
+    return if @message_already_exists
+
+    attach_files
+    attach_location if message_type == 'location'
+    @message.save!
+  end
+
   # Override to handle outgoing messages and group sender info
+  # Also check for duplicate messages by source_id to prevent race conditions
   def create_message(message)
+    source_id = message[:id].to_s
+    existing_message = inbox.messages.find_by(source_id: source_id)
+
+    if existing_message
+      # If duplicate exists but new message has content and existing doesn't, update it
+      new_content = message_content(message)
+      existing_message.update!(content: new_content) if new_content.present? && existing_message.content.blank?
+      @message = existing_message
+      @message_already_exists = true
+      return
+    end
+
     @message = @conversation.messages.build(message_attributes(message))
   end
 
@@ -658,6 +686,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def sync_history_chat_messages(chat)
     chat_jid = chat['jid']
     return if chat_jid.blank?
+    return if ignore_group_messages? && group_chat?(chat_jid)
 
     # Will be enriched with chat_info from first messages response
     enriched_chat = chat.dup
