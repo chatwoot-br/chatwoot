@@ -5,12 +5,24 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def perform
     processed_params
     return if ignore_group_messages? && group_message?
+    return if empty_message?
 
     if processed_params.try(:[], :reaction).present?
       process_reaction
     else
       super
     end
+  end
+
+  # Skip messages with no content and no attachments (but allow reactions and status updates)
+  def empty_message?
+    return false if processed_params.blank? # Allow empty params (handled elsewhere)
+    return false if processed_params[:reaction].present?
+    return false if processed_params[:attachments].present?
+    return false if processed_params[:statuses].present? # Allow status updates
+
+    content = message_content(processed_params)
+    content.blank?
   end
 
   private
