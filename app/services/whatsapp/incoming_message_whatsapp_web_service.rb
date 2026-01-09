@@ -69,15 +69,28 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     message_id = payload[:id]
     timestamp = parse_timestamp(payload[:timestamp])
 
-    # For is_from_me messages, use chat_id as the contact identifier (the recipient)
-    # For incoming messages, use from as the contact identifier (the sender)
-    contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
-    contact_phone = extract_phone_number(contact_jid)
+    # For LID-based chats, use LID as identifier (phone not known yet)
+    # For regular chats, use phone-based JID
+    if lid_based_chat_payload?(payload)
+      # LID-only: use LID as identifier, no phone available
+      contact_jid = payload[:chat_id]
+      contact_phone = nil # Phone not known yet
+    else
+      # For is_from_me messages, use chat_id as the contact identifier (the recipient)
+      # For incoming messages, use from as the contact identifier (the sender)
+      contact_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
+      contact_phone = extract_phone_number(contact_jid)
+    end
 
     {
       contacts: [build_contact(payload)],
-      messages: [build_message(payload, message_id, contact_phone, timestamp)]
+      messages: [build_message(payload, message_id, contact_phone || extract_phone_number(contact_jid), timestamp)]
     }
+  end
+
+  # Helper to check LID in payload context (for transform methods)
+  def lid_based_chat_payload?(payload)
+    payload[:chat_id].to_s.end_with?('@lid')
   end
 
   # Transform message.ack event to status update format
@@ -145,10 +158,17 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     reactions[emoji] << sender unless reactions[emoji].include?(sender)
   end
 
-  # Override to handle group messages differently
+  # Override to handle group messages and LID-based chats differently
   def set_contact
     if group_message?
       set_group_contact
+    elsif lid_based_chat?
+      # Scenario 1: chat_id is @lid (phone not known yet)
+      set_lid_contact
+    elsif from_lid_matches_existing_contact?
+      # Scenario 2: chat_id is @s.whatsapp.net but from_lid matches existing LID contact
+      # This is when we finally learn the phone number!
+      set_contact_from_lid_match
     else
       super
       sync_contact_avatar if @contact
@@ -157,6 +177,30 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def group_message?
     webhook_params.dig(:payload, :chat_id).to_s.end_with?('@g.us')
+  end
+
+  # LID (Linked ID) detection methods
+  # WhatsApp uses LID for contacts where phone number is not yet identified
+  def lid_based_chat?
+    webhook_params.dig(:payload, :chat_id).to_s.end_with?('@lid')
+  end
+
+  def lid_chat_id
+    webhook_params.dig(:payload, :chat_id)
+  end
+
+  # Check if from_lid matches an existing LID-based contact
+  # This allows linking phone-based messages back to existing LID contacts
+  def from_lid_matches_existing_contact?
+    from_lid = payload_from_lid
+    return false if from_lid.blank?
+    return false unless from_lid.end_with?('@lid')
+
+    inbox.contact_inboxes.exists?(source_id: from_lid)
+  end
+
+  def payload_from_lid
+    webhook_params.dig(:payload, :from_lid)
   end
 
   def ignore_group_messages?
@@ -185,6 +229,58 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     # Sync group avatar (uses same endpoint as user avatar)
     sync_group_avatar(group_jid)
+  end
+
+  # Scenario 1: Create contact with LID as source_id, no phone
+  # Called when chat_id ends with @lid (phone not known yet)
+  def set_lid_contact
+    lid_jid = lid_chat_id
+    payload = webhook_params[:payload]
+    contact_name = payload[:is_from_me] ? payload[:chat_name] : payload[:from_name]
+
+    contact_inbox = ::ContactInboxWithContactBuilder.new(
+      source_id: lid_jid,
+      inbox: inbox,
+      contact_attributes: {
+        name: contact_name || lid_jid.split('@').first,
+        phone_number: nil, # Phone not known yet for LID-only chats
+        additional_attributes: { is_lid_chat: true, lid: lid_jid }
+      }
+    ).perform
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+
+    Rails.logger.info "[WhatsApp Web] Created LID contact: source_id=#{lid_jid}, name=#{@contact.name}"
+  end
+
+  # Scenario 2: Phone-based message with from_lid matching existing LID contact
+  # Now we can update the contact with the phone number!
+  def set_contact_from_lid_match
+    from_lid = payload_from_lid
+    contact_inbox = inbox.contact_inboxes.find_by(source_id: from_lid)
+
+    @contact_inbox = contact_inbox
+    @contact = contact_inbox.contact
+
+    # Update phone number now that we know it
+    update_contact_with_discovered_phone
+    sync_contact_avatar if @contact
+  end
+
+  # Update contact with discovered phone number from from_lid match
+  def update_contact_with_discovered_phone
+    payload = webhook_params[:payload]
+    # For incoming messages, phone is in 'from'; for outgoing, it's in 'chat_id'
+    phone_jid = payload[:is_from_me] ? payload[:chat_id] : payload[:from]
+    phone = extract_phone_number(phone_jid)
+
+    return if phone.blank?
+    return if @contact.phone_number.present? # Don't overwrite if already set
+
+    formatted_phone = "+#{phone}"
+    @contact.update(phone_number: formatted_phone)
+    Rails.logger.info "[WhatsApp Web] Discovered phone for LID contact #{@contact.id}: #{formatted_phone} (from_lid: #{payload_from_lid})"
   end
 
   def sync_group_avatar(group_jid)
