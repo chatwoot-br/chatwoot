@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **WhatsApp LID Support**: Handle WhatsApp LID (Linked ID) addresses for contacts without known phone numbers
+  - Create contacts with LID as source_id when phone is not yet identified
+  - Automatically link phone number when discovered via `from_lid` matching
+  - Support sending messages to LID-based chats (gowa handles LID→phone resolution)
+
 ## [v4.9.1+1] - 2025-01-07
 
 ### Added

@@ -123,21 +123,23 @@ def group_sender_attributes
 end
 ```
 
-### 5. Update ContactInbox validation to accept group IDs
+### 5. Update regex to accept group IDs
 
-**File**: `app/models/contact_inbox.rb`
+**File**: `lib/regex_helper.rb`
 
-Update the regex to accept `@g.us` suffix for groups:
+Added `@g.us` pattern for groups:
 ```ruby
-WHATSAPP_CHANNEL_REGEX = /^\+?\d{1,15}(@(s\.whatsapp\.net|g\.us))?$/
+# Note: Later extended by PLAN-0006 to also include @lid
+WHATSAPP_CHANNEL_REGEX = Regexp.new('^(\d{1,15}|\d+@g\.us)\z')
 ```
 
-## Files to Modify
+## Files Summary
 
 | File | Changes |
 |------|---------|
 | `app/services/whatsapp/incoming_message_whatsapp_web_service.rb` | Add group detection, override `set_contact`, store sender info |
 | `app/services/whatsapp/providers/whatsapp_web_service.rb` | Add `fetch_group_info` method |
+| `lib/regex_helper.rb` | Add `@g.us` to WHATSAPP_CHANNEL_REGEX |
 | `app/models/contact_inbox.rb` | Update regex to accept group IDs |
 
 ## Data Flow
