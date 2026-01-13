@@ -230,8 +230,18 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     attachment = message.attachments.first
     endpoint = attachment_endpoint(attachment.file_type)
 
+    # go-whatsapp's /send/file endpoint only accepts multipart form data, not URLs
+    # For other types (image, video, audio), URLs are supported
+    if attachment.file_type == 'file'
+      send_file_multipart(phone_number, message, attachment, endpoint)
+    else
+      send_attachment_with_url(phone_number, message, attachment, endpoint)
+    end
+  end
+
+  def send_attachment_with_url(phone_number, message, attachment, endpoint)
     body = build_attachment_body(phone_number, message, attachment)
-    Rails.logger.info "[WhatsApp Web] Sending attachment: #{body.to_json}"
+    Rails.logger.info "[WhatsApp Web] Sending attachment with URL: #{body.to_json}"
 
     response = HTTParty.post(
       "#{api_base_path}#{endpoint}",
@@ -241,6 +251,70 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     )
 
     process_response(response, message)
+  end
+
+  def send_file_multipart(phone_number, message, attachment, endpoint)
+    Rails.logger.info "[WhatsApp Web] Sending file via multipart: #{attachment.file.filename}"
+
+    filename = attachment.file.filename.to_s
+    content_type = attachment.file.content_type || 'application/octet-stream'
+
+    # Use blob.open for streaming file access (recommended by Chatwoot)
+    attachment.file.blob.open do |tempfile|
+      form_data = build_file_form_data(phone_number, message, tempfile, content_type, filename)
+      response = post_multipart_file(endpoint, form_data)
+      return process_faraday_response(response, message)
+    end
+  end
+
+  def build_file_form_data(phone_number, message, tempfile, content_type, filename)
+    form_data = {
+      phone: phone_number,
+      file: Faraday::Multipart::FilePart.new(tempfile, content_type, filename)
+    }
+    # Add caption (message text) if present
+    form_data[:caption] = message.content if message.content.present?
+    form_data[:reply_message_id] = reply_message_id(message) if reply_message_id(message).present?
+    form_data
+  end
+
+  def post_multipart_file(endpoint, form_data)
+    connection = Faraday.new(url: api_base_path) do |f|
+      f.request :multipart
+      f.request :url_encoded
+      f.adapter Faraday.default_adapter
+    end
+
+    connection.post(endpoint) do |req|
+      req.headers['X-Device-Id'] = device_id
+      req.body = form_data
+      req.options.timeout = HTTP_TIMEOUT
+    end
+  end
+
+  def process_faraday_response(response, message)
+    parsed_response = JSON.parse(response.body)
+    if response.success? && parsed_response['code'] == 'SUCCESS'
+      parsed_response.dig('results', 'message_id')
+    else
+      Rails.logger.error "[WhatsApp Web] File upload failed: #{response.body}"
+      handle_faraday_error(response, message)
+      nil
+    end
+  rescue JSON::ParserError => e
+    Rails.logger.error "[WhatsApp Web] Failed to parse response: #{e.message}"
+    nil
+  end
+
+  def handle_faraday_error(response, message)
+    parsed = begin
+      JSON.parse(response.body)
+    rescue JSON::ParserError
+      {}
+    end
+    error_msg = parsed['error'] || parsed['message'] || 'Unknown error occurred'
+    Rails.logger.error "[WhatsApp Web] Error sending file: #{error_msg}"
+    message.update!(status: :failed, external_error: error_msg)
   end
 
   def attachment_endpoint(file_type)
