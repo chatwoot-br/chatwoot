@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v4.9.1+2] - 2025-01-13
+
 ### Added
 
+- **WhatsApp History Sync on Reconnect**: Trigger history sync when clicking "Reconnect" in Connection tab
+  - New `sync_history` API endpoint to manually trigger history sync
+  - Auto-sync after successful device reconnection
 - **WhatsApp LID Support**: Handle WhatsApp LID (Linked ID) addresses for contacts without known phone numbers
   - Create contacts with LID as source_id when phone is not yet identified
   - Automatically link phone number when discovered via `from_lid` matching
   - Support sending messages to LID-based chats (gowa handles LID→phone resolution)
+
+### Fixed
+
+- **WhatsApp Web Attachments**: Properly handle file attachments and captions for WhatsApp Web messages
+- **AI Agents**: Skip SDK config when installation_configs table is missing
 
 ## [v4.9.1+1] - 2025-01-07
 
