@@ -549,7 +549,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
                   { id: media_data }
                 end
 
-    media_obj[:caption] = caption if caption.present?
+    # Extract caption: prefer explicit caption parameter, then try nested caption in media_data
+    effective_caption = caption.presence || (media_data.is_a?(Hash) ? media_data[:caption] : nil)
+    media_obj[:caption] = effective_caption if effective_caption.present?
     media_obj
   end
 
