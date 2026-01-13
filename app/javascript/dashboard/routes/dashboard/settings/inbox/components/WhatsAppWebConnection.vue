@@ -182,6 +182,14 @@ const handleReconnect = async () => {
     await whatsappWebAPI.reconnect(props.inbox.id);
     useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_SUCCESS'));
     await fetchDeviceStatus();
+
+    // Auto-sync history after successful reconnect
+    try {
+      await whatsappWebAPI.syncHistory(props.inbox.id);
+      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_SUCCESS'));
+    } catch {
+      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_ERROR'));
+    }
   } catch (error) {
     useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_ERROR'));
   } finally {
