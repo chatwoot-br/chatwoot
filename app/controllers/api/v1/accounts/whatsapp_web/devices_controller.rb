@@ -3,7 +3,7 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
   before_action :check_whatsapp_web_api_url
   before_action :authorize_account_access, only: [:create]
-  before_action :resolve_device_id, only: [:qr_code, :status, :reconnect, :logout]
+  before_action :resolve_device_id, only: [:qr_code, :status, :reconnect, :logout, :sync_history]
 
   # POST /api/v1/accounts/:account_id/whatsapp_web/devices
   # Creates a new device in go-whatsapp-web-multidevice
@@ -67,6 +67,25 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     render json: {
       success: true,
       message: 'Device logged out successfully'
+    }
+  rescue StandardError => e
+    render_error(e)
+  end
+
+  # POST /api/v1/accounts/:account_id/whatsapp_web/devices/:id/sync_history
+  # Triggers history sync for the device
+  def sync_history
+    authorize_device_action(:update?)
+
+    Webhooks::WhatsappWebEventsJob.perform_later(
+      'event' => 'history_sync_complete',
+      'device_id' => @device_id,
+      'payload' => { 'sync_type' => 'MANUAL', 'timestamp' => Time.current.iso8601 }
+    )
+
+    render json: {
+      success: true,
+      message: 'History sync started'
     }
   rescue StandardError => e
     render_error(e)

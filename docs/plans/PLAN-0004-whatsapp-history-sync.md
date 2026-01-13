@@ -784,3 +784,103 @@ end
 ```
 
 **File:** `app/services/whatsapp/incoming_message_whatsapp_web_service.rb`
+
+### 17. Manual History Sync on Reconnect
+**Feature**: Trigger history sync when user clicks "Reconnect" in the Connection tab.
+
+**Problem**: History sync only happened on initial QR scan connection. Users needed a way to sync history after reconnecting.
+
+**Implementation**:
+
+**Backend - New API endpoint** (`app/controllers/api/v1/accounts/whatsapp_web/devices_controller.rb`):
+```ruby
+# POST /api/v1/accounts/:account_id/whatsapp_web/devices/:id/sync_history
+def sync_history
+  authorize_device_action(:update?)
+
+  Webhooks::WhatsappWebEventsJob.perform_later(
+    'event' => 'history_sync_complete',
+    'device_id' => @device_id,
+    'payload' => { 'sync_type' => 'MANUAL', 'timestamp' => Time.current.iso8601 }
+  )
+
+  render json: { success: true, message: 'History sync started' }
+end
+```
+
+**Route** (`config/routes.rb`):
+```ruby
+namespace :whatsapp_web do
+  resources :devices, only: [:create] do
+    member do
+      # ... existing routes ...
+      post :sync_history
+    end
+  end
+end
+```
+
+**Frontend API** (`app/javascript/dashboard/api/channel/whatsappWebChannel.js`):
+```javascript
+syncHistory(inboxId) {
+  return axios.post(
+    `${this.baseUrl()}/whatsapp_web/devices/${inboxId}/sync_history`
+  );
+}
+```
+
+**Vue Component** (`app/javascript/dashboard/routes/dashboard/settings/inbox/components/WhatsAppWebConnection.vue`):
+```javascript
+const handleReconnect = async () => {
+  isReconnecting.value = true;
+  try {
+    await whatsappWebAPI.reconnect(props.inbox.id);
+    useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_SUCCESS'));
+    await fetchDeviceStatus();
+
+    // Auto-sync history after successful reconnect
+    try {
+      await whatsappWebAPI.syncHistory(props.inbox.id);
+      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_SUCCESS'));
+    } catch {
+      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_ERROR'));
+    }
+  } catch (error) {
+    useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_ERROR'));
+  } finally {
+    isReconnecting.value = false;
+  }
+};
+```
+
+**Translations** (`app/javascript/dashboard/i18n/locale/en/inboxMgmt.json`):
+```json
+"ALERTS": {
+  "SYNC_SUCCESS": "History sync started. Messages will appear shortly.",
+  "SYNC_ERROR": "Failed to start history sync."
+}
+```
+
+**Flow**:
+```
+User clicks "Reconnect"
+    ↓
+POST /devices/:id/reconnect
+    ↓
+fetchDeviceStatus()
+    ↓
+POST /devices/:id/sync_history (auto-triggered)
+    ↓
+WhatsappWebEventsJob queued (async)
+    ↓
+process_history_sync() runs in background
+    ↓
+Messages appear in conversations
+```
+
+**Files Modified:**
+- `app/controllers/api/v1/accounts/whatsapp_web/devices_controller.rb`
+- `config/routes.rb`
+- `app/javascript/dashboard/api/channel/whatsappWebChannel.js`
+- `app/javascript/dashboard/routes/dashboard/settings/inbox/components/WhatsAppWebConnection.vue`
+- `app/javascript/dashboard/i18n/locale/en/inboxMgmt.json`
