@@ -19,6 +19,23 @@ const store = useStore();
 const POLL_INTERVAL_MS = 3000; // 3 seconds
 const MAX_POLL_COUNT = 60; // 3 minutes max (60 * 3s)
 
+// Phone number helpers
+const extractPhoneFromJid = jid => {
+  if (!jid) return '';
+  return jid.split('@')[0];
+};
+
+const normalizePhone = phone => {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+};
+
+const isPhoneMismatch = (expectedPhone, connectedJid) => {
+  const expected = normalizePhone(expectedPhone);
+  const connected = normalizePhone(extractPhoneFromJid(connectedJid));
+  return expected && connected && expected !== connected;
+};
+
 // Form state
 const currentStep = ref('phone_input');
 const phoneNumber = ref('');
@@ -126,6 +143,28 @@ const checkDeviceStatus = async () => {
     const response = await whatsappWebAPI.getDeviceStatus(deviceId.value);
 
     if (response.data.state === 'logged_in') {
+      // Validate that connected phone matches expected phone
+      if (isPhoneMismatch(phoneNumber.value, response.data.jid)) {
+        stopStatusPolling();
+        // Disconnect the wrong device
+        try {
+          await whatsappWebAPI.logout(deviceId.value);
+        } catch {
+          // Ignore logout errors
+        }
+
+        const connectedPhone = extractPhoneFromJid(response.data.jid);
+        errorMessage.value = t(
+          'INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.PHONE_MISMATCH',
+          {
+            expected: phoneNumber.value,
+            connected: `+${connectedPhone}`,
+          }
+        );
+        useAlert(errorMessage.value);
+        return;
+      }
+
       stopStatusPolling();
       currentStep.value = 'connected';
       await createInbox();
@@ -191,6 +230,12 @@ const refreshQRCode = async () => {
 const skipQRScan = async () => {
   stopStatusPolling();
   await createInbox();
+};
+
+const goBackToPhoneInput = () => {
+  stopStatusPolling();
+  errorMessage.value = '';
+  currentStep.value = 'phone_input';
 };
 
 // Cleanup
@@ -374,9 +419,26 @@ onBeforeUnmount(() => {
         <!-- Error Message -->
         <div
           v-if="errorMessage"
-          class="w-full max-w-md p-3 rounded-lg bg-n-error/10"
+          class="flex gap-3 items-start w-full max-w-md p-4 rounded-lg border border-n-amber-6 bg-n-amber-3"
         >
-          <p class="text-sm text-n-error">{{ errorMessage }}</p>
+          <Icon
+            icon="i-lucide-alert-triangle"
+            class="flex-shrink-0 w-5 h-5 text-n-amber-11"
+            size="20"
+          />
+          <div class="flex flex-col gap-2">
+            <p class="text-sm font-medium text-n-amber-11">
+              {{ errorMessage }}
+            </p>
+            <button
+              type="button"
+              class="flex gap-1 items-center text-sm font-medium text-n-amber-12 hover:underline"
+              @click="goBackToPhoneInput"
+            >
+              <Icon icon="i-lucide-arrow-left" size="14" />
+              {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.QR_CODE.GO_BACK') }}
+            </button>
+          </div>
         </div>
 
         <!-- Actions -->

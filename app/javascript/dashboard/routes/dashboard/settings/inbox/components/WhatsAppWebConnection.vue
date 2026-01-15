@@ -22,6 +22,23 @@ const store = useStore();
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_COUNT = 60; // 3 minutes max
 
+// Phone number helpers
+const extractPhoneFromJid = jid => {
+  if (!jid) return '';
+  return jid.split('@')[0];
+};
+
+const normalizePhone = phone => {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+};
+
+const isPhoneMismatch = (expectedPhone, connectedJid) => {
+  const expected = normalizePhone(expectedPhone);
+  const connected = normalizePhone(extractPhoneFromJid(connectedJid));
+  return expected && connected && expected !== connected;
+};
+
 // State
 const isLoading = ref(false);
 const deviceStatus = ref(null);
@@ -33,6 +50,8 @@ const pollCount = ref(0);
 const isReconnecting = ref(false);
 const isDisconnecting = ref(false);
 const isSavingSettings = ref(false);
+const phoneMismatchInfo = ref(null); // { expected, connected } or null
+const mismatchError = ref(null); // { expected, connected } or null - for QR modal error state
 const ignoreGroupMessages = ref(
   props.inbox.provider_config?.ignore_group_messages ?? false
 );
@@ -98,12 +117,34 @@ const statusIconClass = computed(() => {
   return 'text-n-ruby-11';
 });
 
+const hasPhoneMismatch = computed(() => phoneMismatchInfo.value !== null);
+
+const phoneMismatchMessage = computed(() => {
+  if (!phoneMismatchInfo.value) return '';
+  return t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.PHONE_MISMATCH', {
+    expected: phoneMismatchInfo.value.expected,
+    connected: `+${phoneMismatchInfo.value.connected}`,
+  });
+});
+
 // Methods
 const fetchDeviceStatus = async () => {
   isLoading.value = true;
+  phoneMismatchInfo.value = null; // Reset mismatch info
   try {
     const response = await whatsappWebAPI.getDeviceStatus(props.inbox.id);
     deviceStatus.value = response.data;
+
+    // Check for phone mismatch if connected
+    if (response.data.state === 'logged_in' && response.data.jid) {
+      const expectedPhone = props.inbox.phone_number || props.inbox.phoneNumber;
+      if (isPhoneMismatch(expectedPhone, response.data.jid)) {
+        phoneMismatchInfo.value = {
+          expected: expectedPhone,
+          connected: extractPhoneFromJid(response.data.jid),
+        };
+      }
+    }
   } catch (error) {
     useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.STATUS_ERROR'));
   } finally {
@@ -143,14 +184,37 @@ const checkDeviceStatus = async () => {
 
   try {
     const response = await whatsappWebAPI.getDeviceStatus(props.inbox.id);
-    deviceStatus.value = response.data;
 
     if (response.data.state === 'logged_in') {
+      // Validate that connected phone matches expected phone
+      const expectedPhone = props.inbox.phone_number || props.inbox.phoneNumber;
+      if (isPhoneMismatch(expectedPhone, response.data.jid)) {
+        stopStatusPolling();
+        // Disconnect the wrong device
+        try {
+          await whatsappWebAPI.logout(props.inbox.id);
+        } catch {
+          // Ignore logout errors
+        }
+
+        const connectedPhone = extractPhoneFromJid(response.data.jid);
+        // Set error state for QR modal instead of just showing toast
+        mismatchError.value = {
+          expected: expectedPhone,
+          connected: connectedPhone,
+        };
+        // Keep QR modal open for retry
+        return;
+      }
+
+      deviceStatus.value = response.data;
       stopStatusPolling();
       showQRModal.value = false;
       useAlert(
         t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_SUCCESS')
       );
+    } else {
+      deviceStatus.value = response.data;
     }
   } catch {
     // Silent fail during polling
@@ -163,12 +227,14 @@ const startStatusPolling = () => {
 };
 
 const handleConnect = async () => {
+  mismatchError.value = null; // Clear any previous error
   showQRModal.value = true;
   await fetchQRCode();
   startStatusPolling();
 };
 
 const handleRefreshQR = async () => {
+  mismatchError.value = null; // Clear error on refresh
   await fetchQRCode();
   pollCount.value = 0;
   if (!pollInterval.value) {
@@ -176,13 +242,22 @@ const handleRefreshQR = async () => {
   }
 };
 
-const handleCloseQRModal = () => {
+const handleTryAgain = async () => {
+  mismatchError.value = null; // Clear error
+  await fetchQRCode();
+  startStatusPolling();
+};
+
+const handleCloseQRModal = async () => {
   showQRModal.value = false;
+  mismatchError.value = null; // Clear error on modal close
   stopStatusPolling();
   if (qrCodeUrl.value) {
     URL.revokeObjectURL(qrCodeUrl.value);
     qrCodeUrl.value = '';
   }
+  // Always refresh status to get actual device state
+  await fetchDeviceStatus();
 };
 
 const handleReconnect = async () => {
@@ -414,6 +489,37 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <!-- Phone Mismatch Warning -->
+      <div
+        v-if="hasPhoneMismatch"
+        class="flex gap-3 items-start p-4 rounded-lg border border-n-amber-6 bg-n-amber-3"
+      >
+        <Icon
+          icon="i-lucide-alert-triangle"
+          class="flex-shrink-0 w-5 h-5 text-n-amber-11"
+        />
+        <div class="flex-1">
+          <p class="text-sm font-medium text-n-amber-11">
+            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.PHONE_MISMATCH.TITLE') }}
+          </p>
+          <p class="mt-1 text-sm text-n-amber-11">
+            {{ phoneMismatchMessage }}
+          </p>
+          <p class="mt-2 text-xs text-n-amber-10">
+            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.PHONE_MISMATCH.HELP') }}
+          </p>
+        </div>
+        <ButtonV4
+          sm
+          faded
+          amber
+          :disabled="isDisconnecting"
+          @click="handleDisconnectClick"
+        >
+          {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.DISCONNECT') }}
+        </ButtonV4>
+      </div>
+
       <!-- Settings Section -->
       <div
         class="flex flex-col gap-4 p-4 rounded-lg border border-n-weak bg-n-solid-1"
@@ -465,93 +571,134 @@ onBeforeUnmount(() => {
     <!-- QR Code Modal -->
     <Modal :show="showQRModal" :on-close="handleCloseQRModal">
       <div class="flex flex-col gap-6 p-6">
-        <div class="text-center">
-          <h2 class="text-lg font-medium text-n-slate-12">
-            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.TITLE') }}
-          </h2>
-          <p class="mt-1 text-sm text-n-slate-11">
-            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.DESCRIPTION') }}
-          </p>
-        </div>
-
-        <!-- QR Code Image -->
-        <div class="flex justify-center">
-          <div
-            v-if="qrCodeUrl"
-            class="p-4 bg-white rounded-lg border border-n-weak"
-          >
-            <img :src="qrCodeUrl" alt="WhatsApp QR Code" class="w-64 h-64" />
+        <!-- Error State: Phone Mismatch -->
+        <template v-if="mismatchError">
+          <div class="text-center">
+            <div
+              class="flex justify-center items-center mx-auto mb-4 w-12 h-12 rounded-full bg-n-ruby-3"
+            >
+              <Icon
+                icon="i-lucide-alert-triangle"
+                class="w-6 h-6 text-n-ruby-11"
+              />
+            </div>
+            <h2 class="text-lg font-medium text-n-slate-12">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.ERROR.TITLE') }}
+            </h2>
+            <p class="mt-2 text-sm text-n-slate-11">
+              {{
+                t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.ERROR.MESSAGE', {
+                  expected: mismatchError.expected,
+                  connected: `+${mismatchError.connected}`,
+                })
+              }}
+            </p>
           </div>
+
+          <!-- Error Actions -->
+          <div class="flex gap-3 justify-center">
+            <ButtonV4 sm solid blue @click="handleTryAgain">
+              <Icon icon="i-lucide-refresh-cw" class="mr-1 w-4 h-4" />
+              {{
+                t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.ERROR.TRY_AGAIN')
+              }}
+            </ButtonV4>
+            <ButtonV4 sm faded slate @click="handleCloseQRModal">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.CLOSE') }}
+            </ButtonV4>
+          </div>
+        </template>
+
+        <!-- Normal State: QR Code -->
+        <template v-else>
+          <div class="text-center">
+            <h2 class="text-lg font-medium text-n-slate-12">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.TITLE') }}
+            </h2>
+            <p class="mt-1 text-sm text-n-slate-11">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.DESCRIPTION') }}
+            </p>
+          </div>
+
+          <!-- QR Code Image -->
+          <div class="flex justify-center">
+            <div
+              v-if="qrCodeUrl"
+              class="p-4 bg-white rounded-lg border border-n-weak"
+            >
+              <img :src="qrCodeUrl" alt="WhatsApp QR Code" class="w-64 h-64" />
+            </div>
+            <div
+              v-else
+              class="flex justify-center items-center w-64 h-64 rounded-lg border border-n-weak bg-n-solid-1"
+            >
+              <Icon
+                icon="i-lucide-loader-circle"
+                class="w-8 h-8 animate-spin text-n-slate-11"
+              />
+            </div>
+          </div>
+
+          <!-- Instructions -->
+          <div class="p-4 rounded-lg bg-n-slate-2">
+            <h3 class="mb-3 text-sm font-medium text-n-slate-12">
+              {{
+                t(
+                  'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.TITLE'
+                )
+              }}
+            </h3>
+            <ol
+              class="space-y-2 text-sm list-decimal list-inside text-n-slate-11"
+            >
+              <li>
+                {{
+                  t(
+                    'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_1'
+                  )
+                }}
+              </li>
+              <li>
+                {{
+                  t(
+                    'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_2'
+                  )
+                }}
+              </li>
+              <li>
+                {{
+                  t(
+                    'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_3'
+                  )
+                }}
+              </li>
+            </ol>
+          </div>
+
+          <!-- Waiting indicator -->
           <div
-            v-else
-            class="flex justify-center items-center w-64 h-64 rounded-lg border border-n-weak bg-n-solid-1"
+            class="flex gap-2 justify-center items-center text-sm text-n-slate-11"
           >
             <Icon
               icon="i-lucide-loader-circle"
-              class="w-8 h-8 animate-spin text-n-slate-11"
+              class="w-4 h-4 animate-spin text-n-brand"
             />
+            <span>{{
+              t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.WAITING')
+            }}</span>
           </div>
-        </div>
 
-        <!-- Instructions -->
-        <div class="p-4 rounded-lg bg-n-slate-2">
-          <h3 class="mb-3 text-sm font-medium text-n-slate-12">
-            {{
-              t(
-                'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.TITLE'
-              )
-            }}
-          </h3>
-          <ol
-            class="space-y-2 text-sm list-decimal list-inside text-n-slate-11"
-          >
-            <li>
-              {{
-                t(
-                  'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_1'
-                )
-              }}
-            </li>
-            <li>
-              {{
-                t(
-                  'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_2'
-                )
-              }}
-            </li>
-            <li>
-              {{
-                t(
-                  'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.INSTRUCTIONS.STEP_3'
-                )
-              }}
-            </li>
-          </ol>
-        </div>
-
-        <!-- Waiting indicator -->
-        <div
-          class="flex gap-2 justify-center items-center text-sm text-n-slate-11"
-        >
-          <Icon
-            icon="i-lucide-loader-circle"
-            class="w-4 h-4 animate-spin text-n-brand"
-          />
-          <span>{{
-            t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.QR_MODAL.WAITING')
-          }}</span>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex gap-3 justify-center">
-          <ButtonV4 sm faded slate @click="handleRefreshQR">
-            <Icon icon="i-lucide-refresh-cw" class="mr-1 w-4 h-4" />
-            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.REFRESH_QR') }}
-          </ButtonV4>
-          <ButtonV4 sm faded slate @click="handleCloseQRModal">
-            {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.CLOSE') }}
-          </ButtonV4>
-        </div>
+          <!-- Actions -->
+          <div class="flex gap-3 justify-center">
+            <ButtonV4 sm faded slate @click="handleRefreshQR">
+              <Icon icon="i-lucide-refresh-cw" class="mr-1 w-4 h-4" />
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.REFRESH_QR') }}
+            </ButtonV4>
+            <ButtonV4 sm faded slate @click="handleCloseQRModal">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ACTIONS.CLOSE') }}
+            </ButtonV4>
+          </div>
+        </template>
       </div>
     </Modal>
 

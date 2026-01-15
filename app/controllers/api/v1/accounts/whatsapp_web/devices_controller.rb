@@ -213,16 +213,23 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
   end
 
   def fetch_device_status_from_api(device_id)
-    url = "#{whatsapp_web_api_url}/devices/#{device_id}/status"
+    # Use GET /devices/:device_id to get both status and JID
+    # The /status endpoint doesn't return the actual JID from WhatsApp
+    url = "#{whatsapp_web_api_url}/devices/#{device_id}"
     response = HTTParty.get(url, **http_options('X-Device-Id' => device_id))
 
     # Handle "device not found" gracefully as disconnected state
     return { state: 'disconnected' } if !response.success? && response.body.to_s.include?('not found')
 
-    results = handle_api_response(response, 'fetch device status')['results'] || {}
-    state = results['is_logged_in'] ? 'logged_in' : 'disconnected'
-    state = 'connected' if !results['is_logged_in'] && results['is_connected']
-    { state: state, jid: results['jid'], display_name: results['display_name'] || results['pushname'] }
+    results = handle_api_response(response, 'fetch device info')['results'] || {}
+
+    # Map state from device info (state can be: 'logged_in', 'disconnected', 'connecting', etc.)
+    state = results['state'] || 'disconnected'
+    state = 'logged_in' if state == 'logged_in'
+    state = 'connected' if state == 'connecting' || state == 'connected'
+    state = 'disconnected' unless %w[logged_in connected].include?(state)
+
+    { state: state, jid: results['jid'], display_name: results['display_name'] }
   end
 
   def reconnect_device_in_api(device_id)

@@ -346,7 +346,9 @@
           "SKIP_NOTE": "You can connect to WhatsApp later from the inbox settings page.",
           "ERROR": "Failed to load QR code. Please try again.",
           "REFRESH_ERROR": "Failed to refresh QR code. Please try again.",
-          "TIMEOUT": "QR code scan timed out. Please refresh and try again."
+          "TIMEOUT": "QR code scan timed out. Please refresh and try again.",
+          "PHONE_MISMATCH": "Phone number mismatch. Expected {expected} but connected {connected}. Please scan with the correct WhatsApp account.",
+          "GO_BACK": "Go back to change phone number"
         },
         "API": {
           "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"
@@ -751,7 +753,12 @@
           "STEP_2": "Tap Menu or Settings and select Linked Devices",
           "STEP_3": "Point your phone at this screen to capture the QR code"
         },
-        "WAITING": "Waiting for connection..."
+        "WAITING": "Waiting for connection...",
+        "ERROR": {
+          "TITLE": "Wrong WhatsApp Account",
+          "MESSAGE": "You scanned with {connected} but this inbox is configured for {expected}. Please scan with the correct WhatsApp account.",
+          "TRY_AGAIN": "Try Again"
+        }
       },
       "DISCONNECT_CONFIRM": {
         "TITLE": "Disconnect WhatsApp?",
@@ -768,7 +775,12 @@
         "SETTINGS_UPDATED": "Settings updated successfully",
         "SETTINGS_UPDATE_ERROR": "Failed to update settings. Please try again.",
         "SYNC_SUCCESS": "History sync started. Messages will appear shortly.",
-        "SYNC_ERROR": "Failed to start history sync."
+        "SYNC_ERROR": "Failed to start history sync.",
+        "PHONE_MISMATCH": "Phone number mismatch. Expected {expected} but connected {connected}. Please scan with the correct WhatsApp account."
+      },
+      "PHONE_MISMATCH": {
+        "TITLE": "Wrong WhatsApp Account Connected",
+        "HELP": "Messages will not be received correctly until you connect with the correct phone number. Click Disconnect to sign out and scan the QR code again with the correct account."
       },
       "IGNORE_GROUP_MESSAGES": "Ignore group messages",
       "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported",
