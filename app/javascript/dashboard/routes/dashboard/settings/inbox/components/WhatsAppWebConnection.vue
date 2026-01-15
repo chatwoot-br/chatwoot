@@ -36,12 +36,21 @@ const isSavingSettings = ref(false);
 const ignoreGroupMessages = ref(
   props.inbox.provider_config?.ignore_group_messages ?? false
 );
+const historySyncEnabled = ref(
+  props.inbox.provider_config?.history_sync_enabled ?? false
+);
 
-// Watch for inbox prop changes to sync ignoreGroupMessages
+// Watch for inbox prop changes to sync settings
 watch(
   () => props.inbox.provider_config?.ignore_group_messages,
   newValue => {
     ignoreGroupMessages.value = newValue ?? false;
+  }
+);
+watch(
+  () => props.inbox.provider_config?.history_sync_enabled,
+  newValue => {
+    historySyncEnabled.value = newValue ?? false;
   }
 );
 
@@ -183,12 +192,14 @@ const handleReconnect = async () => {
     useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_SUCCESS'));
     await fetchDeviceStatus();
 
-    // Auto-sync history after successful reconnect
-    try {
-      await whatsappWebAPI.syncHistory(props.inbox.id);
-      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_SUCCESS'));
-    } catch {
-      useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_ERROR'));
+    // Only sync history if enabled
+    if (historySyncEnabled.value) {
+      try {
+        await whatsappWebAPI.syncHistory(props.inbox.id);
+        useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_SUCCESS'));
+      } catch {
+        useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SYNC_ERROR'));
+      }
     }
   } catch (error) {
     useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.RECONNECT_ERROR'));
@@ -238,6 +249,32 @@ const handleIgnoreGroupMessagesChange = async () => {
   } catch {
     // Revert the value on error
     ignoreGroupMessages.value = !ignoreGroupMessages.value;
+    useAlert(
+      t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SETTINGS_UPDATE_ERROR')
+    );
+  } finally {
+    isSavingSettings.value = false;
+  }
+};
+
+const handleHistorySyncEnabledChange = async () => {
+  isSavingSettings.value = true;
+  try {
+    const updatedProviderConfig = {
+      ...props.inbox.provider_config,
+      history_sync_enabled: historySyncEnabled.value,
+    };
+    await store.dispatch('inboxes/updateInbox', {
+      id: props.inbox.id,
+      formData: false,
+      channel: {
+        provider_config: updatedProviderConfig,
+      },
+    });
+    useAlert(t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SETTINGS_UPDATED'));
+  } catch {
+    // Revert the value on error
+    historySyncEnabled.value = !historySyncEnabled.value;
     useAlert(
       t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.ALERTS.SETTINGS_UPDATE_ERROR')
     );
@@ -401,6 +438,24 @@ onBeforeUnmount(() => {
                   'INBOX_MGMT.WHATSAPP_WEB_CONNECTION.IGNORE_GROUP_MESSAGES_HELP'
                 )
               }}
+            </span>
+          </div>
+        </label>
+
+        <label class="flex gap-3 items-start cursor-pointer">
+          <input
+            v-model="historySyncEnabled"
+            type="checkbox"
+            class="mt-0.5 w-4 h-4 rounded border-n-weak text-n-brand focus:ring-n-brand"
+            :disabled="isSavingSettings"
+            @change="handleHistorySyncEnabledChange"
+          />
+          <div class="flex flex-col gap-1">
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.IMPORT_HISTORY') }}
+            </span>
+            <span class="text-xs text-n-slate-11">
+              {{ t('INBOX_MGMT.WHATSAPP_WEB_CONNECTION.IMPORT_HISTORY_HELP') }}
             </span>
           </div>
         </label>

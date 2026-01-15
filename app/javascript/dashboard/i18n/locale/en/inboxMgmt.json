@@ -352,7 +352,9 @@
           "ERROR_MESSAGE": "We were not able to connect your WhatsApp account"
         },
         "IGNORE_GROUP_MESSAGES": "Ignore group messages",
-        "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
+        "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported",
+        "IMPORT_HISTORY": "Import message history",
+        "IMPORT_HISTORY_HELP": "When enabled, existing messages will be imported when connecting to WhatsApp"
       },
       "VOICE": {
         "TITLE": "Voice Channel",
@@ -769,7 +771,9 @@
         "SYNC_ERROR": "Failed to start history sync."
       },
       "IGNORE_GROUP_MESSAGES": "Ignore group messages",
-      "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported"
+      "IGNORE_GROUP_MESSAGES_HELP": "When enabled, messages from WhatsApp groups will not be imported",
+      "IMPORT_HISTORY": "Import message history",
+      "IMPORT_HISTORY_HELP": "When enabled, existing messages will be imported when reconnecting to WhatsApp"
     },
     "SETTINGS": "Settings",
     "FEATURES": {
