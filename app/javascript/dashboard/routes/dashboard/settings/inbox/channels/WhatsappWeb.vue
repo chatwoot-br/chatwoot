@@ -30,6 +30,7 @@ const errorMessage = ref('');
 const pollInterval = ref(null);
 const pollCount = ref(0);
 const ignoreGroupMessages = ref(false);
+const historySyncEnabled = ref(false);
 
 // Validation
 const rules = {
@@ -86,6 +87,7 @@ const createInbox = async () => {
         provider_config: {
           device_id: deviceId.value,
           ignore_group_messages: ignoreGroupMessages.value,
+          history_sync_enabled: historySyncEnabled.value,
         },
       },
     });
@@ -278,6 +280,22 @@ onBeforeUnmount(() => {
           </label>
           <span class="text-xs text-n-slate-11">
             {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.IGNORE_GROUP_MESSAGES_HELP') }}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <label class="flex gap-2 items-center cursor-pointer">
+            <input
+              v-model="historySyncEnabled"
+              type="checkbox"
+              class="w-4 h-4 rounded border-n-weak text-n-brand focus:ring-n-brand"
+            />
+            <span class="text-sm font-medium text-n-slate-12">
+              {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.IMPORT_HISTORY') }}
+            </span>
+          </label>
+          <span class="text-xs text-n-slate-11">
+            {{ $t('INBOX_MGMT.ADD.WHATSAPP_WEB.IMPORT_HISTORY_HELP') }}
           </span>
         </div>
 

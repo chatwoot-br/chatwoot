@@ -207,6 +207,10 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     inbox.channel.provider_config['ignore_group_messages'] == true
   end
 
+  def history_sync_enabled?
+    inbox.channel.provider_config['history_sync_enabled'] == true
+  end
+
   def group_id
     webhook_params.dig(:payload, :chat_id)
   end
@@ -611,7 +615,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     sender_chat = @history_chats_by_jid[sender_jid]
 
     # Try with @s.whatsapp.net suffix if not found
-    sender_chat = @history_chats_by_jid["#{sender_jid}@s.whatsapp.net"] if sender_chat.nil? && !sender_jid.include?('@')
+    sender_chat = @history_chats_by_jid["#{sender_jid}@s.whatsapp.net"] if sender_chat.nil? && sender_jid.exclude?('@')
 
     sender_chat&.dig('name')
   end
@@ -762,6 +766,11 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def process_history_sync
     Rails.logger.info "[WhatsApp History Sync] Starting for inbox #{inbox.id}"
 
+    unless history_sync_enabled?
+      Rails.logger.info "[WhatsApp History Sync] Skipping - history sync is disabled for inbox #{inbox.id}"
+      return
+    end
+
     # Fetch all chats and store for name lookups during message processing
     @history_chats = fetch_all_history_chats
     @history_chats_by_jid = @history_chats.index_by { |c| c['jid'] }
@@ -769,9 +778,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Debug: Log all fetched chats with names
     @history_chats.each do |chat|
       Rails.logger.info "[WhatsApp History Sync] Chat: jid=#{chat['jid']}, name=#{chat['name'].inspect}"
-    end
 
-    @history_chats.each do |chat|
       sync_history_chat_messages(chat)
     end
 
