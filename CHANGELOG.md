@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v4.9.1+3] - 2025-01-15
+
+### Added
+
+- **WhatsApp Phone Number Mismatch Detection**: Detect and prevent phone number mismatch when scanning QR code
+  - Validates that the device phone matches the configured inbox phone number
+  - Shows clear error message if mismatch is detected
+- **WhatsApp History Sync Toggle**: Option to disable history sync on connect/reconnect
+  - New inbox setting to control whether history is synced on each connection
+  - Useful for accounts with large chat histories where sync is not needed
+
 ## [v4.9.1+2] - 2025-01-13
 
 ### Added
