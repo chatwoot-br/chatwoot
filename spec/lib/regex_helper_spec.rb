@@ -26,6 +26,13 @@ RSpec.describe RegexHelper do
       end
     end
 
+    context 'with WhatsApp broadcast lists (@broadcast)' do
+      it 'matches broadcast list IDs' do
+        expect(regex.match?('1720632860@broadcast')).to be true
+        expect(regex.match?('123456789@broadcast')).to be true
+      end
+    end
+
     context 'with invalid formats' do
       it 'does not match phone numbers with + prefix' do
         expect(regex.match?('+5511999999999')).to be false
@@ -46,6 +53,7 @@ RSpec.describe RegexHelper do
       it 'does not match partial suffixes' do
         expect(regex.match?('123456@g')).to be false
         expect(regex.match?('123456@li')).to be false
+        expect(regex.match?('123456@broadca')).to be false
       end
     end
   end
