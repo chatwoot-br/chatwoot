@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v4.9.1+4] - 2025-01-17
+
 ### Fixed
 
 - **WhatsApp History Sync Duplicate Contacts**: Fixed duplicate contacts/conversations during history sync (ISSUE-0002)
