@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **WhatsApp History Sync Duplicate Contacts**: Fixed duplicate contacts/conversations during history sync (ISSUE-0002)
+  - Two-phase history sync: collects and normalizes contacts before processing messages
+  - LID→phone mapping extraction from `from_lid` fields prevents duplicate creation
+  - Bulk contact creation with cache lookup by both JID and LID
+- **WhatsApp Real-Time LID Linking**: Fixed duplicate contacts when LID message arrives after phone message
+  - Stores `from_lid` on phone contacts for reverse lookup
+  - LID messages now find and link to existing phone contacts instead of creating duplicates
+
 ## [v4.9.1+3] - 2025-01-15
 
 ### Added

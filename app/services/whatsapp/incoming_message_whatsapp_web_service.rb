@@ -164,7 +164,12 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       set_group_contact
     elsif lid_based_chat?
       # Scenario 1: chat_id is @lid (phone not known yet)
-      set_lid_contact
+      # First check if a phone contact already has this LID stored
+      if phone_contact_with_lid_exists?
+        set_contact_from_phone_with_lid
+      else
+        set_lid_contact
+      end
     elsif from_lid_matches_existing_contact?
       # Scenario 2: chat_id is @s.whatsapp.net but from_lid matches existing LID contact
       # This is when we finally learn the phone number!
@@ -172,6 +177,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     else
       super
       sync_contact_avatar if @contact
+      store_from_lid_on_contact if payload_from_lid.present?
     end
   end
 
@@ -201,6 +207,46 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   def payload_from_lid
     webhook_params.dig(:payload, :from_lid)
+  end
+
+  # Check if a phone-based contact already has this LID stored in additional_attributes
+  # This handles the case where phone message with from_lid arrived before LID message
+  def phone_contact_with_lid_exists?
+    lid_jid = lid_chat_id
+    return false if lid_jid.blank?
+
+    inbox.contacts.exists?(["additional_attributes->>'from_lid' = ?", lid_jid])
+  end
+
+  # Scenario 3: LID message arrives but phone contact already has this LID stored
+  # Link the LID to the existing phone contact instead of creating a new one
+  def set_contact_from_phone_with_lid
+    lid_jid = lid_chat_id
+    @contact = inbox.contacts.find_by("additional_attributes->>'from_lid' = ?", lid_jid)
+
+    # Create a contact_inbox for the LID pointing to the same contact
+    @contact_inbox = inbox.contact_inboxes.find_or_create_by!(
+      source_id: lid_jid,
+      contact: @contact
+    )
+
+    # Update contact to mark it as having LID
+    attrs = @contact.additional_attributes.merge('is_lid_chat' => true, 'lid' => lid_jid)
+    @contact.update(additional_attributes: attrs)
+
+    Rails.logger.info "[WhatsApp Web] Linked LID #{lid_jid} to existing phone contact #{@contact.id} (#{@contact.phone_number})"
+  end
+
+  # Store the from_lid on the contact so we can find it when LID message arrives later
+  def store_from_lid_on_contact
+    return unless @contact
+    return if payload_from_lid.blank?
+
+    # Store the LID in additional_attributes for reverse lookup
+    attrs = @contact.additional_attributes.merge('from_lid' => payload_from_lid)
+    @contact.update(additional_attributes: attrs)
+
+    Rails.logger.info "[WhatsApp Web] Stored from_lid #{payload_from_lid} on contact #{@contact.id}"
   end
 
   def ignore_group_messages?
@@ -763,31 +809,125 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   AVATAR_SYNC_INTERVAL = 1.hour
 
   # Process history sync complete event by fetching and importing messages
+  # Uses two-phase approach to prevent duplicate contacts:
+  # Phase 1: Collect all messages, build LID→phone mapping, normalize contacts
+  # Phase 2: Bulk create contacts, then process messages using cached lookups
   def process_history_sync
-    Rails.logger.info "[WhatsApp History Sync] Starting for inbox #{inbox.id}"
+    Rails.logger.info "[WhatsApp History Sync] Starting two-phase sync for inbox #{inbox.id}"
 
     unless history_sync_enabled?
       Rails.logger.info "[WhatsApp History Sync] Skipping - history sync is disabled for inbox #{inbox.id}"
       return
     end
 
-    # Fetch all chats and store for name lookups during message processing
+    # Fetch all chats
     @history_chats = fetch_all_history_chats
+    return if @history_chats.empty?
+
     @history_chats_by_jid = @history_chats.index_by { |c| c['jid'] }
 
-    # Debug: Log all fetched chats with names
-    @history_chats.each do |chat|
-      Rails.logger.info "[WhatsApp History Sync] Chat: jid=#{chat['jid']}, name=#{chat['name'].inspect}"
+    # === PHASE 1: Collect and normalize ===
+    Rails.logger.info '[WhatsApp History Sync] Phase 1: Collecting messages and building contact map'
 
-      sync_history_chat_messages(chat)
+    all_messages = collect_all_history_messages(@history_chats)
+    lid_to_phone = build_lid_to_phone_mapping(all_messages)
+    contact_map = build_normalized_contact_map(@history_chats_by_jid, lid_to_phone)
+
+    Rails.logger.info "[WhatsApp History Sync] Found #{contact_map.size} unique contacts (after LID normalization)"
+
+    # === PHASE 2: Create contacts and process messages ===
+    Rails.logger.info '[WhatsApp History Sync] Phase 2: Creating contacts and processing messages'
+
+    contact_cache = bulk_create_contacts_for_history_sync(contact_map)
+
+    # Process messages using cache
+    @history_chats.each do |chat|
+      chat_jid = chat['jid']
+      next if chat_jid.blank?
+      next if ignore_group_messages? && group_chat?(chat_jid)
+
+      messages = @history_messages_by_chat[chat_jid] || []
+      process_history_messages_with_cache(chat_jid, messages, contact_cache, lid_to_phone)
+      update_conversation_timestamps_for_chat(chat_jid)
     end
 
     Rails.logger.info "[WhatsApp History Sync] Completed for inbox #{inbox.id}"
   rescue StandardError => e
     Rails.logger.error "[WhatsApp History Sync] Failed: #{e.message}"
+    Rails.logger.error e.backtrace.first(10).join("\n")
   ensure
     @history_chats = nil
     @history_chats_by_jid = nil
+    @history_messages_by_chat = nil
+  end
+
+  # Collect all messages from all chats for Phase 1 analysis
+  def collect_all_history_messages(chats)
+    @history_messages_by_chat = {}
+    all_messages = []
+
+    chats.each do |chat|
+      chat_jid = chat['jid']
+      next if chat_jid.blank?
+      next if ignore_group_messages? && group_chat?(chat_jid)
+
+      messages = fetch_all_messages_for_chat(chat_jid)
+      @history_messages_by_chat[chat_jid] = messages
+      all_messages.concat(messages)
+    end
+
+    all_messages
+  end
+
+  def fetch_all_messages_for_chat(chat_jid)
+    messages = []
+    offset = 0
+
+    loop do
+      response = inbox.channel.provider_service.fetch_chat_messages(
+        chat_jid: chat_jid,
+        limit: HISTORY_MESSAGE_BATCH_SIZE,
+        offset: offset
+      )
+      break if response.blank?
+
+      batch = response['data']
+      break if batch.blank? || !batch.is_a?(Array)
+
+      messages.concat(batch)
+      break unless more_history_pages?(response, offset, HISTORY_MESSAGE_BATCH_SIZE)
+
+      offset += HISTORY_MESSAGE_BATCH_SIZE
+    end
+
+    messages
+  end
+
+  # Process messages using pre-built contact cache (Phase 2)
+  def process_history_messages_with_cache(chat_jid, messages, contact_cache, lid_to_phone)
+    messages.each do |message|
+      contact_inbox = resolve_contact_from_history_cache(message, contact_cache, lid_to_phone)
+      next if contact_inbox.nil?
+
+      process_single_history_message_with_contact(chat_jid, message, contact_inbox)
+    rescue StandardError => e
+      Rails.logger.error "[WhatsApp History Sync] Error processing message #{message['id']}: #{e.message}"
+    end
+  end
+
+  def process_single_history_message_with_contact(chat_jid, message, _contact_inbox)
+    # Skip if message already exists
+    source_id = message['id']
+    return if source_id.blank?
+    return if inbox.messages.exists?(source_id: source_id)
+
+    # Use existing build_history_message_params + perform flow
+    # This reuses all existing logic: timestamps, avatars, media, sender resolution
+    chat = @history_chats_by_jid[chat_jid]
+    return if chat.nil?
+
+    transformed_params = build_history_message_params(message, chat)
+    self.class.new(inbox: inbox, params: transformed_params).perform
   end
 
   def fetch_all_history_chats
@@ -1017,6 +1157,181 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     Time.zone.parse(last_sync) > AVATAR_SYNC_INTERVAL.ago
   rescue ArgumentError
     false
+  end
+
+  # Build a mapping of LID JIDs to phone JIDs from messages with from_lid field
+  # Used during history sync Phase 1 to normalize contacts before creation
+  def build_lid_to_phone_mapping(messages)
+    mapping = {}
+
+    messages.each do |msg|
+      chat_jid = msg[:chat_jid] || msg['chat_jid']
+      from_lid = msg[:from_lid] || msg['from_lid']
+
+      next if from_lid.blank?
+      next unless chat_jid&.end_with?('@s.whatsapp.net')
+
+      mapping[from_lid] = chat_jid
+    end
+
+    mapping
+  end
+
+  # Build a normalized contact map from chats, merging LID entries into phone entries
+  # Used during history sync Phase 1 to deduplicate contacts before creation
+  def build_normalized_contact_map(chats_by_jid, lid_to_phone_mapping)
+    contact_map = {}
+
+    # First pass: build initial contact map from chats
+    chats_by_jid.each do |jid, chat|
+      contact_map[jid] = {
+        jid: jid,
+        name: chat['name'],
+        lid: nil
+      }
+    end
+
+    # Second pass: merge LID entries into phone entries
+    lid_to_phone_mapping.each do |lid_jid, phone_jid|
+      next unless contact_map.key?(lid_jid)
+
+      lid_data = contact_map.delete(lid_jid)
+
+      contact_map[phone_jid] ||= { jid: phone_jid, name: nil, lid: nil }
+      contact_map[phone_jid][:lid] = lid_jid
+      contact_map[phone_jid][:name] ||= lid_data[:name]
+    end
+
+    contact_map
+  end
+
+  # Bulk create contacts for history sync and return a cache for lookups
+  # Used during history sync Phase 2
+  def bulk_create_contacts_for_history_sync(contact_map)
+    cache = {}
+
+    contact_map.each do |jid, data|
+      contact_inbox = find_or_create_contact_for_history_sync(jid, data)
+      next if contact_inbox.nil?
+
+      # Cache by primary JID
+      cache[jid] = contact_inbox
+
+      # Also cache by LID if present
+      cache[data[:lid]] = contact_inbox if data[:lid].present?
+    end
+
+    cache
+  end
+
+  def find_or_create_contact_for_history_sync(jid, data)
+    phone_number = extract_phone_number_from_jid(jid)
+
+    # Try to find existing contact_inbox
+    contact_inbox = find_existing_contact_inbox_for_history_sync(jid, phone_number, data[:lid])
+    return contact_inbox if contact_inbox.present?
+
+    # Create new contact
+    create_contact_for_history_sync(jid, data, phone_number)
+  rescue ActiveRecord::RecordNotUnique
+    # Race condition: another process created it, fetch and return
+    find_existing_contact_inbox_for_history_sync(jid, phone_number, data[:lid])
+  end
+
+  def find_existing_contact_inbox_for_history_sync(jid, phone_number, lid)
+    # Try by source_id (phone number only for regular chats, full JID for LID/group)
+    source_id = extract_source_id_from_jid(jid)
+    contact_inbox = inbox.contact_inboxes.find_by(source_id: source_id)
+    return contact_inbox if contact_inbox.present?
+
+    # Try by LID source_id
+    if lid.present?
+      contact_inbox = inbox.contact_inboxes.find_by(source_id: lid)
+      return contact_inbox if contact_inbox.present?
+    end
+
+    # Try by phone number
+    if phone_number.present?
+      contact = inbox.account.contacts.find_by(phone_number: phone_number)
+      return contact.contact_inboxes.find_by(inbox: inbox) if contact.present?
+    end
+
+    nil
+  end
+
+  def create_contact_for_history_sync(jid, data, phone_number)
+    contact_attributes = {
+      name: data[:name] || phone_number || jid,
+      phone_number: phone_number
+    }
+
+    # Build additional_attributes based on JID type
+    additional_attrs = {}
+    additional_attrs[:lid] = data[:lid] if data[:lid].present?
+    additional_attrs[:is_group] = true if jid.end_with?('@g.us')
+    additional_attrs[:is_broadcast] = true if jid.end_with?('@broadcast')
+    contact_attributes[:additional_attributes] = additional_attrs if additional_attrs.present?
+
+    # source_id must be phone number only (not full JID) for WhatsApp inbox validation
+    # or the full JID for LID/group chats
+    source_id = extract_source_id_from_jid(jid)
+
+    ContactInboxWithContactBuilder.new(
+      inbox: inbox,
+      source_id: source_id,
+      contact_attributes: contact_attributes
+    ).perform
+  end
+
+  def extract_phone_number_from_jid(jid)
+    return nil if jid.blank?
+    return nil if jid.end_with?('@lid')
+    return nil if jid.end_with?('@g.us')
+    return nil if jid.end_with?('@broadcast')
+    return nil unless jid.end_with?('@s.whatsapp.net')
+
+    phone = jid.gsub('@s.whatsapp.net', '')
+    phone.present? ? "+#{phone}" : nil
+  end
+
+  # Extract source_id for ContactInbox - WhatsApp validation requires:
+  # - Phone number only (digits) for regular chats
+  # - Full JID for group chats (@g.us), LID chats (@lid), and broadcasts (@broadcast)
+  def extract_source_id_from_jid(jid)
+    return jid if jid.blank?
+    return jid if jid.end_with?('@lid', '@g.us', '@broadcast')
+
+    # For regular chats, extract phone number only
+    jid.gsub('@s.whatsapp.net', '')
+  end
+
+  # Resolve contact from history sync cache using multiple lookup strategies
+  # Used during history sync Phase 2 to find contacts without database queries
+  def resolve_contact_from_history_cache(message, cache, lid_to_phone)
+    chat_jid = message[:chat_jid] || message['chat_jid']
+    from_lid = message[:from_lid] || message['from_lid']
+
+    # Try direct JID lookup
+    contact_inbox = cache[chat_jid]
+    return contact_inbox if contact_inbox.present?
+
+    # Try from_lid lookup
+    if from_lid.present?
+      contact_inbox = cache[from_lid]
+      return contact_inbox if contact_inbox.present?
+    end
+
+    # Try LID→phone mapping for LID messages
+    if chat_jid&.end_with?('@lid')
+      phone_jid = lid_to_phone[chat_jid]
+      contact_inbox = cache[phone_jid] if phone_jid.present?
+      return contact_inbox if contact_inbox.present?
+    end
+
+    Rails.logger.warn(
+      "[HistorySync] Contact not found in cache: chat_jid=#{chat_jid}, from_lid=#{from_lid}"
+    )
+    nil
   end
 end
 # rubocop:enable Metrics/ClassLength
