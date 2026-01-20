@@ -17,6 +17,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update configuration for ChatWoot Brazil deployment (PostgreSQL schema support, branding updates, disabled inbound_emails and campaigns by default)
 
+## [v4.10.1] - 2026-01-20
+
+### Added
+
+- Report download task (#13250)
+
+### Fixed
+
+- Remove `phone_number_id` param from WhatsApp media retrieval for incoming messages (#13319)
+- Setup webhooks for manual WhatsApp Cloud channel creation (#13278)
+- Captain inbox modal shows wrong assistant data (#13302)
+- Validate status and priority params in search conversations tool (#13295)
+
+## [v4.10.0] - 2026-01-16
+
+### Added
+
+- Advanced Search backend with date range, sender, and inbox filters (#12917)
+- Review Notes for CSAT Reports (Enterprise) (#13289)
+- Call-to-action template support for Twilio WhatsApp channels (#13179)
+- CSAT surveys via WhatsApp Cloud templates (#12787)
+- CSAT surveys via WhatsApp Twilio templates (#13143)
+- API to query metrics by channel type (#13255)
+- Conversations summary CSV export (#13110)
+- Include headers from incoming emails (#13139)
+- Agent bot and Captain responses can reset waiting since (#13181)
+- Global config for Captain settings (#13141)
+- Sorting by contacts count in companies list (#13012)
+- Amplitude for Cloud Analytics (#13217)
+
+### Changed
+
+- Replace plain editor with advanced editor (#13071)
+- Upgrade Node.js to v24.x LTS (#13004, #13291)
+- Improve compose new conversation form (#13176)
+- Use widget color for chat input focus state (#13214)
+- Update copyright year to 2026 (#13195)
+- Contact merge endpoint added to Swagger documentation (#13172)
+
+### Fixed
+
+- Rendering of translations based on the user's locale (#13211)
+- Strip autolinks when links are not supported (#13204)
+- Backslash issue with `--` and improve autolink handling (#13208)
+- Add code_block method to WhatsApp and Instagram markdown renderers (#13166)
+- Reset sidebar to show expanded list when refreshing the page (#13229)
+- Avoid double notification email after importing contacts (#13150)
+- Use SignedId instead of regular ID in portal update (#13197)
+- Consistent instrumentation with conversation.display_id (#13194)
+- Pass serialized data in notification.deleted event to avoid deserialization errors (#13061)
+- Prevent unsupported file types on clipboard paste (#13182)
+- Prevent deserialization error on deletion (#13264)
+- Case-insensitive language matching for WhatsApp template messages (#13269)
+- Prevent NoMethodError in mute helpers when contact is nil (#13277)
+- Respect survey label rules for WhatsApp CSAT template (#13285)
+- Increase Alfred connection pool size to 10 (#13138)
+- Webhook URL changed to text type (#13157)
+- Country code validation against contact (#13186)
+- Double counting in Langfuse instrumentation (#13202)
+
+## [v4.9.2] - 2026-01-12
+
+### Fixed
+
+- Sanitize HTML content before processing quoted text to prevent XSS (#13252)
+
 ## [v4.9.1] - 2025-12-22
 
 ### Fixed
@@ -25,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent invalid attachments from blocking text paste (#13135)
 - Add Linear integration for the Startup plan (#13136)
 
-## [4.9.0] - 2025-12-19
+## [v4.9.0] - 2025-12-19
 
 ### Added
 
@@ -92,7 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Widget shows 'away' on initial load despite agents being online (#12869)
 - Change messages.source_id to text column (#12908)
 
-## [4.8.0] - 2025-11-18
+## [v4.8.0] - 2025-11-18
 
 ### Added
 
@@ -151,7 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extend phone number normalization to Twilio WhatsApp (#12655)
 - Parameterize agent name (#12709)
 
-## [4.7.0] - 2025-10-15
+## [v4.7.0] - 2025-10-15
 
 ### Added
 
@@ -217,7 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use account locale when generating PDF FAQs (#12491)
 - Ensure messages go to correct conversation when receiving multiple users in one LINE webhook (#12322)
 
-## [4.6.0] - 2025-09-19
+## [v4.6.0] - 2025-09-19
 
 ### Added
 
@@ -305,7 +371,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use dynamic installation name in vueapp.html.erb (#11799)
 - cwctl version to handle the upgrade loop (#12232)
 
-## [4.5.2] - 2025-08-20
+## [v4.5.2] - 2025-08-20
 
 ### Changed
 
@@ -315,7 +381,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SDK changes to ignore messages from a different origin and sanitize URLs (#12248)
 
-## [4.5.1] - 2025-08-20
+## [v4.5.1] - 2025-08-20
 
 ### Added
 
@@ -327,7 +393,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Skip AddFeatureCitationToAssistantConfig migration on OSS (#12244)
 - Prevent reopening a resolved conversation (#11168)
 
-## [4.5.0] - 2025-08-18
+## [v4.5.0] - 2025-08-18
 
 ### Added
 
@@ -419,7 +485,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bubble color for outgoing email (#12003)
 - Fetch all Facebook pages during inbox creation (#11956)
 
-## [4.4.0] - 2025-07-16
+## [v4.4.0] - 2025-07-16
 
 ### Added
 
@@ -498,7 +564,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Captain image support feature (#11841)
 
-## [4.3.0] - 2025-06-17
+## [v4.3.0] - 2025-06-17
 
 ### Added
 
@@ -603,7 +669,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Display message content for CSAT messages in non-widget inboxes (#11528)
 - Status not updating when creating a Linear issue (#11523)
 
-## [4.2.0] - 2025-05-20
+## [v4.2.0] - 2025-05-20
 
 ### Added
 
@@ -682,7 +748,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent CC/BCC field reset on chat activity actions (#11342)
 - Correct typo in CampaignConversationBuilder (#11336)
 
-## [4.1.0] - 2025-04-16
+## [v4.1.0] - 2025-04-16
 
 ### Added
 
@@ -750,7 +816,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correct settings name translation in pt-BR (#11172)
 - Support Business hours when downloading the agent reports
 
-## [4.0.4] - 2025-03-21
+## [v4.0.4] - 2025-03-21
 
 ### Added
 
@@ -821,7 +887,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Process non-image inline attachments as regular attachments (#10998)
 - Enable active record connection pool reaper (#10866)
 
-## [4.0.3] - 2025-02-27
+## [v4.0.3] - 2025-02-27
 
 ### Added
 
@@ -850,7 +916,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Transcription email locales for pt_BR (#10952)
 - Accented characters issue with variables in canned response (#10947)
 
-## [4.0.2] - 2025-02-21
+## [v4.0.2] - 2025-02-21
 
 ### Added
 
@@ -955,7 +1021,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Next bubble improvements (#10795)
 
-## [4.0.1] - 2025-01-17
+## [v4.0.1] - 2025-01-17
 
 ### Fixed
 
@@ -968,24 +1034,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update SECURITY.md (#10705)
 
-## [4.0.0] - 2025-01-16
+## [v4.0.0] - 2025-01-16
 
 Initial v4 release with major UI redesign and new features.
 
-[v4.9.1]: https://github.com/chatwoot-br/chatwoot/compare/v4.9.0...v4.9.1
-[4.9.0]: https://github.com/chatwoot/chatwoot/compare/v4.8.0...v4.9.0
-[4.8.0]: https://github.com/chatwoot/chatwoot/compare/v4.7.0...v4.8.0
-[4.7.0]: https://github.com/chatwoot/chatwoot/compare/v4.6.0...v4.7.0
-[4.6.0]: https://github.com/chatwoot/chatwoot/compare/v4.5.2...v4.6.0
-[4.5.2]: https://github.com/chatwoot/chatwoot/compare/v4.5.1...v4.5.2
-[4.5.1]: https://github.com/chatwoot/chatwoot/compare/v4.5.0...v4.5.1
-[4.5.0]: https://github.com/chatwoot/chatwoot/compare/v4.4.0...v4.5.0
-[4.4.0]: https://github.com/chatwoot/chatwoot/compare/v4.3.0...v4.4.0
-[4.3.0]: https://github.com/chatwoot/chatwoot/compare/v4.2.0...v4.3.0
-[4.2.0]: https://github.com/chatwoot/chatwoot/compare/v4.1.0...v4.2.0
-[4.1.0]: https://github.com/chatwoot/chatwoot/compare/v4.0.4...v4.1.0
-[4.0.4]: https://github.com/chatwoot/chatwoot/compare/v4.0.3...v4.0.4
-[4.0.3]: https://github.com/chatwoot/chatwoot/compare/v4.0.2...v4.0.3
-[4.0.2]: https://github.com/chatwoot/chatwoot/compare/v4.0.1...v4.0.2
-[4.0.1]: https://github.com/chatwoot/chatwoot/compare/v4.0.0...v4.0.1
-[4.0.0]: https://github.com/chatwoot/chatwoot/releases/tag/v4.0.0
+[v4.10.1]: https://github.com/chatwoot/chatwoot/compare/v4.10.0...v4.10.1
+[v4.10.0]: https://github.com/chatwoot/chatwoot/compare/v4.9.2...v4.10.0
+[v4.9.2]: https://github.com/chatwoot/chatwoot/compare/v4.9.1...v4.9.2
+[v4.9.1]: https://github.com/chatwoot/chatwoot/compare/v4.9.0...v4.9.1
+[v4.9.0]: https://github.com/chatwoot/chatwoot/compare/v4.8.0...v4.9.0
+[v4.8.0]: https://github.com/chatwoot/chatwoot/compare/v4.7.0...v4.8.0
+[v4.7.0]: https://github.com/chatwoot/chatwoot/compare/v4.6.0...v4.7.0
+[v4.6.0]: https://github.com/chatwoot/chatwoot/compare/v4.5.2...v4.6.0
+[v4.5.2]: https://github.com/chatwoot/chatwoot/compare/v4.5.1...v4.5.2
+[v4.5.1]: https://github.com/chatwoot/chatwoot/compare/v4.5.0...v4.5.1
+[v4.5.0]: https://github.com/chatwoot/chatwoot/compare/v4.4.0...v4.5.0
+[v4.4.0]: https://github.com/chatwoot/chatwoot/compare/v4.3.0...v4.4.0
+[v4.3.0]: https://github.com/chatwoot/chatwoot/compare/v4.2.0...v4.3.0
+[v4.2.0]: https://github.com/chatwoot/chatwoot/compare/v4.1.0...v4.2.0
+[v4.1.0]: https://github.com/chatwoot/chatwoot/compare/v4.0.4...v4.1.0
+[v4.0.4]: https://github.com/chatwoot/chatwoot/compare/v4.0.3...v4.0.4
+[v4.0.3]: https://github.com/chatwoot/chatwoot/compare/v4.0.2...v4.0.3
+[v4.0.2]: https://github.com/chatwoot/chatwoot/compare/v4.0.1...v4.0.2
+[v4.0.1]: https://github.com/chatwoot/chatwoot/compare/v4.0.0...v4.0.1
+[v4.0.0]: https://github.com/chatwoot/chatwoot/releases/tag/v4.0.0
