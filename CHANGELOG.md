@@ -7,36 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **WhatsApp History Sync Duplicate Contacts**: Fixed duplicate contacts/conversations during history sync (ISSUE-0002)
-  - Two-phase history sync: collects and normalizes contacts before processing messages
-  - LID→phone mapping extraction from `from_lid` fields prevents duplicate creation
-  - Bulk contact creation with cache lookup by both JID and LID
-- **WhatsApp Real-Time LID Linking**: Fixed duplicate contacts when LID message arrives after phone message
-  - Stores `from_lid` on phone contacts for reverse lookup
-  - LID messages now find and link to existing phone contacts instead of creating duplicates
-
-## [v4.9.1+3] - 2025-01-15
-
 ### Added
 
-- **WhatsApp LID Support**: Handle WhatsApp LID (Linked ID) addresses for contacts without known phone numbers
+- **WhatsApp Web Provider**: New provider for QR code-based WhatsApp authentication
+  - QR code generation and scanning flow for device linking
+  - Connection management tab for whatsapp_web inboxes
+  - Allow inbox creation without immediate WhatsApp connection
+  - Device cleanup from go-whatsapp on inbox deletion
+- **WhatsApp Group Messages**: Full support for group conversations
+  - Display sender info for incoming group messages
+  - Create contact records for group message senders
+  - Handle messages from connected device in groups
+  - Option to ignore group messages via inbox settings
+- **WhatsApp Message Reactions**: Display and sync message reactions
+  - Show reactions on grouped messages in conversation view
+- **WhatsApp Reply Messages**: Support for quoted/reply messages
+- **WhatsApp Contact Avatar Sync**: Automatically sync contact avatars from WhatsApp Web
+- **WhatsApp History Sync**: Foundation for syncing message history on reconnect
+  - Trigger history sync on reconnect
+  - Option to disable history sync on connect/reconnect
+  - Two-phase sync: collects and normalizes contacts before processing messages
+- **WhatsApp LID Support**: Handle WhatsApp Linked ID addresses for contacts without known phone numbers
   - Create contacts with LID as source_id when phone is not yet identified
   - Automatically link phone number when discovered via `from_lid` matching
-  - Support sending messages to LID-based chats (gowa handles LID→phone resolution)
-
-## [v4.9.1+1] - 2025-01-07
-
-### Added
-
+  - Support sending messages to LID-based chats
+- **WhatsApp Direct Messaging**: Allow direct messaging for whatsapp_web inboxes (no 24-hour window restriction)
 - Chatwoot Helm chart with initial templates and configurations (env-secret, ingress, migrations-job, web/worker deployments, HPA, service account)
 - Development Docker setup with docker-compose.dev.yaml for local development
 - Docker and Helm release CI workflows with multi-arch builds using Hetzner Cloud runners
 
 ### Changed
 
+- Auto-enable `lock_to_single_conversation` for whatsapp_web provider
+- Persist `lock_to_single_conversation` on inbox creation
 - Update configuration for ChatWoot Brazil deployment (PostgreSQL schema support, branding updates, disabled inbound_emails and campaigns by default)
+
+### Fixed
+
+- **WhatsApp History Sync Duplicate Contacts**: Fixed duplicate contacts/conversations during history sync
+  - LID→phone mapping extraction from `from_lid` fields prevents duplicate creation
+  - Bulk contact creation with cache lookup by both JID and LID
+- **WhatsApp Real-Time LID Linking**: Fixed duplicate contacts when LID message arrives after phone message
+  - Stores `from_lid` on phone contacts for reverse lookup
+  - LID messages now find and link to existing phone contacts instead of creating duplicates
+- **WhatsApp Phone Number Mismatch Detection**: Detect and prevent phone number mismatch on QR scan
+- **WhatsApp File Attachments**: Handle file attachments and captions for WhatsApp Web
+- **WhatsApp Webhook Handling**: Multiple improvements for webhook processing
+  - Correctly check message content in `empty_message?` helper
+  - Skip processing webhooks with empty content
+  - Prevent duplicate empty messages hiding ones with content
+- **WhatsApp Contact Names**: Improved contact name resolution
+  - Use device owner name for outgoing history messages
+  - Use `chat_name` from webhook for outgoing messages
+  - Use `contact_name` for outgoing message contacts
+  - Merge `chat_info` from messages API for contact names
+- **WhatsApp Status Updates**: Fix message delivery and status updates
+  - Prevent status race condition with pessimistic locking
+  - Fix status polling to detect `logged_in` state
+- **WhatsApp Message Routing**: Route `is_from_me` messages to recipient contact
+- **WhatsApp Media Handling**: Fix attachment sending, download media from go-whatsapp server URL
+- **WhatsApp Device Handling**: Handle device not found gracefully after disconnect
 
 ## [v4.10.1] - 2026-01-20
 
