@@ -1,5 +1,6 @@
-class SendReplyJob < ApplicationJob
+class SendReplyJob < MutexApplicationJob
   queue_as :high
+  retry_on LockAcquisitionError, wait: 1.second, attempts: 8
 
   CHANNEL_SERVICES = {
     'Channel::TwitterProfile' => ::Twitter::SendOnTwitterService,
@@ -16,15 +17,18 @@ class SendReplyJob < ApplicationJob
   }.freeze
 
   def perform(message_id)
-    message = Message.find(message_id)
-    channel_name = message.conversation.inbox.channel.class.to_s
+    key = format(::Redis::RedisKeys::SEND_REPLY_MUTEX, message_id: message_id)
+    with_lock(key) do
+      message = Message.find(message_id)
+      channel_name = message.conversation.inbox.channel.class.to_s
 
-    return send_on_facebook_page(message) if channel_name == 'Channel::FacebookPage'
-
-    service_class = CHANNEL_SERVICES[channel_name]
-    return unless service_class
-
-    service_class.new(message: message).perform
+      if channel_name == 'Channel::FacebookPage'
+        send_on_facebook_page(message)
+      else
+        service_class = CHANNEL_SERVICES[channel_name]
+        service_class&.new(message: message)&.perform
+      end
+    end
   end
 
   private
