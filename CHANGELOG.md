@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v4.8.0+5] - 2026-01-20
+
+### Fork Changes
+- fix(whatsapp): remove phone_number_id param from media retrieval for incoming messages (cherry-picked from upstream v4.10.1)
+
+### Chart Changes (4.8.6)
+- fix(helm): separate container and pod security contexts for better Kubernetes compliance
+- feat(helm): add default runAsNonRoot and runAsUser to podSecurityContext
+
 ## [v4.8.0+4] - 2025-12-11
 
 ### Fork Changes
