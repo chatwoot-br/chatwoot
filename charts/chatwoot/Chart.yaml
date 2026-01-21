@@ -29,7 +29,7 @@ sources:
   - https://chatwoot.app.br
 
 # This is the chart version.
-version: 4.10.1
+version: 4.10.2
 
 # This is the application version (use - for Docker tag compatibility).
-appVersion: "v4.10.1-1"
+appVersion: "v4.10.1-2"
