@@ -70,6 +70,30 @@ describe Whatsapp::IncomingMessageService do
         expect(contact_inbox.conversations.last.messages.last.content).to eq(params[:messages].first[:text][:body])
       end
 
+      it 'creates only one conversation when called concurrently for the same contact' do
+        contact_inbox = create(:contact_inbox, inbox: whatsapp_channel.inbox, source_id: params[:messages].first[:from])
+
+        # Simulate concurrent webhook processing
+        threads = Array.new(2) do
+          Thread.new do
+            ActiveRecord::Base.connection_pool.with_connection do
+              described_class.new(inbox: whatsapp_channel.inbox, params: params.deep_dup).perform
+            end
+          rescue StandardError => e
+            Thread.current[:exception] = e
+          end
+        end
+
+        threads.each(&:join)
+        threads.each { |t| raise t[:exception] if t[:exception] }
+
+        # Reload to get latest DB state after concurrent operations
+        contact_inbox.reload
+
+        # Should create only one conversation despite concurrent calls
+        expect(contact_inbox.conversations.count).to eq(1)
+      end
+
       it 'will not create duplicate messages when same message is received' do
         described_class.new(inbox: whatsapp_channel.inbox, params: params).perform
         expect(whatsapp_channel.inbox.messages.count).to eq(1)
