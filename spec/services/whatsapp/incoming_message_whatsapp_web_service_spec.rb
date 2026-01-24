@@ -751,6 +751,34 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
     end
   end
 
+  describe '#processable_chat_jid?' do
+    let(:service) { described_class.new(inbox: inbox, params: {}) }
+
+    it 'returns true for valid @s.whatsapp.net JID' do
+      expect(service.send(:processable_chat_jid?, '556281945389@s.whatsapp.net')).to be true
+    end
+
+    it 'returns true for valid @g.us group JID' do
+      expect(service.send(:processable_chat_jid?, '120363419221703893@g.us')).to be true
+    end
+
+    it 'returns true for valid @lid JID' do
+      expect(service.send(:processable_chat_jid?, '142897974350025@lid')).to be true
+    end
+
+    it 'returns false for status@broadcast' do
+      expect(service.send(:processable_chat_jid?, 'status@broadcast')).to be false
+    end
+
+    it 'returns false for nil' do
+      expect(service.send(:processable_chat_jid?, nil)).to be false
+    end
+
+    it 'returns false for blank string' do
+      expect(service.send(:processable_chat_jid?, '')).to be false
+    end
+  end
+
   describe '#resolve_contact_from_history_cache' do
     let(:service) { described_class.new(inbox: inbox, params: {}) }
     let(:contact_inbox) { create(:contact_inbox, inbox: inbox) }

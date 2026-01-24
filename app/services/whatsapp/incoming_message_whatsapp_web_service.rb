@@ -185,6 +185,15 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     webhook_params.dig(:payload, :chat_id).to_s.end_with?('@g.us')
   end
 
+  # Check if a JID is processable (valid for WhatsApp channel)
+  # Returns false for special JIDs like status@broadcast that don't match WHATSAPP_CHANNEL_REGEX
+  def processable_chat_jid?(jid)
+    return false if jid.blank?
+
+    source_id = extract_source_id_from_jid(jid)
+    RegexHelper::WHATSAPP_CHANNEL_REGEX.match?(source_id)
+  end
+
   # LID (Linked ID) detection methods
   # WhatsApp uses LID for contacts where phone number is not yet identified
   def lid_based_chat?
