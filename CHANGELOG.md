@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v4.10.1+3] - 2026-01-24
+
+### Added
+
+- **WhatsApp JID Validation**: Add `processable_chat_jid?` helper for filtering valid chat JIDs
+
+### Fixed
+
+- **WhatsApp History Sync**: Validate JIDs and add resilient error handling in history sync
+- **DevContainer**: Improve Dockerfile permissions and enhance setup script for port visibility
+
 ## [v4.10.1+2] - 2026-01-21
 
 ### Fixed
