@@ -13,4 +13,6 @@ if [ -n "$CLAUDE_CODE_API_KEY" ]; then
 fi
 
 # codespaces make the ports public
-gh codespace ports visibility 3000:public 3036:public 8025:public -c $CODESPACE_NAME
+if [ -n "$CODESPACE_NAME" ] && command -v gh >/dev/null 2>&1; then
+  gh codespace ports visibility 3000:public 3036:public 8025:public -c "$CODESPACE_NAME"
+fi
