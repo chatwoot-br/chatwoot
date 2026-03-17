@@ -13,6 +13,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      gowa:
+        condition: service_started
     ports:
       - '3000:3000'
     env_file: .env.e2e
@@ -27,6 +29,25 @@ services:
         rm -rf /app/tmp/pids/server.pid
         bundle exec rails db:prepare
         bundle exec rails s -p 3000 -b 0.0.0.0
+
+  gowa:
+    image: ghcr.io/chatwoot-br/go-whatsapp-web-multidevice:v8.1.2-1
+    environment:
+      - APP_PORT=3000
+      - APP_HOST=0.0.0.0
+      - APP_DEBUG=false
+      - APP_OS=Chrome
+      - APP_TRUSTED_PROXIES=0.0.0.0/0
+      - DB_URI=file:storages/whatsapp.db?_foreign_keys=on
+      - WHATSAPP_WEBHOOK=http://rails:3000/webhooks/whatsapp_web
+      - WHATSAPP_WEBHOOK_SECRET=e2e-test-secret
+      - WHATSAPP_WEBHOOK_INSECURE_SKIP_VERIFY=true
+      - WHATSAPP_AUTO_MARK_READ=true
+      - WHATSAPP_AUTO_DOWNLOAD_MEDIA=true
+      - WHATSAPP_ACCOUNT_VALIDATION=true
+      - WHATSAPP_CHAT_STORAGE=true
+    volumes:
+      - gowa-data:/app/storages
 
   postgres:
     image: pgvector/pgvector:pg16
@@ -43,3 +64,6 @@ services:
 
   redis:
     image: redis:alpine
+
+volumes:
+  gowa-data:
