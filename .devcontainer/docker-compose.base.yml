@@ -16,10 +16,10 @@ services:
         RUBY_VERSION: '3.4.4'
         USER_UID: '1000'
         USER_GID: '1000'
-    image: ghcr.io/chatwoot/chatwoot_codespace:latest
+    image: ghcr.io/chatwoot-br/chatwoot_codespace:latest
 
   devx:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile.devx
-    image: ghcr.io/chatwoot/chatwoot_codespace_devx:latest
+    image: ghcr.io/chatwoot-br/chatwoot_codespace_devx:latest
