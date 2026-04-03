@@ -50,6 +50,12 @@ case "$1" in
     fi
     ln -sf ~/.claude/.claude.json ~/.claude.json
 
+    # Codex CLI (global npm package)
+    if ! command -v codex &>/dev/null; then
+      log create "Installing Codex CLI"
+      sudo npm install -g @openai/codex || warn create "Codex CLI install failed"
+    fi
+
     # LazyVim (bootstrap starter config if not already present)
     if [ ! -d ~/.config/nvim ]; then
       log create "Bootstrapping LazyVim"
