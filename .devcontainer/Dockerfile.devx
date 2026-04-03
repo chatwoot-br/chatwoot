@@ -67,14 +67,14 @@ RUN GLOW_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "x86_64") &&
 # chafa >= 1.16 from source (yazi image preview; Debian ships 1.14)
 ARG CHAFA_VERSION=1.18.1
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libglib2.0-dev libjpeg-dev libpng-dev libwebp-dev && \
+    libglib2.0-dev libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev && \
     curl -fsSL -o /tmp/chafa.tar.xz \
       "https://github.com/hpjansson/chafa/releases/download/${CHAFA_VERSION}/chafa-${CHAFA_VERSION}.tar.xz" && \
     cd /tmp && tar xf chafa.tar.xz && cd chafa-${CHAFA_VERSION} && \
     ./configure --prefix=/usr/local --disable-static --disable-man && \
     make -j$(nproc) && make install && ldconfig && \
     cd / && rm -rf /tmp/chafa* && \
-    apt-get purge -y --auto-remove libglib2.0-dev libjpeg-dev libpng-dev libwebp-dev && \
+    apt-get purge -y --auto-remove libglib2.0-dev libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Playwright + Chromium (browser automation / E2E tests)
