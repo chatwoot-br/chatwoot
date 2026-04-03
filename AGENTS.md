@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Chatwoot Development Guidelines
 
 ## Build / Test / Lint
@@ -18,6 +22,32 @@
 - **Ruby Version**: Manage Ruby via `rbenv` and install the version listed in `.ruby-version` (e.g., `rbenv install $(cat .ruby-version)`)
 - **rbenv setup**: Before running any `bundle` or `rspec` commands, init rbenv in your shell (`eval "$(rbenv init -)"`) so the correct Ruby/Bundler versions are used
 - Always prefer `bundle exec` for Ruby CLI tasks (rspec, rake, rubocop, etc.)
+
+## Architecture
+
+Chatwoot is a multi-tenant customer communication platform: Rails 7.1 backend, Vue 3 + Vite frontend, PostgreSQL, Redis, Sidekiq, ActionCable (WebSockets).
+
+### Backend
+
+- **Multi-tenant**: All resources scoped by `account_id` in routes and enforced via Pundit policies
+- **Service objects pattern**: Business logic in `app/services/` (172+ services), not in models or controllers
+- **Event-driven real-time**: Model changes emit events → `app/listeners/` (especially `ActionCableListener`) → broadcast to clients via `RoomChannel`
+- **API surfaces**: `api/v1/accounts/:account_id/` (primary), `api/v2/` (newer), `platform/api/v1/` (partner/OAuth), `public/api/v1/` (webhooks/unauthenticated)
+- **Channel architecture**: Each messaging channel (Facebook, WhatsApp, Email, etc.) has a model under `app/models/channel/` with channel-specific logic
+
+### Frontend
+
+- **Multi-entrypoint Vite build**: `app/javascript/dashboard/` (main SPA), `widget/` (customer-facing chat widget), `portal/` (help center), `sdk/` (standalone JS SDK), `survey/`, `v3/`
+- **SPA routing**: Rails catches all `/app/*` requests → renders Vue root → client-side router takes over
+- **State management**: Hybrid Vuex modules (`dashboard/store/modules/`, 50+ modules) + Pinia stores (`dashboard/store/stores/`) + composables (`dashboard/composables/`, 40+ files). New code should use composables/Pinia
+- **API layer**: `dashboard/api/ApiClient.js` (base axios client), `CacheEnabledApiClient.js` (IndexedDB caching), 50+ resource-specific API classes
+- **Component migration**: `components/` (legacy) → `components-next/` (Vue 3 Composition API). Use `components-next/` for new work
+
+### Key Files
+
+- `config/routes.rb` — all backend routing (large file, ~24k lines)
+- `config/features.yml` — feature flag definitions
+- `Procfile.dev` — runs Rails server (port 3000), Sidekiq worker, and Vite dev server
 
 ## Code Style
 
