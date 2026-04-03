@@ -1,6 +1,7 @@
 # The below image is created out of the Dockerfile.base
 # It has the dependencies already installed so that codespace will boot up fast
-FROM ghcr.io/chatwoot-br/chatwoot_codespace_devx:latest
+ARG DEVX_IMAGE=ghcr.io/chatwoot-br/chatwoot_codespace_devx:latest
+FROM ${DEVX_IMAGE}
 
 # Do the set up required for chatwoot app
 WORKDIR /workspace/chatwoot

@@ -10,6 +10,9 @@ case "$1" in
       mkdir -p "${LOCAL_WORKSPACE_FOLDER}/../${dir}"
     done
 
+    # Ensure .env.devcontainer exists (runArgs --env-file requires it)
+    touch "${LOCAL_WORKSPACE_FOLDER}/.env.devcontainer"
+
     # Shared volume between chatwoot and notebook devcontainers
     if command -v docker &>/dev/null && ! docker volume inspect woot-code &>/dev/null 2>&1; then
       docker volume create woot-code
@@ -72,11 +75,17 @@ case "$1" in
     ;;
 
   db-prepare)
-    # Runs after create — separate phase so DB failures are visible but non-fatal
+    # Runs after create — fails by default so broken DBs are caught early.
+    # Set DEVCONTAINER_DB_SOFT_FAIL=1 to allow container creation to proceed anyway.
     if POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare; then
       log db-prepare "Database ready"
     else
-      warn db-prepare "db:chatwoot_prepare failed (DB may not be ready yet — run manually later)"
+      if [ "${DEVCONTAINER_DB_SOFT_FAIL:-0}" = "1" ]; then
+        warn db-prepare "db:chatwoot_prepare failed (soft-fail enabled — run manually later)"
+      else
+        warn db-prepare "db:chatwoot_prepare failed. Set DEVCONTAINER_DB_SOFT_FAIL=1 in .env.devcontainer to skip."
+        exit 1
+      fi
     fi
     ;;
 

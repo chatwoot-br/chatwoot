@@ -1,6 +1,7 @@
 # DevX tooling layer — sits between Dockerfile.base and Dockerfile
 # Build: docker-compose -f .devcontainer/docker-compose.base.yml build devx
-FROM ghcr.io/chatwoot-br/chatwoot_codespace:latest
+ARG BASE_IMAGE=ghcr.io/chatwoot-br/chatwoot_codespace:latest
+FROM ${BASE_IMAGE}
 
 USER root
 

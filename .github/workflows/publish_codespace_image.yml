@@ -77,6 +77,8 @@ jobs:
           file: .devcontainer/Dockerfile.devx
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ github.sha }}
           tags: |
             ${{ env.DEVX_IMAGE }}:latest
             ${{ env.DEVX_IMAGE }}:${{ github.sha }}
