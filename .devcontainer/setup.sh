@@ -38,9 +38,9 @@ case "$1" in
 
     # === DevX tooling setup ===
 
-    # Claude CLI (binary goes into mounted ~/.claude, persists across rebuilds)
-    if ! command -v claude &>/dev/null; then
-      log create "Installing Claude CLI"
+    # Claude CLI — native installer puts binary at ~/.local/bin/claude
+    if [ ! -x ~/.local/bin/claude ]; then
+      log create "Installing Claude CLI (native)"
       curl -fsSL https://claude.ai/install.sh | bash || warn create "Claude CLI install failed"
     fi
 
@@ -63,6 +63,11 @@ case "$1" in
 
     # Claude config symlink
     ln -sf ~/.claude/.claude.json ~/.claude.json
+
+    # Ensure /home/node points to actual home so hook paths resolve
+    if [ ! -e /home/node ] && [ "$HOME" != "/home/node" ]; then
+      sudo ln -s "$HOME" /home/node 2>/dev/null || true
+    fi
 
     # Codespaces: make ports public
     if [ -n "$CODESPACE_NAME" ] && command -v gh >/dev/null 2>&1; then

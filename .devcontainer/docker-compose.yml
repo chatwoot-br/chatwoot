@@ -19,6 +19,7 @@ services:
 
     volumes:
       - ..:/workspace/chatwoot:cached
+      - woot-code:/workspace/code
 
     # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
@@ -51,3 +52,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  woot-code:
+    external: true
