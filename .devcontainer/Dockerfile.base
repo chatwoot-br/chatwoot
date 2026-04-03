@@ -10,7 +10,7 @@ ARG USER_UID="1000"
 ARG USER_GID="1000"
 ARG TARGETARCH
 ARG PNPM_VERSION="10.2.0"
-ENV PNPM_VERSION ${PNPM_VERSION}
+ENV PNPM_VERSION=${PNPM_VERSION}
 ENV RUBY_CONFIGURE_OPTS=--disable-install-doc
 
 # Update args in docker-compose.yaml to set the UID/GID of the "vscode" user.
@@ -47,7 +47,7 @@ RUN NODE_MAJOR=$(echo $NODE_VERSION | cut -d. -f1) \
 RUN git clone --depth 1 https://github.com/rbenv/rbenv.git ~/.rbenv \
     &&  echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bashrc \
     &&  echo 'eval "$(rbenv init -)"' >> ~/.bashrc
-ENV PATH "/root/.rbenv/bin/:/root/.rbenv/shims/:$PATH"
+ENV PATH="/root/.rbenv/bin/:/root/.rbenv/shims/:$PATH"
 RUN git clone --depth 1 https://github.com/rbenv/ruby-build.git && \
     PREFIX=/usr/local ./ruby-build/install.sh
 

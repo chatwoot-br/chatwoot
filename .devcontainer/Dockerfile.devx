@@ -29,7 +29,7 @@ RUN FISH_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "aarch64" || echo "x86_64") 
 
 # Neovim (LazyVim requires >= 0.11.2)
 ARG NVIM_VERSION=0.12.0
-RUN NVIM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "linux-x86_64") && \
+RUN NVIM_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "x86_64") && \
     curl -fsSL "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/nvim-linux-${NVIM_ARCH}.tar.gz" \
     | tar xz --strip-components=1 -C /usr/local && \
     ln -s /usr/local/bin/nvim /usr/local/bin/vim
