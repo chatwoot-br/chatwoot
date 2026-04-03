@@ -64,7 +64,8 @@ RUN su - vscode -c "git clone --depth 1 https://github.com/rbenv/rbenv.git ~/.rb
 
 # Overmind (process manager)
 ARG OVERMIND_VERSION=2.5.1
-RUN curl -L "https://github.com/DarthSim/overmind/releases/download/v${OVERMIND_VERSION}/overmind-v${OVERMIND_VERSION}-linux-amd64.gz" > overmind.gz \
+RUN OVERMIND_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") && \
+    curl -L "https://github.com/DarthSim/overmind/releases/download/v${OVERMIND_VERSION}/overmind-v${OVERMIND_VERSION}-linux-${OVERMIND_ARCH}.gz" > overmind.gz \
   && gunzip overmind.gz \
   && mv overmind /usr/local/bin \
   && chmod +x /usr/local/bin/overmind

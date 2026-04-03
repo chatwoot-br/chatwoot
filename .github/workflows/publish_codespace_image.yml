@@ -29,18 +29,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile.base
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.BASE_IMAGE }}:latest
             ${{ env.BASE_IMAGE }}:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:latest
-          cache-to: type=inline
+          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache,mode=max
 
   build-devx:
     runs-on: ubuntu-latest
@@ -58,15 +61,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: docker/setup-qemu-action@v3
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile.devx
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.DEVX_IMAGE }}:latest
             ${{ env.DEVX_IMAGE }}:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DEVX_IMAGE }}:latest
-          cache-to: type=inline
+          cache-from: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache,mode=max
