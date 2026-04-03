@@ -1,5 +1,7 @@
-# Docker Compose file for building the base image in GitHub Actions
-# Usage: docker-compose -f .devcontainer/docker-compose.base.yml build base
+# Docker Compose file for building base images in GitHub Actions
+# Usage:
+#   docker-compose -f .devcontainer/docker-compose.base.yml build base
+#   docker-compose -f .devcontainer/docker-compose.base.yml build devx
 
 version: '3'
 
@@ -12,7 +14,12 @@ services:
         VARIANT: 'ubuntu-22.04'
         NODE_VERSION: '24.14.1'
         RUBY_VERSION: '3.4.4'
-        # On Linux, you may need to update USER_UID and USER_GID below if not your local UID is not 1000.
         USER_UID: '1000'
         USER_GID: '1000'
     image: ghcr.io/chatwoot/chatwoot_codespace:latest
+
+  devx:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.devx
+    image: ghcr.io/chatwoot/chatwoot_codespace_devx:latest
