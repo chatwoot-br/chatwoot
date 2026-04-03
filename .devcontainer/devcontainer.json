@@ -10,7 +10,7 @@
   },
 
   "initializeCommand": "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder} .devcontainer/setup.sh init",
-  "postCreateCommand": ".devcontainer/setup.sh create && (POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare || true) && pnpm install",
+  "postCreateCommand": ".devcontainer/setup.sh create && .devcontainer/setup.sh db-prepare && pnpm install",
   "postStartCommand": ".devcontainer/setup.sh start",
 
   "mounts": [
@@ -29,6 +29,7 @@
   ],
 
   "containerEnv": {
+    // Claude Code hooks require bash; fish is the interactive login shell (set in Dockerfile.devx)
     "SHELL": "/usr/bin/bash",
     "TERM": "xterm-ghostty",
     "EDITOR": "nvim",

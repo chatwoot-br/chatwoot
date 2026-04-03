@@ -39,6 +39,7 @@ case "$1" in
     # === DevX tooling setup ===
 
     # Claude CLI — native installer puts binary at ~/.local/bin/claude
+    # Not pinned: installer auto-updates on each run; guard prevents re-install
     if [ ! -x ~/.local/bin/claude ]; then
       log create "Installing Claude CLI (native)"
       curl -fsSL https://claude.ai/install.sh | bash || warn create "Claude CLI install failed"
@@ -50,17 +51,27 @@ case "$1" in
     fi
     ln -sf ~/.claude/.claude.json ~/.claude.json
 
-    # Codex CLI (global npm package)
+    # Codex CLI (user-local npm package)
     if ! command -v codex &>/dev/null; then
       log create "Installing Codex CLI"
-      sudo npm install -g @openai/codex || warn create "Codex CLI install failed"
+      npm install --prefix ~/.local -g @openai/codex || warn create "Codex CLI install failed"
     fi
 
     # LazyVim (bootstrap starter config if not already present)
+    LAZYVIM_STARTER_TAG=v4.43.0
     if [ ! -d ~/.config/nvim ]; then
-      log create "Bootstrapping LazyVim"
-      git clone https://github.com/LazyVim/starter ~/.config/nvim
+      log create "Bootstrapping LazyVim (${LAZYVIM_STARTER_TAG})"
+      git clone --depth 1 --branch "$LAZYVIM_STARTER_TAG" https://github.com/LazyVim/starter ~/.config/nvim
       rm -rf ~/.config/nvim/.git
+    fi
+    ;;
+
+  db-prepare)
+    # Runs after create — separate phase so DB failures are visible but non-fatal
+    if POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare; then
+      log db-prepare "Database ready"
+    else
+      warn db-prepare "db:chatwoot_prepare failed (DB may not be ready yet — run manually later)"
     fi
     ;;
 
@@ -70,7 +81,8 @@ case "$1" in
     # Claude config symlink
     ln -sf ~/.claude/.claude.json ~/.claude.json
 
-    # Ensure /home/node points to actual home so hook paths resolve
+    # claude-mem plugin hardcodes /home/node paths (from notebook devcontainer origin).
+    # Symlink so those paths resolve when running as vscode user.
     if [ ! -e /home/node ] && [ "$HOME" != "/home/node" ]; then
       sudo ln -s "$HOME" /home/node 2>/dev/null || true
     fi
@@ -82,7 +94,7 @@ case "$1" in
     ;;
 
   *)
-    echo "Usage: setup.sh {init|create|start}" >&2
+    echo "Usage: setup.sh {init|create|db-prepare|start}" >&2
     exit 1
     ;;
 esac

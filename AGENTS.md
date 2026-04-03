@@ -1,8 +1,6 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 # Chatwoot Development Guidelines
+
+This file provides guidance to Claude Code (claude.ai/code) and Codex when working with this repository.
 
 ## Build / Test / Lint
 
