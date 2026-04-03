@@ -10,8 +10,9 @@
 
 name: Run Linux nightly installer
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  # Disabled: tests installer from get.chatwoot.app, not applicable to fork
+  # schedule:
+  #   - cron: "0 0 * * *"
   workflow_dispatch:
 
 jobs:
