@@ -6,9 +6,14 @@ warn() { printf '[setup:%s] WARN: %s\n' "$1" "$2" >&2; }
 case "$1" in
   init)
     # Runs on host before container creation — ensure bind mount sources exist
-    for dir in .claude .config .local/share .local/state .claude-mem .codex; do
+    for dir in .claude .config .local/share .local/state .claude-mem .codex notebook; do
       mkdir -p "${LOCAL_WORKSPACE_FOLDER}/../${dir}"
     done
+
+    # Shared volume between chatwoot and notebook devcontainers
+    if command -v docker &>/dev/null && ! docker volume inspect woot-code &>/dev/null 2>&1; then
+      docker volume create woot-code
+    fi
     ;;
 
   create)
