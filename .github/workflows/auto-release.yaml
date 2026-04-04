@@ -1,0 +1,39 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - next
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Compute version
+        id: version
+        run: |
+          CW_VERSION=$(cat VERSION_CW)
+          SHA=$(git rev-parse --short=7 HEAD)
+          OCTAL=$(printf '%o' "0x${SHA}")
+          VERSION="v${CW_VERSION}${OCTAL}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION} (upstream ${CW_VERSION}, sha ${SHA})"
+
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git tag "${VERSION}"
+          git push origin "${VERSION}"
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            --generate-notes \
+            --latest

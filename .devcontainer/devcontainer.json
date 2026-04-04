@@ -36,10 +36,11 @@
     "VISUAL": "nvim"
   },
 
-  "forwardPorts": [8025, 3000, 3036, 37777],
+  "forwardPorts": [8025, 3000, 3036, 4000, 37777],
   "portsAttributes": {
     "3000": { "label": "Rails Server" },
     "3036": { "label": "Vite Dev Server" },
+    "4000": { "label": "GoWA WhatsApp Web" },
     "8025": { "label": "Mailhog UI" },
     "37777": { "label": "Memory Server", "onAutoForward": "notify" }
   },

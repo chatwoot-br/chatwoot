@@ -32,6 +32,7 @@ services:
     ports:
       - "3000:3000"
       - "3036:3036"
+      - "4000:4000"
       - "8025:8025"
       - "37777:37777"
     volumes:
@@ -53,8 +54,30 @@ services:
     image: mailhog/mailhog
     network_mode: service:db
 
+  gowa:
+    image: ghcr.io/chatwoot-br/go-whatsapp-web-multidevice:v8.1.2-1
+    restart: unless-stopped
+    network_mode: service:db
+    environment:
+      - APP_PORT=4000
+      - APP_HOST=0.0.0.0
+      - APP_DEBUG=false
+      - APP_OS=Chrome
+      - APP_TRUSTED_PROXIES=0.0.0.0/0
+      - DB_URI=file:storages/whatsapp.db?_foreign_keys=on
+      - WHATSAPP_WEBHOOK=http://localhost:3000/webhooks/whatsapp_web
+      - WHATSAPP_WEBHOOK_SECRET=dev-secret
+      - WHATSAPP_WEBHOOK_INSECURE_SKIP_VERIFY=true
+      - WHATSAPP_AUTO_MARK_READ=true
+      - WHATSAPP_AUTO_DOWNLOAD_MEDIA=true
+      - WHATSAPP_ACCOUNT_VALIDATION=true
+      - WHATSAPP_CHAT_STORAGE=true
+    volumes:
+      - gowa-data:/app/storages
+
 volumes:
   postgres-data:
   redis-data:
+  gowa-data:
   woot-code:
     external: true
