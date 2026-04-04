@@ -66,6 +66,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   def transform_message_event(payload)
+    # Skip invalid JIDs (e.g., status@broadcast)
+    return {} unless processable_chat_jid?(payload[:chat_id])
+
     message_id = payload[:id]
     timestamp = parse_timestamp(payload[:timestamp])
 
@@ -852,12 +855,16 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     # Process messages using cache
     @history_chats.each do |chat|
       chat_jid = chat['jid']
-      next if chat_jid.blank?
+      next unless processable_chat_jid?(chat_jid)
       next if ignore_group_messages? && group_chat?(chat_jid)
 
-      messages = @history_messages_by_chat[chat_jid] || []
-      process_history_messages_with_cache(chat_jid, messages, contact_cache, lid_to_phone)
-      update_conversation_timestamps_for_chat(chat_jid)
+      begin
+        messages = @history_messages_by_chat[chat_jid] || []
+        process_history_messages_with_cache(chat_jid, messages, contact_cache, lid_to_phone)
+        update_conversation_timestamps_for_chat(chat_jid)
+      rescue StandardError => e
+        Rails.logger.error "[WhatsApp History Sync] Failed to process chat #{chat_jid}: #{e.message}"
+      end
     end
 
     Rails.logger.info "[WhatsApp History Sync] Completed for inbox #{inbox.id}"
@@ -877,7 +884,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     chats.each do |chat|
       chat_jid = chat['jid']
-      next if chat_jid.blank?
+      next unless processable_chat_jid?(chat_jid)
       next if ignore_group_messages? && group_chat?(chat_jid)
 
       messages = fetch_all_messages_for_chat(chat_jid)
@@ -1228,6 +1235,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
       # Also cache by LID if present
       cache[data[:lid]] = contact_inbox if data[:lid].present?
+    rescue StandardError => e
+      Rails.logger.error "[WhatsApp History Sync] Failed to create contact for #{jid}: #{e.message}"
     end
 
     cache
