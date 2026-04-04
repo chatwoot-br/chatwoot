@@ -26,14 +26,20 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: ${VERSION} (upstream ${CW_VERSION}, sha ${SHA})"
 
-      - name: Create tag and release
-        env:
-          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
+      - name: Push tag
         run: |
           git tag "${VERSION}"
-          git push origin "${VERSION}"
+          git push "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}.git" "${VERSION}"
+        env:
+          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Create release
+        run: |
           gh release create "${VERSION}" \
             --title "${VERSION}" \
             --generate-notes \
             --latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
