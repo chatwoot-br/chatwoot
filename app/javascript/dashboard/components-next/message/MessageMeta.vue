@@ -6,6 +6,7 @@ import MessageStatus from './MessageStatus.vue';
 import Icon from 'next/icon/Icon.vue';
 import { useInbox } from 'dashboard/composables/useInbox';
 import { useMessageContext } from './provider.js';
+import MessageReactions from './MessageReactions.vue';
 
 import { MESSAGE_STATUS, MESSAGE_TYPES } from './constants';
 
@@ -133,6 +134,7 @@ const statusToShow = computed(() => {
 
 <template>
   <div class="text-xs flex items-center gap-1.5">
+    <MessageReactions />
     <div class="inline">
       <time class="inline">{{ readableTime }}</time>
     </div>
