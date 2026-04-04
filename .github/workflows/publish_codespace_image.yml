@@ -2,7 +2,7 @@ name: Publish Devcontainer Images
 
 on:
   push:
-    branches: [main]
+    branches: [next]
     paths:
       - '.devcontainer/**'
       - '.github/workflows/publish_codespace_image.yml'
