@@ -15,11 +15,11 @@
 #  index_installation_configs_on_name_and_created_at  (name,created_at) UNIQUE
 #
 class InstallationConfig < ApplicationRecord
-  # https://stackoverflow.com/questions/72970170/upgrading-to-rails-6-1-6-1-causes-psychdisallowedclass-tried-to-load-unspecif
-  # https://discuss.rubyonrails.org/t/cve-2022-32224-possible-rce-escalation-bug-with-serialized-columns-in-active-record/81017
-  # FIX ME : fixes breakage of installation config. we need to migrate.
-  # Fix configuration in application.rb
-  serialize :serialized_value, coder: YAML, type: ActiveSupport::HashWithIndifferentAccess
+  def serialized_value
+    raw = super
+    parsed = raw.is_a?(String) ? YAML.safe_load(raw, permitted_classes: [ActiveSupport::HashWithIndifferentAccess]) : raw
+    (parsed || {}).with_indifferent_access
+  end
 
   before_validation :set_lock
   validates :name, presence: true
@@ -33,10 +33,6 @@ class InstallationConfig < ApplicationRecord
   after_commit :clear_cache
 
   def value
-    # This is an extra hack again cause of the YAML serialization, in case of new object initialization in super admin
-    # It was throwing error as the default value of column '{}' was failing in deserialization.
-    return {}.with_indifferent_access if new_record? && @attributes['serialized_value']&.value_before_type_cast == '{}'
-
     serialized_value[:value]
   end
 
