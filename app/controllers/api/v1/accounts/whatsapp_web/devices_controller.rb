@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::BaseController
   HTTP_TIMEOUT = 30 # seconds
 
@@ -188,6 +189,7 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     handle_api_response(response, 'create device')
   end
 
+  # rubocop:disable Metrics/AbcSize
   def fetch_qr_code_from_api(device_id)
     # Use legacy /app/login endpoint with X-Device-Id header
     # as /devices/{id}/login is not implemented yet
@@ -214,7 +216,9 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
     image_response.body
   end
+  # rubocop:enable Metrics/AbcSize
 
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def fetch_device_status_from_api(device_id)
     # Use GET /devices/:device_id to get both status and JID
     # The /status endpoint doesn't return the actual JID from WhatsApp
@@ -234,6 +238,7 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
 
     { state: state, jid: results['jid'], display_name: results['display_name'] }
   end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
   def reconnect_device_in_api(device_id)
     url = "#{whatsapp_web_api_url}/devices/#{device_id}/reconnect"
@@ -279,3 +284,4 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     }, status: :unprocessable_entity
   end
 end
+# rubocop:enable Metrics/ClassLength

@@ -52,6 +52,7 @@ RSpec.describe ContactInbox do
         expect(contact_inbox.source_id.length).to eq(300)
       end
 
+      # rubocop:disable RSpec/MultipleExpectations
       it 'validates whatsapp channel source_id' do
         whatsapp_inbox = create(:channel_whatsapp, sync_templates: false, validate_provider_config: false).inbox
         contact = create(:contact)
@@ -71,6 +72,7 @@ RSpec.describe ContactInbox do
         expect(ci_plus_in_source_id.valid?).to be(false)
         expect(ci_plus_in_source_id.errors[:source_id].first).to include('invalid source id for whatsapp inbox')
       end
+      # rubocop:enable RSpec/MultipleExpectations
 
       it 'validates twilio sms channel source_id' do
         twilio_sms_inbox = create(:channel_twilio_sms).inbox

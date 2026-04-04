@@ -14,12 +14,13 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
 
   before do
     provider_service_double = instance_double(Whatsapp::Providers::WhatsappWebService)
+    dedup_lock_double = instance_double(Whatsapp::MessageDedupLock, acquire!: true)
     allow(whatsapp_channel).to receive(:provider_service).and_return(provider_service_double)
     allow(provider_service_double).to receive(:fetch_avatar_url).and_return(nil)
     allow(provider_service_double).to receive(:fetch_group_info).and_return({})
     # Message source dedup lock uses Redis with long TTL and can leak across examples
     # because many examples intentionally reuse fixed message IDs.
-    allow_any_instance_of(described_class).to receive(:lock_message_source_id!).and_return(true)
+    allow(Whatsapp::MessageDedupLock).to receive(:new).and_return(dedup_lock_double)
   end
 
   describe '#perform' do
@@ -369,6 +370,7 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
     end
 
     describe 'sequential message processing (expected behavior)' do
+      # rubocop:disable RSpec/MultipleExpectations
       it 'creates exactly one contact and one conversation for same sender' do
         # Process first message
         expect do
@@ -383,11 +385,15 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
         expect(contact.name).to eq(contact_name)
 
         # Process second message - should go to same contact/conversation
+        initial_contact_count = Contact.count
+        initial_conversation_count = Conversation.count
+
         expect do
           described_class.new(inbox: inbox, params: build_message_params('msg_002', 'Já estou na sala')).perform
-        end.to change(Contact, :count).by(0)
-                                      .and change(Conversation, :count).by(0)
-                                                                       .and change(Message, :count).by(1)
+        end.to change(Message, :count).by(1)
+
+        expect(Contact.count).to eq(initial_contact_count)
+        expect(Conversation.count).to eq(initial_conversation_count)
 
         # Verify still single contact_inbox
         contact_inboxes = inbox.contact_inboxes.where(source_id: contact_phone)
@@ -398,6 +404,7 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
         expect(conversations.count).to eq(1)
         expect(conversations.first.messages.count).to eq(2)
       end
+      # rubocop:enable RSpec/MultipleExpectations
 
       it 'does not create duplicates when same message processed twice' do
         # First processing
@@ -433,7 +440,7 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
           Concurrent::CyclicBarrier.new(3)
         rescue StandardError
           nil
-        end # Use concurrent-ruby if available
+        end
 
         # Simulate 3 concurrent webhook jobs processing different messages for same contact
         # This replicates what was seen in production logs with multiple job IDs

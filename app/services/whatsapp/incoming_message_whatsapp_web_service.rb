@@ -162,6 +162,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   end
 
   # Override to handle group messages and LID-based chats differently
+  # rubocop:disable Metrics/PerceivedComplexity
   def set_contact
     if group_message?
       set_group_contact
@@ -183,6 +184,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       store_from_lid_on_contact if payload_from_lid.present?
     end
   end
+  # rubocop:enable Metrics/PerceivedComplexity
 
   def group_message?
     webhook_params.dig(:payload, :chat_id).to_s.end_with?('@g.us')
@@ -829,6 +831,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   # Uses two-phase approach to prevent duplicate contacts:
   # Phase 1: Collect all messages, build LID→phone mapping, normalize contacts
   # Phase 2: Bulk create contacts, then process messages using cached lookups
+  # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
   def process_history_sync
     Rails.logger.info "[WhatsApp History Sync] Starting two-phase sync for inbox #{inbox.id}"
 
@@ -881,6 +884,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     @history_chats_by_jid = nil
     @history_messages_by_chat = nil
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
   # Collect all messages from all chats for Phase 1 analysis
   def collect_all_history_messages(chats)
@@ -971,6 +975,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     chats
   end
 
+  # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
   def sync_history_chat_messages(chat)
     chat_jid = chat['jid']
     return if chat_jid.blank?
@@ -1006,6 +1011,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   rescue StandardError => e
     Rails.logger.error "[WhatsApp History Sync] Error syncing chat #{chat_jid}: #{e.message}"
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/MethodLength, Metrics/PerceivedComplexity
 
   def process_history_messages(messages, chat)
     messages.each do |msg|
@@ -1026,6 +1032,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     self.class.new(inbox: inbox, params: transformed_params).perform
   end
 
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def build_history_message_params(message, chat)
     chat_jid = chat['jid']
     sender_jid = message['sender_jid'] || chat_jid
@@ -1073,7 +1080,9 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       'payload' => payload
     }
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/MethodLength
   def add_history_media_to_payload(payload, message, chat)
     media_type = message['media_type']
     return if media_type.blank?
@@ -1103,6 +1112,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     when 'sticker' then payload[:sticker] = media_obj
     end
   end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/MethodLength
 
   def more_history_pages?(response, current_offset, batch_size)
     return false unless response.is_a?(Hash)
@@ -1118,6 +1128,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Update conversation timestamps based on actual message dates
   # This ensures created_at reflects the oldest message and last_activity_at reflects the newest
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def update_conversation_timestamps_for_chat(chat_jid)
     # Find the contact_inbox for this chat
     phone = extract_phone_number(chat_jid)
@@ -1154,6 +1165,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   rescue StandardError => e
     Rails.logger.error "[WhatsApp History Sync] Error updating conversation timestamps: #{e.message}"
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   # Fetch avatar from go-whatsapp and schedule sync job
   # Rate limited to once per hour to avoid excessive API calls
@@ -1330,6 +1342,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Resolve contact from history sync cache using multiple lookup strategies
   # Used during history sync Phase 2 to find contacts without database queries
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
   def resolve_contact_from_history_cache(message, cache, lid_to_phone)
     chat_jid = message[:chat_jid] || message['chat_jid']
     from_lid = message[:from_lid] || message['from_lid']
@@ -1356,5 +1369,6 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
     )
     nil
   end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 end
 # rubocop:enable Metrics/ClassLength

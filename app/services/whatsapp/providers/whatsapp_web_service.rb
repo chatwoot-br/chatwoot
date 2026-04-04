@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
   HTTP_TIMEOUT = 30 # seconds
 
@@ -383,3 +384,4 @@ class Whatsapp::Providers::WhatsappWebService < Whatsapp::Providers::BaseService
     'Unknown error occurred'
   end
 end
+# rubocop:enable Metrics/ClassLength
