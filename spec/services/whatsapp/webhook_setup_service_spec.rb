@@ -325,4 +325,58 @@ describe Whatsapp::WebhookSetupService do
       end
     end
   end
+
+  describe '#register_callback' do
+    it 'registers webhook without invoking phone registration checks' do
+      with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+        expect(api_client).not_to receive(:phone_number_verified?)
+        expect(api_client).not_to receive(:register_phone_number)
+        expect(api_client).to receive(:subscribe_waba_webhook)
+          .with(waba_id, 'https://app.chatwoot.com/webhooks/whatsapp/+1234567890', 'test_verify_token')
+
+        service.register_callback
+      end
+    end
+  end
+
+  describe 'initializer defaults' do
+    let(:channel_with_defaults) do
+      create(:channel_whatsapp,
+             phone_number: '+1987654321',
+             provider_config: {
+               'source' => 'embedded_signup'
+             },
+             provider: 'whatsapp_cloud',
+             sync_templates: false,
+             validate_provider_config: false)
+    end
+
+    let(:service_with_defaults) { described_class.new(channel_with_defaults) }
+
+    before do
+      channel_with_defaults.update!(
+        provider_config: channel_with_defaults.provider_config.merge(
+          'phone_number_id' => '987654321',
+          'webhook_verify_token' => 'default_verify_token',
+          'business_account_id' => 'default_waba_id',
+          'api_key' => 'default_api_key'
+        )
+      )
+      allow(api_client).to receive(:phone_number_verified?).with('987654321').and_return(true)
+      allow(health_service).to receive(:fetch_health_status).and_return({
+                                                                          platform_type: 'APPLICABLE',
+                                                                          throughput: { level: 'APPLICABLE' }
+                                                                        })
+    end
+
+    it 'falls back to provider_config business_account_id and api_key when args are omitted' do
+      with_modified_env FRONTEND_URL: 'https://app.chatwoot.com' do
+        expect(Whatsapp::FacebookApiClient).to receive(:new).with('default_api_key').and_return(api_client)
+        expect(api_client).to receive(:subscribe_waba_webhook)
+          .with('default_waba_id', 'https://app.chatwoot.com/webhooks/whatsapp/+1987654321', 'default_verify_token')
+
+        service_with_defaults.perform
+      end
+    end
+  end
 end

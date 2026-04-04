@@ -1060,6 +1060,7 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
       timestamp: message['timestamp'],
       is_from_me: is_from_me
     }
+    payload[:from_lid] = message['from_lid'] if message['from_lid'].present?
 
     content = message['content']
     payload[:body] = content if content.present?
