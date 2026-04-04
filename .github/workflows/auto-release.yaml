@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Compute version
         id: version
@@ -26,12 +26,13 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Version: ${VERSION} (upstream ${CW_VERSION}, sha ${SHA})"
 
-      - name: Push tag
+      - name: Create tag
         run: |
-          git tag "${VERSION}"
-          git push "https://x-access-token:${PAT}@github.com/${GITHUB_REPOSITORY}.git" "${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "${VERSION}"
         env:
-          PAT: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
 
       - name: Create release
