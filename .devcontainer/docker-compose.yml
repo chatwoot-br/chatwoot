@@ -28,6 +28,12 @@ services:
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
+    # Port forwarding for devcontainer CLI (forwardPorts only works in VS Code)
+    ports:
+      - "3000:3000"
+      - "3036:3036"
+      - "8025:8025"
+      - "37777:37777"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
