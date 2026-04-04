@@ -22,11 +22,13 @@ jobs:
     name: Create Hetzner Cloud AMD runner
     runs-on: ubuntu-latest
     outputs:
-      label: ${{ steps.create-hcloud-runner.outputs.label }}
-      server_id: ${{ steps.create-hcloud-runner.outputs.server_id }}
+      label: ${{ steps.set-outputs.outputs.label }}
+      server_id: ${{ steps.set-outputs.outputs.server_id }}
     steps:
-      - name: Create runner
-        id: create-hcloud-runner
+      - name: Try hel1
+        id: try-hel1
+        continue-on-error: true
+        timeout-minutes: 3
         uses: Cyclenerd/hcloud-github-runner@v1
         with:
           mode: create
@@ -35,16 +37,69 @@ jobs:
           server_type: cx53
           location: hel1
           image: docker-ce
+      - name: Try fsn1
+        id: try-fsn1
+        if: steps.try-hel1.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cx53
+          location: fsn1
+          image: docker-ce
+      - name: Try nbg1
+        id: try-nbg1
+        if: steps.try-fsn1.outcome == 'failure'
+        timeout-minutes: 3
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cx53
+          location: nbg1
+          image: docker-ce
+      - name: Set outputs
+        id: set-outputs
+        run: |
+          for loc in hel1 fsn1 nbg1; do
+            outcome_var="try_${loc}_outcome"
+            label_var="try_${loc}_label"
+            server_id_var="try_${loc}_server_id"
+            if [ "${!outcome_var}" = "success" ]; then
+              echo "label=${!label_var}" >> "$GITHUB_OUTPUT"
+              echo "server_id=${!server_id_var}" >> "$GITHUB_OUTPUT"
+              echo "Runner created in ${loc}"
+              exit 0
+            fi
+          done
+          echo "::error::All locations failed"
+          exit 1
+        env:
+          try_hel1_outcome: ${{ steps.try-hel1.outcome }}
+          try_hel1_label: ${{ steps.try-hel1.outputs.label }}
+          try_hel1_server_id: ${{ steps.try-hel1.outputs.server_id }}
+          try_fsn1_outcome: ${{ steps.try-fsn1.outcome }}
+          try_fsn1_label: ${{ steps.try-fsn1.outputs.label }}
+          try_fsn1_server_id: ${{ steps.try-fsn1.outputs.server_id }}
+          try_nbg1_outcome: ${{ steps.try-nbg1.outcome }}
+          try_nbg1_label: ${{ steps.try-nbg1.outputs.label }}
+          try_nbg1_server_id: ${{ steps.try-nbg1.outputs.server_id }}
 
   create-runner-arm:
     name: Create Hetzner Cloud ARM runner
     runs-on: ubuntu-latest
     outputs:
-      label: ${{ steps.create-hcloud-runner.outputs.label }}
-      server_id: ${{ steps.create-hcloud-runner.outputs.server_id }}
+      label: ${{ steps.set-outputs.outputs.label }}
+      server_id: ${{ steps.set-outputs.outputs.server_id }}
     steps:
-      - name: Create runner
-        id: create-hcloud-runner
+      - name: Try hel1
+        id: try-hel1
+        continue-on-error: true
+        timeout-minutes: 3
         uses: Cyclenerd/hcloud-github-runner@v1
         with:
           mode: create
@@ -53,6 +108,57 @@ jobs:
           server_type: cax41
           location: hel1
           image: docker-ce
+      - name: Try fsn1
+        id: try-fsn1
+        if: steps.try-hel1.outcome == 'failure'
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cax41
+          location: fsn1
+          image: docker-ce
+      - name: Try nbg1
+        id: try-nbg1
+        if: steps.try-fsn1.outcome == 'failure'
+        timeout-minutes: 3
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cax41
+          location: nbg1
+          image: docker-ce
+      - name: Set outputs
+        id: set-outputs
+        run: |
+          for loc in hel1 fsn1 nbg1; do
+            outcome_var="try_${loc}_outcome"
+            label_var="try_${loc}_label"
+            server_id_var="try_${loc}_server_id"
+            if [ "${!outcome_var}" = "success" ]; then
+              echo "label=${!label_var}" >> "$GITHUB_OUTPUT"
+              echo "server_id=${!server_id_var}" >> "$GITHUB_OUTPUT"
+              echo "Runner created in ${loc}"
+              exit 0
+            fi
+          done
+          echo "::error::All locations failed"
+          exit 1
+        env:
+          try_hel1_outcome: ${{ steps.try-hel1.outcome }}
+          try_hel1_label: ${{ steps.try-hel1.outputs.label }}
+          try_hel1_server_id: ${{ steps.try-hel1.outputs.server_id }}
+          try_fsn1_outcome: ${{ steps.try-fsn1.outcome }}
+          try_fsn1_label: ${{ steps.try-fsn1.outputs.label }}
+          try_fsn1_server_id: ${{ steps.try-fsn1.outputs.server_id }}
+          try_nbg1_outcome: ${{ steps.try-nbg1.outcome }}
+          try_nbg1_label: ${{ steps.try-nbg1.outputs.label }}
+          try_nbg1_server_id: ${{ steps.try-nbg1.outputs.server_id }}
 
   # ── Base image builds ──────────────────────────────────────────────
   build-base-amd:
