@@ -226,11 +226,16 @@ const isBotOrAgentMessage = computed(() => {
  * @returns {import('vue').ComputedRef<'left'|'right'|'center'>} The computed orientation
  */
 const orientation = computed(() => {
-  if (isBotOrAgentMessage.value) {
+  if (props.messageType === MESSAGE_TYPES.ACTIVITY) return ORIENTATION.CENTER;
+
+  // Outgoing messages always go to the right, regardless of sender type
+  if (props.messageType === MESSAGE_TYPES.OUTGOING) {
     return ORIENTATION.RIGHT;
   }
 
-  if (props.messageType === MESSAGE_TYPES.ACTIVITY) return ORIENTATION.CENTER;
+  if (isBotOrAgentMessage.value) {
+    return ORIENTATION.RIGHT;
+  }
 
   return ORIENTATION.LEFT;
 });
@@ -245,28 +250,41 @@ const flexOrientationClass = computed(() => {
   return map[orientation.value];
 });
 
-const gridClass = computed(() => {
-  const map = {
-    [ORIENTATION.LEFT]: 'grid grid-cols-1fr',
-    [ORIENTATION.RIGHT]: 'grid grid-cols-[1fr_24px]',
-  };
+/**
+ * Detects if the message is from a WhatsApp group conversation
+ * Group messages have senderName in additionalAttributes (camelCase after transform)
+ */
+const isGroupMessage = computed(() => {
+  return !!props.additionalAttributes?.senderName;
+});
 
-  return map[orientation.value];
+const gridClass = computed(() => {
+  if (orientation.value === ORIENTATION.RIGHT) {
+    return 'grid grid-cols-[1fr_24px]';
+  }
+  if (orientation.value === ORIENTATION.LEFT && isGroupMessage.value) {
+    return 'grid grid-cols-[24px_1fr]';
+  }
+  return 'grid grid-cols-1fr';
 });
 
 const gridTemplate = computed(() => {
-  const map = {
-    [ORIENTATION.LEFT]: `
-      "bubble"
-      "meta"
-    `,
-    [ORIENTATION.RIGHT]: `
+  if (orientation.value === ORIENTATION.RIGHT) {
+    return `
       "bubble avatar"
       "meta spacer"
-    `,
-  };
-
-  return map[orientation.value];
+    `;
+  }
+  if (orientation.value === ORIENTATION.LEFT && isGroupMessage.value) {
+    return `
+      "avatar bubble"
+      "spacer meta"
+    `;
+  }
+  return `
+    "bubble"
+    "meta"
+  `;
 });
 
 const shouldGroupWithNext = computed(() => {
@@ -277,9 +295,15 @@ const shouldGroupWithNext = computed(() => {
 
 const shouldShowAvatar = computed(() => {
   if (props.messageType === MESSAGE_TYPES.ACTIVITY) return false;
-  if (orientation.value === ORIENTATION.LEFT) return false;
 
-  return true;
+  // Show avatar for outgoing messages (right side)
+  if (orientation.value === ORIENTATION.RIGHT) return true;
+
+  // Show avatar for incoming group messages (left side)
+  if (orientation.value === ORIENTATION.LEFT && isGroupMessage.value)
+    return true;
+
+  return false;
 });
 
 const componentToRender = computed(() => {
@@ -489,6 +513,12 @@ const avatarTooltip = computed(() => {
   return `${t('CONVERSATION.SENT_BY')} ${avatarInfo.value.name}`;
 });
 
+const avatarTooltipPosition = computed(() => {
+  // For left-oriented messages (incoming), show tooltip on right
+  // For right-oriented messages (outgoing), show tooltip on left
+  return orientation.value === ORIENTATION.LEFT ? 'right-end' : 'left-end';
+});
+
 const setupHighlightTimer = () => {
   if (Number(route.query.messageId) !== Number(props.id)) {
     return;
@@ -547,7 +577,7 @@ provideMessageContext({
     >
       <div
         v-if="!shouldGroupWithNext && shouldShowAvatar"
-        v-tooltip.left-end="avatarTooltip"
+        v-tooltip:[avatarTooltipPosition]="avatarTooltip"
         class="[grid-area:avatar] flex items-end"
       >
         <Avatar v-bind="avatarInfo" :size="24" />
@@ -556,7 +586,8 @@ provideMessageContext({
         class="[grid-area:bubble] flex"
         :class="{
           'ltr:ml-8 rtl:mr-8 justify-end': orientation === ORIENTATION.RIGHT,
-          'ltr:mr-8 rtl:ml-8': orientation === ORIENTATION.LEFT,
+          'ltr:mr-8 rtl:ml-8':
+            orientation === ORIENTATION.LEFT && !isGroupMessage,
           'min-w-0': variant === MESSAGE_VARIANTS.EMAIL,
         }"
         @contextmenu="openContextMenu($event)"

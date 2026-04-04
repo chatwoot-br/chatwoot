@@ -33,15 +33,44 @@ class MessageFinder
   end
 
   def messages_after(after_id)
-    messages.reorder('created_at asc').where('id > ?', after_id).limit(100)
+    # Find the created_at of the reference message to paginate correctly
+    # This handles history-synced messages that have higher IDs but older timestamps
+    reference_message = @conversation.messages.find_by(id: after_id)
+    # Fall back to ID-based query if reference message was deleted (original upstream behavior)
+    return messages.reorder('created_at asc').where('id > ?', after_id).limit(100) unless reference_message
+
+    messages.reorder('created_at asc')
+            .where('created_at > ? OR (created_at = ? AND id > ?)',
+                   reference_message.created_at, reference_message.created_at, after_id)
+            .limit(100)
   end
 
   def messages_before(before_id)
-    messages.reorder('created_at desc').where('id < ?', before_id).limit(20).reverse
+    # Find the created_at of the reference message to paginate correctly
+    # This handles history-synced messages that have higher IDs but older timestamps
+    reference_message = @conversation.messages.find_by(id: before_id)
+    return [] unless reference_message
+
+    messages.reorder('created_at desc')
+            .where('created_at < ? OR (created_at = ? AND id < ?)',
+                   reference_message.created_at, reference_message.created_at, before_id)
+            .limit(20)
+            .reverse
   end
 
   def messages_between(after_id, before_id)
-    messages.reorder('created_at asc').where('id >= ? AND id < ?', after_id, before_id).limit(1000)
+    # Find the created_at of the reference messages to paginate correctly
+    # This handles history-synced messages that have higher IDs but older timestamps
+    after_message = @conversation.messages.find_by(id: after_id)
+    before_message = @conversation.messages.find_by(id: before_id)
+
+    return [] unless after_message && before_message
+
+    messages.reorder('created_at asc')
+            .where('(created_at > ? OR (created_at = ? AND id >= ?)) AND (created_at < ? OR (created_at = ? AND id < ?))',
+                   after_message.created_at, after_message.created_at, after_id,
+                   before_message.created_at, before_message.created_at, before_id)
+            .limit(1000)
   end
 
   def messages_latest

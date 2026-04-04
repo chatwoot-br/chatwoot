@@ -15,5 +15,7 @@ module RegexHelper
 
   TWILIO_CHANNEL_SMS_REGEX = Regexp.new('^\+\d{1,15}\z')
   TWILIO_CHANNEL_WHATSAPP_REGEX = Regexp.new('^whatsapp:\+\d{1,15}\z')
-  WHATSAPP_CHANNEL_REGEX = Regexp.new('^\d{1,15}\z')
+  # Accepts phone numbers (1-15 digits), WhatsApp group IDs (@g.us), LID addresses (@lid), and broadcast lists (@broadcast)
+  # LID (Linked ID) is WhatsApp's new identifier format for contacts without known phone numbers
+  WHATSAPP_CHANNEL_REGEX = Regexp.new('^(\d{1,15}|\d+@g\.us|\d+@lid|\d+@broadcast)\z')
 end
