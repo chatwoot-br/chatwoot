@@ -4,8 +4,25 @@ ConfigLoader.new.process
 
 ## Seeds productions
 if Rails.env.production?
-  # Setup Onboarding flow
-  Redis::Alfred.set(Redis::Alfred::CHATWOOT_INSTALLATION_ONBOARDING, true)
+  admin_email = ENV.fetch('CHATWOOT_ADMIN_EMAIL', nil)
+
+  if admin_email.present? && !User.exists?(email: admin_email)
+    AccountBuilder.new(
+      account_name: ENV.fetch('CHATWOOT_ADMIN_COMPANY', 'ChatWoot BR'),
+      user_full_name: ENV.fetch('CHATWOOT_ADMIN_NAME', 'Admin'),
+      email: admin_email,
+      user_password: ENV.fetch('CHATWOOT_ADMIN_PASSWORD'),
+      super_admin: true,
+      confirmed: true
+    ).perform
+  end
+
+  # Show onboarding screen only when no admin was auto-provisioned
+  if admin_email.blank?
+    Redis::Alfred.set(Redis::Alfred::CHATWOOT_INSTALLATION_ONBOARDING, true)
+  else
+    Redis::Alfred.delete(Redis::Alfred::CHATWOOT_INSTALLATION_ONBOARDING)
+  end
 end
 
 ## Seeds for Local Development
