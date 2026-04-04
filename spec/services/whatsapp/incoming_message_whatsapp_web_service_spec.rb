@@ -12,6 +12,16 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
   end
   let(:inbox) { whatsapp_channel.inbox }
 
+  before do
+    provider_service_double = instance_double(Whatsapp::Providers::WhatsappWebService)
+    allow(whatsapp_channel).to receive(:provider_service).and_return(provider_service_double)
+    allow(provider_service_double).to receive(:fetch_avatar_url).and_return(nil)
+    allow(provider_service_double).to receive(:fetch_group_info).and_return({})
+    # Message source dedup lock uses Redis with long TTL and can leak across examples
+    # because many examples intentionally reuse fixed message IDs.
+    allow_any_instance_of(described_class).to receive(:lock_message_source_id!).and_return(true)
+  end
+
   describe '#perform' do
     context 'with LID-based chat messages' do
       let(:lid_message_params) do
@@ -835,6 +845,7 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
       # Need to stub on inbox.channel since that's what the service uses
       allow(inbox).to receive(:channel).and_return(whatsapp_channel)
       allow(whatsapp_channel).to receive(:provider_service).and_return(provider_service)
+      allow(provider_service).to receive(:fetch_avatar_url).and_return(nil)
     end
 
     it 'creates single contact when same phone appears with LID and phone JID' do
@@ -868,12 +879,20 @@ RSpec.describe Whatsapp::IncomingMessageWhatsappWebService do
       expect do
         service.perform
       end.to change(Contact, :count).by(1)
-                                    .and change(ContactInbox, :count).by(1)
+                                    .and change(ContactInbox, :count).by(2)
 
       # Verify single contact with correct data
       contact = Contact.last
       expect(contact.phone_number).to eq('+5567967077880')
       expect(contact.name).to eq('Quezia')
+
+      # History sync keeps both phone and LID source_ids mapped to the same contact
+      phone_ci = inbox.contact_inboxes.find_by(source_id: '5567967077880')
+      lid_ci = inbox.contact_inboxes.find_by(source_id: '215946727821336@lid')
+      expect(phone_ci).to be_present
+      expect(lid_ci).to be_present
+      expect(phone_ci.contact_id).to eq(contact.id)
+      expect(lid_ci.contact_id).to eq(contact.id)
     end
 
     it 'handles concurrent-like scenario without creating duplicates' do
