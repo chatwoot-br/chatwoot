@@ -1,49 +1,76 @@
 {
-  "name": "Chatwoot Development Codespace",
+  "name": "Chatwoot BR Development",
   "service": "app",
   "dockerComposeFile": "docker-compose.yml",
+  "workspaceFolder": "/workspace/chatwoot",
+  "remoteUser": "vscode",
 
-  "settings": {
-    "terminal.integrated.shell.linux": "/bin/zsh",
-    "extensions.showRecommendationsOnlyOnDemand": true,
-    "editor.formatOnSave": true,
-    "files.trimTrailingWhitespace": true,
-    "files.insertFinalNewline": true,
-    "search.exclude": {
-      "**/node_modules": true,
-      "**/tmp": true,
-      "**/log": true,
-      "**/coverage": true,
-      "**/public/packs": true
-    }
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
 
+  "initializeCommand": "LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder} .devcontainer/setup.sh init",
+  "postCreateCommand": ".devcontainer/setup.sh create && .devcontainer/setup.sh db-prepare && pnpm install",
+  "postStartCommand": ".devcontainer/setup.sh start",
 
-  // Add the IDs of extensions you want installed when the container is created.
-  "extensions": [
-    "Shopify.ruby-lsp",
-    "misogi.ruby-rubocop",
-    "davidpallinder.rails-test-runner",
-    "github.copilot",
-    "mrmlnc.vscode-duplicate"
+  "mounts": [
+    "source=${localWorkspaceFolder}/../.claude,target=/home/vscode/.claude,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.config,target=/home/vscode/.config,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.local/share,target=/home/vscode/.local/share,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.local/state,target=/home/vscode/.local/state,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.claude-mem,target=/home/vscode/.claude-mem,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.codex,target=/home/vscode/.codex,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../notebook,target=/workspace/notebook,type=bind,consistency=cached"
   ],
 
+  "runArgs": [
+    "--env-file",
+    "${localWorkspaceFolder}/.env.devcontainer"
+  ],
 
-  // 5432 postgres
-  // 6379 redis
-  // 1025,8025 mailhog
-  "forwardPorts": [8025, 3000, 3036],
+  "containerEnv": {
+    // Claude Code hooks require bash; fish is the interactive login shell (set in Dockerfile.devx)
+    "SHELL": "/usr/bin/bash",
+    "TERM": "xterm-ghostty",
+    "EDITOR": "nvim",
+    "VISUAL": "nvim"
+  },
 
-  "postCreateCommand": ".devcontainer/scripts/setup.sh && POSTGRES_STATEMENT_TIMEOUT=600s bundle exec rake db:chatwoot_prepare && pnpm install",
+  "forwardPorts": [8025, 3000, 3036, 37777],
   "portsAttributes": {
-    "3000": {
-      "label": "Rails Server"
-    },
-    "3036": {
-      "label": "Vite Dev Server"
-    },
-    "8025": {
-      "label": "Mailhog UI"
+    "3000": { "label": "Rails Server" },
+    "3036": { "label": "Vite Dev Server" },
+    "8025": { "label": "Mailhog UI" },
+    "37777": { "label": "Memory Server", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "fish",
+        "terminal.integrated.profiles.linux": {
+          "fish": { "path": "/usr/local/bin/fish" }
+        },
+        "editor.formatOnSave": true,
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/tmp": true,
+          "**/log": true,
+          "**/coverage": true,
+          "**/public/packs": true
+        }
+      },
+      "extensions": [
+        "Shopify.ruby-lsp",
+        "misogi.ruby-rubocop",
+        "davidpallinder.rails-test-runner",
+        "github.copilot",
+        "mrmlnc.vscode-duplicate",
+        "Anthropic.claude-code",
+        "yzhang.markdown-all-in-one"
+      ]
     }
   }
 }

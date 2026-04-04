@@ -2,8 +2,6 @@
 # https://github.com/microsoft/vscode-dev-containers/blob/master/containers/ruby-rails/.devcontainer/devcontainer.json
 #
 
-version: '3'
-
 services:
   app:
     build:
@@ -11,14 +9,15 @@ services:
       dockerfile: .devcontainer/Dockerfile
       args:
         VARIANT: 'ubuntu-22.04'
-        NODE_VERSION: '24.13.0'
+        NODE_VERSION: '24.14.1'
         RUBY_VERSION: '3.4.4'
         # On Linux, you may need to update USER_UID and USER_GID below if not your local UID is not 1000.
         USER_UID: '1000'
         USER_GID: '1000'
 
     volumes:
-      - ..:/workspace:cached
+      - ..:/workspace/chatwoot:cached
+      - woot-code:/workspace/code
 
     # Overrides default command so things don't shut down after the process ends.
     command: sleep infinity
@@ -29,6 +28,12 @@ services:
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
+    # Port forwarding for devcontainer CLI (forwardPorts only works in VS Code)
+    ports:
+      - "3000:3000"
+      - "3036:3036"
+      - "8025:8025"
+      - "37777:37777"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
@@ -51,3 +56,5 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  woot-code:
+    external: true

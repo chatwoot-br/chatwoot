@@ -4,12 +4,13 @@ FROM mcr.microsoft.com/vscode/devcontainers/base:0-${VARIANT}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG NODE_VERSION
-ARG RUBY_VERSION
-ARG USER_UID
-ARG USER_GID
+ARG NODE_VERSION="24.14.1"
+ARG RUBY_VERSION="3.4.4"
+ARG USER_UID="1000"
+ARG USER_GID="1000"
+ARG TARGETARCH
 ARG PNPM_VERSION="10.2.0"
-ENV PNPM_VERSION ${PNPM_VERSION}
+ENV PNPM_VERSION=${PNPM_VERSION}
 ENV RUBY_CONFIGURE_OPTS=--disable-install-doc
 
 # Update args in docker-compose.yaml to set the UID/GID of the "vscode" user.
@@ -38,6 +39,7 @@ RUN NODE_MAJOR=$(echo $NODE_VERSION | cut -d. -f1) \
         ca-certificates \
         tmux \
         nodejs \
+        unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -45,7 +47,7 @@ RUN NODE_MAJOR=$(echo $NODE_VERSION | cut -d. -f1) \
 RUN git clone --depth 1 https://github.com/rbenv/rbenv.git ~/.rbenv \
     &&  echo 'export PATH="$HOME/.rbenv/bin:$PATH"' >> ~/.bashrc \
     &&  echo 'eval "$(rbenv init -)"' >> ~/.bashrc
-ENV PATH "/root/.rbenv/bin/:/root/.rbenv/shims/:$PATH"
+ENV PATH="/root/.rbenv/bin/:/root/.rbenv/shims/:$PATH"
 RUN git clone --depth 1 https://github.com/rbenv/ruby-build.git && \
     PREFIX=/usr/local ./ruby-build/install.sh
 
@@ -60,25 +62,26 @@ RUN su - vscode -c "git clone --depth 1 https://github.com/rbenv/rbenv.git ~/.rb
     && su - vscode -c "PATH=\"/home/vscode/.rbenv/bin:\$PATH\" rbenv install $RUBY_VERSION" \
     && su - vscode -c "PATH=\"/home/vscode/.rbenv/bin:\$PATH\" rbenv global $RUBY_VERSION"
 
-# Install overmind and gh in single layer
-RUN curl -L https://github.com/DarthSim/overmind/releases/download/v2.1.0/overmind-v2.1.0-linux-amd64.gz > overmind.gz \
+# Overmind (process manager)
+ARG OVERMIND_VERSION=2.5.1
+RUN OVERMIND_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") && \
+    curl -L "https://github.com/DarthSim/overmind/releases/download/v${OVERMIND_VERSION}/overmind-v${OVERMIND_VERSION}-linux-${OVERMIND_ARCH}.gz" > overmind.gz \
   && gunzip overmind.gz \
   && mv overmind /usr/local/bin \
-  && chmod +x /usr/local/bin/overmind \
-  && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends gh \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+  && chmod +x /usr/local/bin/overmind
 
+# GitHub CLI
+ARG GH_VERSION=2.88.1
+RUN GH_ARCH=$([ "$TARGETARCH" = "arm64" ] && echo "arm64" || echo "amd64") && \
+    curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" \
+    | tar xz --strip-components=2 -C /usr/local/bin "gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh"
 
-# Do the set up required for chatwoot app
-WORKDIR /workspace
-RUN chown vscode:vscode /workspace
+# --- App setup ---
+WORKDIR /workspace/chatwoot
+RUN chown vscode:vscode /workspace/chatwoot
 
-# set up node js, pnpm and claude code in single layer
-RUN npm install -g pnpm@${PNPM_VERSION} @anthropic-ai/claude-code \
+# set up pnpm
+RUN npm install -g pnpm@${PNPM_VERSION} \
     && npm cache clean --force
 
 # Switch to vscode user
@@ -95,4 +98,4 @@ RUN eval "$(rbenv init -)" \
     && pnpm install --frozen-lockfile
 
 # Copy source code after dependencies are installed
-COPY --chown=vscode:vscode . /workspace
+COPY --chown=vscode:vscode . /workspace/chatwoot

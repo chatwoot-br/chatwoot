@@ -1,23 +1,86 @@
-name: Publish Codespace Base Image
+name: Publish Devcontainer Images
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/publish_codespace_image.yml'
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  BASE_IMAGE: ghcr.io/chatwoot-br/chatwoot_codespace
+  DEVX_IMAGE: ghcr.io/chatwoot-br/chatwoot_codespace_devx
+
 jobs:
-  publish-code-space-image:
+  build-base:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build the Codespace Base Image
-      run: |
-        docker compose -f .devcontainer/docker-compose.base.yml build base
-        docker push ghcr.io/chatwoot/chatwoot_codespace:latest
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile.base
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VARIANT=ubuntu-22.04
+            NODE_VERSION=24.14.1
+            RUBY_VERSION=3.4.4
+            USER_UID=1000
+            USER_GID=1000
+          tags: |
+            ${{ env.BASE_IMAGE }}:latest
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache,mode=max
+
+  build-devx:
+    runs-on: ubuntu-latest
+    needs: build-base
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile.devx
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ github.sha }}
+          tags: |
+            ${{ env.DEVX_IMAGE }}:latest
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache,mode=max

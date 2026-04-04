@@ -3,7 +3,9 @@ permissions:
   contents: read
 
 on:
-  pull_request:
+  # Disabled: hardcoded github.repository == 'chatwoot/chatwoot' check, never runs on fork
+  # pull_request:
+  workflow_dispatch:
 
 # If two pushes happen within a short time in the same PR, cancel the run of the oldest push
 concurrency:

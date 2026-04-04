@@ -5,8 +5,9 @@
 name: 'Lock Threads'
 
 on:
-  schedule:
-    - cron: '0 * * * *'
+  # Disabled: hardcoded github.repository == 'chatwoot/chatwoot' check, never runs on fork
+  # schedule:
+  #   - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:

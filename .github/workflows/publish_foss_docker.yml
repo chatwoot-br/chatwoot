@@ -7,12 +7,14 @@
 name: Publish Chatwoot CE docker images
 
 on:
-  push:
-    branches:
-      - develop
-      - master
-    tags:
-      - v*
+  # Disabled: publishes to Docker Hub chatwoot/chatwoot, requires upstream secrets
+  # push:
+  #   branches:
+  #     - develop
+  #     - master
+  #   tags:
+  #     - v*
+  workflow_dispatch:
   workflow_dispatch:
 
 env:
