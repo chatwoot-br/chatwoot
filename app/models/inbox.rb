@@ -245,7 +245,7 @@ class Inbox < ApplicationRecord
   def enable_lock_to_single_conversation_for_whatsapp_web
     return unless channel.is_a?(Channel::Whatsapp) && channel.whatsapp_web?
 
-    update_column(:lock_to_single_conversation, true)
+    update(lock_to_single_conversation: true)
   end
 
   def check_channel_type?

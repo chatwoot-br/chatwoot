@@ -720,7 +720,12 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
   def parse_timestamp(timestamp_str)
     return Time.current if timestamp_str.blank?
 
-    Time.zone.parse(timestamp_str)
+    # GoWA sends Unix epoch seconds (e.g. "1712345678")
+    if timestamp_str.to_s.match?(/\A\d+\z/)
+      Time.zone.at(timestamp_str.to_i)
+    else
+      Time.zone.parse(timestamp_str)
+    end
   rescue ArgumentError
     Time.current
   end
@@ -1091,11 +1096,10 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
     case media_type.downcase
     when 'image' then payload[:image] = media_obj
-    when 'video' then payload[:video] = media_obj
+    when 'video', 'video_note' then payload[:video] = media_obj
     when 'audio' then payload[:audio] = media_obj
     when 'document' then payload[:document] = media_obj
     when 'sticker' then payload[:sticker] = media_obj
-    when 'video_note' then payload[:video] = media_obj # PTV messages are video
     end
   end
 

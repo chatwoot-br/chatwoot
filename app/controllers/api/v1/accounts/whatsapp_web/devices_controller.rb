@@ -113,7 +113,8 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     @inbox = Current.account.inboxes.find_by(id: params[:id])
 
     if @inbox
-      validate_whatsapp_web_inbox
+      return validate_whatsapp_web_inbox unless valid_whatsapp_web_inbox?
+
       @device_id = @inbox.channel.provider_config['device_id']
     else
       # Pre-inbox setup: params[:id] is the device_id directly
@@ -121,10 +122,12 @@ class Api::V1::Accounts::WhatsappWeb::DevicesController < Api::V1::Accounts::Bas
     end
   end
 
-  def validate_whatsapp_web_inbox
+  def valid_whatsapp_web_inbox?
     channel = @inbox.channel
-    return if channel.is_a?(Channel::Whatsapp) && channel.provider == Channel::Whatsapp::WHATSAPP_WEB_PROVIDER
+    channel.is_a?(Channel::Whatsapp) && channel.provider == Channel::Whatsapp::WHATSAPP_WEB_PROVIDER
+  end
 
+  def validate_whatsapp_web_inbox
     render json: {
       success: false,
       error: 'Inbox is not a WhatsApp Web channel'

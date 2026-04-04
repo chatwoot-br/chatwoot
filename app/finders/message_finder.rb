@@ -36,7 +36,8 @@ class MessageFinder
     # Find the created_at of the reference message to paginate correctly
     # This handles history-synced messages that have higher IDs but older timestamps
     reference_message = @conversation.messages.find_by(id: after_id)
-    return messages.reorder('created_at asc').limit(100) unless reference_message
+    # Fall back to ID-based query if reference message was deleted (original upstream behavior)
+    return messages.reorder('created_at asc').where('id > ?', after_id).limit(100) unless reference_message
 
     messages.reorder('created_at asc')
             .where('created_at > ? OR (created_at = ? AND id > ?)',
