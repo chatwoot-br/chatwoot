@@ -377,8 +377,8 @@ class Whatsapp::IncomingMessageWhatsappWebService < Whatsapp::IncomingMessageBas
 
   # Override to handle outgoing messages and group sender info
   # Also check for duplicate messages by source_id to prevent race conditions
-  def create_message(message)
-    source_id = message[:id].to_s
+  def create_message(message, source_id: nil)
+    source_id = (source_id || message[:id]).to_s
     existing_message = inbox.messages.find_by(source_id: source_id)
 
     if existing_message
