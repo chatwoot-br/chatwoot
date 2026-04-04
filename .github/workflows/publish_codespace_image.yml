@@ -8,36 +8,71 @@ on:
       - '.github/workflows/publish_codespace_image.yml'
   workflow_dispatch:
 
+concurrency:
+  group: devcontainer-build
+  cancel-in-progress: false
+
 env:
-  REGISTRY: ghcr.io
   BASE_IMAGE: ghcr.io/chatwoot-br/chatwoot_codespace
   DEVX_IMAGE: ghcr.io/chatwoot-br/chatwoot_codespace_devx
 
 jobs:
-  build-base:
+  # ── Hetzner Cloud runners ──────────────────────────────────────────
+  create-runner-amd:
+    name: Create Hetzner Cloud AMD runner
     runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.create-hcloud-runner.outputs.label }}
+      server_id: ${{ steps.create-hcloud-runner.outputs.server_id }}
+    steps:
+      - name: Create runner
+        id: create-hcloud-runner
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cx53
+          location: hel1
+          image: docker-ce
+
+  create-runner-arm:
+    name: Create Hetzner Cloud ARM runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.create-hcloud-runner.outputs.label }}
+      server_id: ${{ steps.create-hcloud-runner.outputs.server_id }}
+    steps:
+      - name: Create runner
+        id: create-hcloud-runner
+        uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: create
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          server_type: cax41
+          location: hel1
+          image: docker-ce
+
+  # ── Base image builds ──────────────────────────────────────────────
+  build-base-amd:
+    needs: create-runner-amd
+    runs-on: ${{ needs.create-runner-amd.outputs.label }}
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-qemu-action@v3
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile.base
-          platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
             VARIANT=ubuntu-22.04
@@ -46,41 +81,164 @@ jobs:
             USER_UID=1000
             USER_GID=1000
           tags: |
-            ${{ env.BASE_IMAGE }}:latest
-            ${{ env.BASE_IMAGE }}:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.BASE_IMAGE }}:buildcache,mode=max
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-amd
 
-  build-devx:
-    runs-on: ubuntu-latest
-    needs: build-base
+  build-base-arm:
+    needs: create-runner-arm
+    runs-on: ${{ needs.create-runner-arm.outputs.label }}
     permissions:
       contents: read
       packages: write
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-qemu-action@v3
-
       - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile.base
+          push: true
+          build-args: |
+            VARIANT=ubuntu-22.04
+            NODE_VERSION=24.14.1
+            RUBY_VERSION=3.4.4
+            USER_UID=1000
+            USER_GID=1000
+          tags: |
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-arm
 
+  merge-base-manifest:
+    needs: [build-base-amd, build-base-arm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Create base image manifests
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.BASE_IMAGE }}:${{ github.sha }} \
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-amd \
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-arm
+          docker buildx imagetools create \
+            -t ${{ env.BASE_IMAGE }}:latest \
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-amd \
+            ${{ env.BASE_IMAGE }}:${{ github.sha }}-arm
+
+  # ── Devx image builds (depends on base) ────────────────────────────
+  build-devx-amd:
+    needs: [create-runner-amd, merge-base-manifest]
+    runs-on: ${{ needs.create-runner-amd.outputs.label }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: .devcontainer/Dockerfile.devx
-          platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ github.sha }}
+            BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ github.sha }}-amd
           tags: |
-            ${{ env.DEVX_IMAGE }}:latest
-            ${{ env.DEVX_IMAGE }}:${{ github.sha }}
-          cache-from: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.DEVX_IMAGE }}:buildcache,mode=max
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-amd
+
+  build-devx-arm:
+    needs: [create-runner-arm, merge-base-manifest]
+    runs-on: ${{ needs.create-runner-arm.outputs.label }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile.devx
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}:${{ github.sha }}-arm
+          tags: |
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-arm
+
+  merge-devx-manifest:
+    needs: [build-devx-amd, build-devx-arm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Create devx image manifests
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.DEVX_IMAGE }}:${{ github.sha }} \
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-amd \
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-arm
+          docker buildx imagetools create \
+            -t ${{ env.DEVX_IMAGE }}:latest \
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-amd \
+            ${{ env.DEVX_IMAGE }}:${{ github.sha }}-arm
+
+  # ── Runner cleanup (always runs) ───────────────────────────────────
+  delete-runner-amd:
+    name: Delete Hetzner Cloud AMD runner
+    needs:
+      - create-runner-amd
+      - build-base-amd
+      - build-devx-amd
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: delete
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          name: ${{ needs.create-runner-amd.outputs.label }}
+          server_id: ${{ needs.create-runner-amd.outputs.server_id }}
+
+  delete-runner-arm:
+    name: Delete Hetzner Cloud ARM runner
+    needs:
+      - create-runner-arm
+      - build-base-arm
+      - build-devx-arm
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - uses: Cyclenerd/hcloud-github-runner@v1
+        with:
+          mode: delete
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          hcloud_token: ${{ secrets.HCLOUD_TOKEN }}
+          name: ${{ needs.create-runner-arm.outputs.label }}
+          server_id: ${{ needs.create-runner-arm.outputs.server_id }}
