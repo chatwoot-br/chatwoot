@@ -20,6 +20,7 @@
     "source=${localWorkspaceFolder}/../.local/state,target=/home/vscode/.local/state,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/../.claude-mem,target=/home/vscode/.claude-mem,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/../.codex,target=/home/vscode/.codex,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/../.agents,target=/home/vscode/.agents,type=bind,consistency=cached",
     "source=${localWorkspaceFolder}/../notebook,target=/workspace/notebook,type=bind,consistency=cached"
   ],
 
@@ -33,7 +34,8 @@
     "SHELL": "/usr/bin/bash",
     "TERM": "xterm-ghostty",
     "EDITOR": "nvim",
-    "VISUAL": "nvim"
+    "VISUAL": "nvim",
+    "AGENT_BROWSER_EXECUTABLE_PATH": "/opt/google/chrome/chrome"
   },
 
   "forwardPorts": [8025, 3000, 3036, 4000, 37777],

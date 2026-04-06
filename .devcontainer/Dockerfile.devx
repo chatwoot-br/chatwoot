@@ -121,7 +121,7 @@ RUN mkdir -p /home/$USERNAME/.local/share /home/$USERNAME/.local/state \
     && chown -R $USERNAME:$USERNAME /home/$USERNAME/.local
 
 # Global npm tools
-RUN npm install -g @anthropic-ai/claude-code \
+RUN npm install -g @anthropic-ai/claude-code agent-browser \
     && npm cache clean --force
 
 # Switch to vscode user
@@ -133,8 +133,9 @@ ARG BUN_VERSION=1.2.17
 RUN curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
 
 # Git config for delta
-RUN git config --global core.pager delta && \
+# side-by-side lives only in the "terminal" feature so lazygit can use plain delta without it
+RUN git config --global core.pager "delta --features terminal" && \
     git config --global interactive.diffFilter "delta --color-only" && \
     git config --global delta.navigate true && \
-    git config --global delta.side-by-side true && \
-    git config --global merge.conflictstyle zdiff3
+    git config --global merge.conflictstyle zdiff3 && \
+    printf '[delta "terminal"]\n    side-by-side = true\n' >> ~/.gitconfig

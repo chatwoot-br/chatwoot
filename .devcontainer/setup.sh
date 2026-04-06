@@ -6,7 +6,7 @@ warn() { printf '[setup:%s] WARN: %s\n' "$1" "$2" >&2; }
 case "$1" in
   init)
     # Runs on host before container creation — ensure bind mount sources exist
-    for dir in .claude .config .local/share .local/state .claude-mem .codex notebook; do
+    for dir in .claude .config .local/share .local/state .claude-mem .codex .agents notebook; do
       mkdir -p "${LOCAL_WORKSPACE_FOLDER}/../${dir}"
     done
 
@@ -63,6 +63,13 @@ case "$1" in
     if ! command -v codex &>/dev/null; then
       log create "Installing Codex CLI"
       npm install --prefix ~/.local -g @openai/codex || warn create "Codex CLI install failed"
+    fi
+
+    # agent-browser skills for Claude Code (~/.agents is bind-mounted, persists)
+    if [ ! -f ~/.agents/.skill-lock.json ]; then
+      log create "Installing agent-browser skills"
+      npx -y skills@1.4.9 add vercel-labs/agent-browser --skill agent-browser -g -y || warn create "agent-browser skill install failed"
+      npx -y skills@1.4.9 add vercel-labs/agent-browser --skill dogfood -g -y || warn create "dogfood skill install failed"
     fi
 
     # LazyVim (bootstrap starter config if not already present)
