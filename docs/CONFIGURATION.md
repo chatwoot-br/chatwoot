@@ -428,7 +428,8 @@ integrations that call OpenAI directly.
 
 | Model key | Provider | Feature |
 |---|---|---|
-| `gpt-4.1`, `gpt-4.1-nano` | OpenAI | editor, assistant, copilot, label_suggestion |
+| `gpt-4.1` | OpenAI | editor, assistant, copilot, label_suggestion |
+| `gpt-4.1-nano` | OpenAI | editor, label_suggestion |
 | `gpt-4.1-mini` | OpenAI | editor, label_suggestion |
 | `gpt-5.1`, `gpt-5.2`, `gpt-5-mini`, `gpt-5-nano` | OpenAI | assistant, copilot |
 | `claude-haiku-4.5`, `claude-sonnet-4.5` | Anthropic | assistant, copilot _(coming soon)_ |

@@ -15,7 +15,7 @@ This guide is for engineers joining the **Chatwoot BR fork**. It covers running 
 | VS Code with Dev Containers extension | any | Or use the `devcontainer` CLI |
 | `git` | any | For cloning |
 
-`Dockerfile.devx` adds `libvips42` on top of `Dockerfile.base`, which provides Ruby 3.4.4, Node.js 24.x, pnpm 10.x, `overmind`, and `bundler`. You do not need to install any of these on your host.
+`Dockerfile.base` provides Ruby 3.4.4, Node.js 24.x, pnpm 10.x, `overmind`, and `bundler`. `Dockerfile.devx` layers on `libvips42` (image processing) and developer tooling (Fish, Neovim, lazygit, git-delta, Playwright). You do not need to install any of these on your host.
 
 ### Bare-metal path
 

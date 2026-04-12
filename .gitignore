@@ -106,3 +106,5 @@ CLAUDE.local.md
 local/
 Procfile.worktree
 .codex
+.planning/tmp
+

@@ -38,7 +38,7 @@
                                              │ enqueue
                           ┌──────────────────▼────────────────────────┐
                           │           Sidekiq Workers                  │
-                          │  (queues: default, low, mailers, webhooks) │
+                          │  (queues: default, medium, low, mailers)    │
                           └──────────────────┬────────────────────────┘
                                              │
                           ┌──────────────────▼────────────────────────┐

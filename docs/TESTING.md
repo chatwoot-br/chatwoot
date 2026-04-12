@@ -43,7 +43,7 @@ spec/
 │   ├── messages.rb
 │   ├── users.rb
 │   └── channel/
-│       └── channel_whatsapp.rb  (handles whatsapp_web via traits)
+│       └── channel_whatsapp.rb  (handles whatsapp_web via provider conditional)
 │       ├── channel_widget.rb
 │       └── ...
 ├── fixtures/             # File fixtures (CSVs, images, binary assets)
